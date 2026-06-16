@@ -3,10 +3,31 @@ body { margin: 0; font: 13px/1.45 -apple-system, Segoe UI, Roboto, sans-serif; c
 header { display: flex; align-items: baseline; gap: 14px; padding: 10px 16px; background: #1f324d; color: #fff; }
 header h1 { font-size: 17px; margin: 0; font-weight: 600; }
 .universe { font-size: 12px; background: #2e6f95; padding: 2px 8px; border-radius: 10px; }
-#search { margin-left: 18px; width: 280px; padding: 5px 9px; border: 0; border-radius: 5px; font-size: 13px; }
+#search { margin-left: 18px; width: 260px; padding: 5px 9px; border: 0; border-radius: 5px; font-size: 13px; }
+#layoutctl { margin-left: 12px; display: inline-flex; gap: 2px; }
+#layoutctl button { font-size: 14px; line-height: 1; border: 1px solid #3a4a63; background: #2a3b54; color: #cdd6dd; cursor: pointer; border-radius: 4px; padding: 3px 7px; }
+#layoutctl button.active { background: #2e6f95; color: #fff; border-color: #2e6f95; }
+#layoutctl button[data-mode="bottom"] { transform: rotate(90deg); }
+#help-btn { margin-left: 12px; width: 24px; height: 24px; border-radius: 50%; border: 1px solid #3a4a63; background: #2a3b54; color: #fff; cursor: pointer; font-weight: 700; }
+#help-btn:hover { background: #2e6f95; }
 .count { margin-left: auto; font-size: 12px; opacity: .85; }
 
-#layout { display: flex; height: calc(100vh - 41px); }
+#help { position: fixed; inset: 0; background: rgba(20,28,40,.55); display: flex; align-items: center; justify-content: center; z-index: 80; }
+#help.hidden { display: none; }
+.help-card { background: #fff; border-radius: 10px; width: 88vw; max-width: 760px; max-height: 86vh; overflow: auto; padding: 20px 26px; position: relative; }
+.help-card h2 { margin: 0 0 6px; color: #1f324d; }
+.help-card h3 { margin: 16px 0 4px; color: #2e6f95; font-size: 13px; text-transform: uppercase; letter-spacing: .03em; border-bottom: 1px solid #eef2f5; padding-bottom: 3px; }
+.help-intro { color: #5b6670; font-size: 13px; margin: 0 0 6px; }
+.help-card dl { margin: 0; }
+.help-card dt { font-weight: 700; color: #1f324d; margin-top: 7px; }
+.help-card dd { margin: 1px 0 0; color: #34404d; font-size: 13px; line-height: 1.5; }
+.help-card code { background: #eef2f5; padding: 0 4px; border-radius: 3px; }
+#help-close { position: absolute; top: 8px; right: 12px; font-size: 22px; border: 0; background: none; cursor: pointer; color: #5b6670; }
+
+#layout { display: flex; height: calc(100vh - 41px); width: 100%; }
+/* docked preview reflows the page so the table stays fully visible */
+body.deepopen-right #layout { width: calc(100% - 46vw); }
+body.deepopen-bottom #layout { height: calc(100vh - 41px - 48vh); }
 #config { width: 290px; overflow-y: auto; padding: 10px 12px; background: #fff; border-right: 1px solid #dde3e8; }
 #config h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: #5b6670; margin: 4px 0 10px; }
 fieldset { border: 1px solid #e3e8ec; border-radius: 6px; margin: 0 0 10px; padding: 6px 9px 9px; }
@@ -45,10 +66,24 @@ tbody tr:hover { background: #eaf3f8; }
 .motif-chip { font-size: 10px; padding: 0 4px; border-radius: 3px; color: #fff; margin-right: 2px; }
 .num { font-variant-numeric: tabular-nums; text-align: right; }
 
-#deep { position: fixed; inset: 0; background: rgba(20,28,40,.55); display: flex; align-items: center; justify-content: center; z-index: 50; }
-#deep.hidden { display: none; }
-.deep-card { background: #fff; border-radius: 8px; width: 92vw; max-width: 1150px; height: 88vh; padding: 14px 18px; position: relative; overflow: auto; }
-#deep-close { position: absolute; top: 8px; right: 12px; font-size: 24px; border: 0; background: none; cursor: pointer; color: #5b6670; }
+#deep.hidden { display: none !important; }
+/* modal (default) */
+#deep.mode-modal { position: fixed; inset: 0; background: rgba(20,28,40,.55); display: flex; align-items: center; justify-content: center; z-index: 50; }
+#deep.mode-modal .deep-card { width: 92vw; max-width: 1150px; height: 88vh; border-radius: 8px; }
+/* dock right */
+#deep.mode-right { position: fixed; top: 41px; right: 0; bottom: 0; width: 46vw; z-index: 50; }
+#deep.mode-right .deep-card { width: 100%; height: 100%; border-radius: 0; box-shadow: -4px 0 24px rgba(0,0,0,.25); }
+/* dock bottom */
+#deep.mode-bottom { position: fixed; left: 0; right: 0; bottom: 0; height: 48vh; z-index: 50; }
+#deep.mode-bottom .deep-card { width: 100%; height: 100%; border-radius: 0; box-shadow: 0 -4px 24px rgba(0,0,0,.25); }
+#deep.mode-right .deep-body, #deep.mode-bottom .deep-body { grid-template-columns: 1fr; }
+#deep.mode-right #viewer3d, #deep.mode-bottom #viewer3d { grid-row: auto; height: 300px; }
+.deep-card { background: #fff; padding: 14px 18px; position: relative; overflow: auto; }
+.deep-tools { position: absolute; top: 8px; right: 10px; display: flex; gap: 2px; z-index: 2; }
+.deep-tools button { font-size: 16px; line-height: 1; border: 1px solid #dde3e8; background: #f4f6f8; cursor: pointer; color: #5b6670; border-radius: 4px; padding: 3px 7px; }
+.deep-tools button:hover { background: #eaf3f8; }
+.deep-tools button[data-mode="bottom"] { transform: rotate(90deg); }
+#deep-close { font-size: 18px; }
 #deep-title { margin: 0 0 8px; font-size: 16px; }
 .deep-body { display: grid; grid-template-columns: 1.1fr 1fr; grid-template-rows: auto auto; gap: 12px; }
 #viewer3d { position: relative; width: 100%; height: 420px; background: #0d1117; border-radius: 6px; grid-row: span 2; }

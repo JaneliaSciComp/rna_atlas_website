@@ -16,6 +16,7 @@ import csv
 import json
 import os
 import re
+import string
 from collections import defaultdict
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -23,9 +24,123 @@ try:
     _CFG = json.load(open(os.path.join(ROOT, "config.json")))
     EXP_DEFAULT = _CFG["mined_dir"]
     PARQ_TMPL = _CFG.get("metadata_parquet", "")
+    STRUCT_BASES = _CFG.get("struct_bases", {})
+    ANNOT = _CFG.get("annotation_manifest", "")
+    REACT_OVERRIDE = _CFG.get("react_override", "")
 except Exception:
     EXP_DEFAULT = ""
     PARQ_TMPL = ""
+    STRUCT_BASES = {}
+    ANNOT = ""
+    REACT_OVERRIDE = ""
+
+PAIR_CHARS = set("()[]{}<>") | set(string.ascii_letters)
+
+
+def struct_path(sid):
+    lib = sid.split("-")[1].replace("ribonanza2", "").upper()
+    base = STRUCT_BASES.get("AE" if lib in "ABCDE" else "FGH", "")
+    return os.path.join(base, sid + ".cif") if base else ""
+
+
+def contact_ratio(path):
+    """C1'-C1' globularity proxy: pairs within 8 A, sequence separation >=6, / length."""
+    import gemmi
+    import numpy as np
+    st = gemmi.read_structure(path)
+    pts = []
+    for r in st[0][0]:
+        for atom in r:
+            if atom.name in ("C1'", "C1*"):
+                pts.append([atom.pos.x, atom.pos.y, atom.pos.z]); break
+    n = len(pts)
+    if n < 2:
+        return None
+    P = np.asarray(pts)
+    D = np.sqrt(((P[:, None, :] - P[None, :, :]) ** 2).sum(-1))
+    idx = np.arange(n)
+    sep = np.abs(idx[:, None] - idx[None, :])
+    mask = np.triu((D <= 8.0) & (sep >= 6), 1)
+    return round(int(mask.sum()) / n, 4)
+
+
+def load_contact_ratios(sel):
+    try:
+        import gemmi  # noqa: F401
+    except Exception as e:
+        print(f"  contact_ratio skipped (no gemmi): {e}")
+        return {}
+    out = {}
+    for sid in sel:
+        p = struct_path(sid)
+        if p and os.path.exists(p):
+            try:
+                v = contact_ratio(p)
+                if v is not None:
+                    out[sid] = v
+            except Exception:
+                pass
+    return out
+
+
+def load_manifest(sel):
+    """From the annotation manifest: base-paired fraction (fold-rep dbn via global_fold_id),
+    and fold-level novelty (best_tm1_v341 / best_v341) for every fold."""
+    if not ANNOT or not os.path.exists(ANNOT):
+        print("  manifest annotations skipped (no annotation_manifest)")
+        return {}, {}, {}
+    import pyarrow.parquet as pq
+    t = pq.read_table(ANNOT, columns=["seq_id", "global_fold_id", "is_fold_rep", "dbn",
+                                       "best_tm1_v341", "best_v341"]).to_pydict()
+    rep_dbn, mem_gf = {}, {}
+    tm, near = {}, {}
+    for i, sid in enumerate(t["seq_id"]):
+        gf, isrep, dbn = t["global_fold_id"][i], t["is_fold_rep"][i], t["dbn"][i]
+        if str(isrep) in ("1", "True", "true") and dbn:
+            rep_dbn[gf] = dbn
+        mem_gf[sid] = gf
+        v = fl(t["best_tm1_v341"][i])
+        if v is not None:
+            tm[sid], near[sid] = v, (t["best_v341"][i] or "")
+    bp = {}
+    for sid in sel:
+        dbn = rep_dbn.get(mem_gf.get(sid))
+        if dbn:
+            bp[sid] = round(sum(c in PAIR_CHARS for c in dbn) / len(dbn), 4)
+    return bp, tm, near
+
+
+def regate_fgh(sel, spans, react_parquet):
+    """Recompute F-H mean tertiary 2A3 protection from the full design-aligned chemmap parquet."""
+    fgh = [s for s in sel if s.split("-")[1].replace("ribonanza2", "").upper() not in "ABCDE"]
+    if not fgh or not react_parquet or not os.path.exists(react_parquet):
+        return {}
+    import pyarrow.parquet as pq
+    import numpy as np
+    t = pq.read_table(react_parquet, columns=["sequence_id", "reactivity_2A3"],
+                      filters=[("sequence_id", "in", fgh)]).to_pydict()
+    react = {s: t["reactivity_2A3"][i] for i, s in enumerate(t["sequence_id"])}
+    out = {}
+    for sid in fgh:
+        arr = react.get(sid)
+        if arr is None:
+            continue
+        a = np.asarray(arr, float)
+        valid = a[~np.isnan(a)]
+        if valid.size == 0:
+            continue
+        bg = float(np.median(valid))
+        provals = []
+        for mtype, resstr in spans.get(sid, []):
+            if mtype not in TERT:
+                continue
+            ds = [d for rng in parse_residues(resstr) for d in range(rng[0], rng[1] + 1)]
+            vals = [a[d - 1] for d in ds if 0 <= d - 1 < len(a) and not np.isnan(a[d - 1])]
+            if vals:
+                provals.append(bg - float(np.mean(vals)))
+        if provals:
+            out[sid] = round(sum(provals) / len(provals), 4)
+    return out
 
 TERT = {"A_MINOR", "TL_RECEPTOR", "UA_HANDLE", "T_LOOP", "GA_MINOR", "PLATFORM",
         "TANDEM_GA_SHEARED", "TANDEM_GA_WATSON_CRICK", "TETRALOOP_TL_RECEPTOR"}
@@ -172,6 +287,14 @@ def main():
             names.setdefault(r["seq_id"], r.get("human_name", ""))
     # derive names for the rest from sublibrary + source_id
     src_ids = load_source_ids(sel)
+    # structuredness metrics + manifest novelty (best_tm1 for all folds)
+    contact = load_contact_ratios(sel)
+    bpfrac, tm_manifest, near_manifest = load_manifest(sel)
+    for sid in sel:
+        if sid not in novelty and sid in tm_manifest:
+            novelty[sid] = {"best_tm1": tm_manifest[sid], "near": near_manifest.get(sid, "")}
+    # re-gate F-H SHAPE from the full design-aligned chemmap parquet
+    fgh_prot = regate_fgh(sel, spans, REACT_OVERRIDE)
 
     folds = []
     for sid, s in sel.items():
@@ -180,7 +303,7 @@ def main():
         sh = short.get(sid, {})
         nv = novelty.get(sid, {})
         r2a3 = fl(md.get("r_2a3_ispaired"))
-        mp = mean_prot.get(sid)
+        mp = fgh_prot[sid] if sid in fgh_prot else mean_prot.get(sid)
         # SHAPE-supported: per-residue protection>0 (any letter) OR fold pairing agreement r2a3<-0.2
         shape_ok = 1 if ((mp is not None and mp > 0) or (r2a3 is not None and r2a3 < -0.2)) else 0
         length = md.get("length") or len(s.get("design_sequence", ""))
@@ -199,6 +322,8 @@ def main():
             "motifs": sorted(a["motifs"]),
             "pseudoknot": 1 if md.get("pseudoknot") == "1" else 0,
             "ss_class": md.get("ss_class", ""),
+            "contact_ratio": contact.get(sid),
+            "bp_fraction": bpfrac.get(sid),
             "r2a3": r2a3,
             "mean_prot_2a3": mp if mp is not None else fl(sh.get("mean_prot_2a3")),
             "shape_ok": shape_ok,
@@ -220,7 +345,9 @@ def main():
 
     n_tm = sum(1 for r in folds if r["best_tm1"] is not None)
     n_sh = sum(1 for r in folds if r["shape_ok"])
-    print(f"folds.json: {len(folds)} folds  ({n_sh} SHAPE-supported, {n_tm} with continuous best_tm1)")
+    n_cr = sum(1 for r in folds if r["contact_ratio"] is not None)
+    n_bp = sum(1 for r in folds if r["bp_fraction"] is not None)
+    print(f"folds.json: {len(folds)} folds  ({n_sh} SHAPE-supported, {n_tm} best_tm1, {n_cr} contact_ratio, {n_bp} bp_fraction)")
     print(f"motifs.json: {len(spans)} folds with motif spans  (structure paths resolved at serve time via config.json)")
 
 

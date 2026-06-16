@@ -21,6 +21,12 @@
   <h1>RNA Atlas Explorer</h1>
   <span id="universe" class="universe">curated set</span>
   <input id="search" type="search" placeholder="search id · name · sublibrary…" autocomplete="off">
+  <span id="layoutctl" title="preview panel layout">
+    <button data-mode="modal" title="Centered window">&#9744;</button>
+    <button data-mode="right" title="Dock right">&#9707;</button>
+    <button data-mode="bottom" title="Dock bottom">&#9707;</button>
+  </span>
+  <button id="help-btn" title="What do the filters & metrics mean?">?</button>
   <span id="count" class="count"></span>
 </header>
 
@@ -54,6 +60,12 @@
     </fieldset>
 
     <fieldset>
+      <legend>Structure</legend>
+      <div class="row"><label>compactness &ge;</label><input type="range" id="cr_min" min="0" max="5" value="0" step="0.05"><span id="cr_min_v">0</span></div>
+      <div class="row"><label>paired frac &ge;</label><input type="range" id="bp_min" min="0" max="1" value="0" step="0.01"><span id="bp_min_v">0.00</span></div>
+    </fieldset>
+
+    <fieldset>
       <legend>Motifs</legend>
       <label class="chk"><input type="checkbox" id="req_tert"> require &ge;1 tertiary motif</label>
       <label class="chk"><input type="checkbox" id="req_rare"> require a rare tertiary motif</label>
@@ -75,9 +87,16 @@
         <option value="plddt:desc">pLDDT</option>
         <option value="length:desc">length (large first)</option>
         <option value="n_rare:desc">rare motifs</option>
+        <option value="contact_ratio:desc">compactness</option>
+        <option value="bp_fraction:desc">base-paired fraction</option>
       </select>
       <div class="row"><label>top-N</label><input type="number" id="topn" value="200" min="1"></div>
       <label class="chk"><input type="checkbox" id="per_letter"> top-N per letter</label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Display</legend>
+      <label class="chk"><input type="checkbox" id="alt_palette" checked> base colors: A gold · C green · G red · U blue</label>
     </fieldset>
 
     <button id="reset">Reset</button>
@@ -91,9 +110,71 @@
   </main>
 </div>
 
-<div id="deep" class="hidden">
+<div id="help" class="hidden">
+  <div class="help-card">
+    <button id="help-close" title="Close">&times;</button>
+    <h2>Filters &amp; metrics</h2>
+    <p class="help-intro">Every fold in the curated distillation set (7,757) is a redundancy-reduced cluster
+      representative that is novel vs the v341 PDB training set. All filtering happens live in your browser;
+      settings persist across reloads.</p>
+
+    <h3>Identity &amp; size</h3>
+    <dl>
+      <dt>Search</dt><dd>Matches the <b>seq_id</b>, the human-readable <b>name</b>, or the <b>sublibrary</b>.</dd>
+      <dt>Length</dt><dd>Design-region length in nucleotides (excludes the fixed primer/barcode padding).</dd>
+      <dt>Source / letter</dt><dd><b>A–E</b> = synthetic designs (gRNAde, UW, RNAMake). <b>F–H</b> = natural RNAs (RNAcentral). Per-library checkboxes.</dd>
+    </dl>
+
+    <h3>Confidence</h3>
+    <dl>
+      <dt>pLDDT</dt><dd>Model confidence, 0–100; higher = more confident. The pool bar is pLDDT&gt;85.</dd>
+      <dt>clashscore</dt><dd>Steric clashes per 1000 atoms (Phenix); lower = cleaner geometry. Populated on curated reps.</dd>
+    </dl>
+
+    <h3>Novelty</h3>
+    <dl>
+      <dt>best_tm1</dt><dd>USalign <b>TM1 to the closest of the 2,243 v341 PDB-RNA chains</b>. <b>Lower = more novel</b> (≲0.45 novel, ≲0.40 clearly novel). Fold-level for the whole set; the deck candidates use a per-structure value.</dd>
+      <dt>nearest</dt><dd>The closest known PDB chain found for that TM1.</dd>
+      <dt>overlap_AE</dt><dd>For an F–H fold, the TM1 to its closest <b>A–E</b> fold — i.e. how structurally redundant it is across the natural/synthetic sets. Lower = more distinct.</dd>
+    </dl>
+
+    <h3>Chemical mapping (SHAPE/DMS)</h3>
+    <dl>
+      <dt>SHAPE</dt><dd><b>yes</b> = the fold's tertiary-motif residues are <i>protected</i> (mean 2A3 protection &gt; 0) or the fold's reactivity agrees with its predicted pairing (r(2A3) &lt; −0.2). <b>no</b> = reactivity exists but doesn't indicate protection. <b>n/d</b> = no usable protection signal (no tertiary motif to score, or no reactivity coverage) — the raw reactivity may still be viewable in the fold's deep view. A–E reactivity is read from the experiment HDF5s; F–H from the full design-aligned chemmap.</dd>
+      <dt>r(2A3)</dt><dd>Correlation of 2A3 reactivity with predicted base-pairing. <b>Negative</b> ⇒ paired positions are protected ⇒ supports the fold.</dd>
+    </dl>
+
+    <h3>Structure</h3>
+    <dl>
+      <dt>Compactness</dt><dd><b>C1′–C1′ contact ratio</b>: number of nucleotide pairs whose C1′ atoms are within 8 Å (sequence separation ≥ 6), divided by length. A globularity proxy (the RNA analog of the AlphaFold-DB Cα contact ratio). <b>Higher = more compact / globular</b>; an extended chain scores near 0.</dd>
+      <dt>Base-paired fraction</dt><dd>Fraction of positions that are paired in the fold's predicted secondary structure (dot-bracket). Higher = more structured. Computed on the fold representative.</dd>
+    </dl>
+
+    <h3>Motifs &amp; topology</h3>
+    <dl>
+      <dt>Motifs</dt><dd>Tertiary RNA motifs detected by Rosetta <code>rna_motif</code> (A-minor, TL-receptor, T-loop, U-turn, platform, …). Filter by "≥1 tertiary", "a rare tertiary", or specific types. <b>tert</b>/<b>rare</b> columns count them.</dd>
+      <dt>Pseudoknot</dt><dd>The predicted secondary structure contains crossed base pairs.</dd>
+    </dl>
+
+    <h3>Ranking &amp; display</h3>
+    <dl>
+      <dt>Ranking · top-N · per letter</dt><dd>Sort key (novelty, compactness, base-paired fraction, pLDDT, length, …) and how many rows to show — overall, or top-N within each library. Click any column header to sort by it.</dd>
+      <dt>Base colors</dt><dd>Toggle the sequence-strip nucleotide palette (A gold · C green · G red · U blue).</dd>
+    </dl>
+
+    <h3>Deep view (click any row)</h3>
+    <dl>
+      <dt>3D structure</dt><dd>Interactive cartoon colored by 2A3 reactivity (blue = protected → red = reactive); tertiary-motif residues shown as colored sticks. Dock it centered / right / bottom via the header layout buttons.</dd>
+      <dt>Tracks</dt><dd>Motif lanes · sequence · DMS · 2A3 reactivity, aligned on the design-sequence position axis.</dd>
+    </dl>
+  </div>
+</div>
+
+<div id="deep" class="hidden mode-modal">
   <div class="deep-card">
-    <button id="deep-close">&times;</button>
+    <div class="deep-tools">
+      <button id="deep-close" title="Close">&times;</button>
+    </div>
     <h2 id="deep-title"></h2>
     <div class="deep-body">
       <div id="viewer3d"></div>

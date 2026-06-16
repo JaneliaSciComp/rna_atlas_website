@@ -21,6 +21,9 @@ const MOTIF_COLORS = {
 const MOTIF_DEFAULT = "#9aa7b3";
 
 const NUC_COLORS = { A: "#4e9f3d", C: "#3d6cb9", G: "#e8a33d", U: "#c0504d", T: "#c0504d" };
+// alternate base palette (user-selectable): A gold, C forest green, G red, U blue
+const NUC_COLORS_ALT = { A: "#E8A317", C: "#2E7D32", G: "#D32F2F", U: "#1F6FB2", T: "#1F6FB2" };
+function nucColor(ch, alt) { return (alt ? NUC_COLORS_ALT : NUC_COLORS)[ch] || "#ccc"; }
 
 const TERT = new Set(["A_MINOR", "TL_RECEPTOR", "UA_HANDLE", "T_LOOP", "GA_MINOR",
   "PLATFORM", "TANDEM_GA_SHEARED", "TANDEM_GA_WATSON_CRICK", "TETRALOOP_TL_RECEPTOR"]);

@@ -107,10 +107,11 @@ def main():
     for sid in ids:
         bylib[sid.split("-")[1].replace("ribonanza2", "")].append(sid)
 
-    # F-H override parquet (read once)
+    # F-H override parquet — filter to our F-H ids (the full chemmap is ~6.9M rows / 2 GB)
     ovr = {}
-    if os.path.exists(REACT_OVERRIDE):
-        t = pq.read_table(REACT_OVERRIDE).to_pydict()
+    fgh_ids = [s for s in ids if s.split("-")[1].replace("ribonanza2", "").upper() not in "ABCDE"]
+    if fgh_ids and os.path.exists(REACT_OVERRIDE):
+        t = pq.read_table(REACT_OVERRIDE, filters=[("sequence_id", "in", fgh_ids)]).to_pydict()
         for i, s in enumerate(t["sequence_id"]):
             ovr[s] = (t["reactivity_DMS"][i], t["reactivity_2A3"][i])
 

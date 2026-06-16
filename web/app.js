@@ -25,7 +25,8 @@ const num = (x, d = 1) => (x === null || x === undefined || Number.isNaN(x)) ? "
 // --- persist filter settings across reloads ---
 const FKEY = "atlas_filters";
 const FIELD_IDS = ["search", "len_min", "len_max", "plddt_min", "clash_max", "tm_max", "tm_has",
-  "ov_max", "shape_ok", "r2a3_max", "req_tert", "req_rare", "pk", "rank_key", "topn", "per_letter"];
+  "ov_max", "shape_ok", "r2a3_max", "cr_min", "bp_min", "req_tert", "req_rare", "pk", "rank_key", "topn", "per_letter", "alt_palette"];
+const altPalette = () => !!($("alt_palette") && $("alt_palette").checked);
 function snapshot() {
   const s = {};
   FIELD_IDS.forEach((id) => { const el = $(id); if (el) s[id] = el.type === "checkbox" ? el.checked : el.value; });
@@ -90,6 +91,8 @@ async function boot() {
   MOTIF_SET = [...ms].sort();
   LETTERS = [...ls].sort();
   $("len_max").value = maxLen;
+  const maxCR = Math.max(1, ...FOLDS.map((f) => f.contact_ratio || 0));
+  $("cr_min").max = Math.ceil(maxCR * 20) / 20;
   buildMotifFilter();
   buildLetterFilter();
   wireControls();
@@ -119,18 +122,26 @@ function wireControls() {
     $("plddt_min").value = 0; $("clash_max").value = 9999; $("len_min").value = 0;
     $("len_max").value = Math.max(...FOLDS.map((f) => f.length || 0));
     ["shape_ok", "req_tert", "req_rare", "tm_has", "per_letter"].forEach((id) => $(id).checked = false);
+    $("cr_min").value = 0; $("bp_min").value = 0;
     $("pk").value = "any"; $("rank_key").value = "best_tm1:asc"; $("topn").value = 200;
     if ($("search")) $("search").value = "";
     sortOverride = null; localStorage.removeItem(FKEY); syncLabels(); render();
   });
   if ($("search")) $("search").addEventListener("input", () => { saveState(); render(); });
+  if ($("alt_palette")) $("alt_palette").addEventListener("change", () => { if (currentDeep) drawTracks(currentDeep.f, currentDeep.react); });
   // collapsible sections (click a legend) + collapse-all (click the panel heading)
   document.querySelectorAll("#config fieldset legend").forEach((lg) =>
     lg.addEventListener("click", () => { lg.parentElement.classList.toggle("collapsed"); saveState(); }));
   const h2 = document.querySelector("#config h2");
   if (h2) h2.addEventListener("click", () => { $("config").classList.toggle("allcollapsed"); saveState(); });
-  $("deep-close").addEventListener("click", () => $("deep").classList.add("hidden"));
-  $("deep").addEventListener("click", (e) => { if (e.target.id === "deep") $("deep").classList.add("hidden"); });
+  $("deep-close").addEventListener("click", closeDeep);
+  $("deep").addEventListener("click", (e) => { if (e.target.id === "deep") closeDeep(); });
+  document.querySelectorAll('#layoutctl button[data-mode]').forEach((b) =>
+    b.addEventListener("click", () => setDeepMode(b.dataset.mode)));
+  if ($("help-btn")) $("help-btn").addEventListener("click", () => $("help").classList.remove("hidden"));
+  if ($("help-close")) $("help-close").addEventListener("click", () => $("help").classList.add("hidden"));
+  $("help").addEventListener("click", (e) => { if (e.target.id === "help") $("help").classList.add("hidden"); });
+  updateLayout();
   syncLabels();
 }
 function syncLabels() {
@@ -138,6 +149,8 @@ function syncLabels() {
   $("tm_max_v").textContent = (+$("tm_max").value).toFixed(2);
   $("ov_max_v").textContent = (+$("ov_max").value).toFixed(2);
   $("r2a3_max_v").textContent = (+$("r2a3_max").value).toFixed(2);
+  $("cr_min_v").textContent = (+$("cr_min").value).toFixed(2);
+  $("bp_min_v").textContent = (+$("bp_min").value).toFixed(2);
 }
 
 function filters() {
@@ -150,6 +163,7 @@ function filters() {
     tmax: +$("tm_max").value, tmhas: $("tm_has").checked,
     ovmax: +$("ov_max").value,
     shape: $("shape_ok").checked, r2a3: +$("r2a3_max").value,
+    crmin: +$("cr_min").value, bpmin: +$("bp_min").value,
     tert: $("req_tert").checked, rare: $("req_rare").checked, motifs: mf,
     pk: $("pk").value, letters: new Set(lf),
     rank: $("rank_key").value, topn: +$("topn").value, perLetter: $("per_letter").checked,
@@ -167,6 +181,8 @@ function pass(f, c) {
   if (f.overlap_ae != null && f.overlap_ae > c.ovmax) return false;
   if (c.shape && !f.shape_ok) return false;
   if (f.r2a3 != null && f.r2a3 > c.r2a3) return false;
+  if (c.crmin > 0 && (f.contact_ratio == null || f.contact_ratio < c.crmin)) return false;
+  if (c.bpmin > 0 && (f.bp_fraction == null || f.bp_fraction < c.bpmin)) return false;
   if (c.tert && f.n_tert < 1) return false;
   if (c.rare && f.n_rare < 1) return false;
   if (c.motifs.length && !c.motifs.some((m) => (f.motifs || []).includes(m))) return false;
@@ -206,8 +222,8 @@ function render() {
 const COLS = [
   ["id", "seq_id"], ["name", "name"], ["letter", "L"], ["length", "len"], ["plddt", "pLDDT"],
   ["best_tm1", "best_tm1"], ["near", "nearest"], ["overlap_ae", "ovlp_AE"],
-  ["shape_ok", "SHAPE"], ["r2a3", "r(2A3)"], ["n_tert", "tert"], ["n_rare", "rare"],
-  ["pseudoknot", "PK"], ["motifs", "motifs"],
+  ["shape_ok", "SHAPE"], ["r2a3", "r(2A3)"], ["contact_ratio", "compact"], ["bp_fraction", "paired"],
+  ["n_tert", "tert"], ["n_rare", "rare"], ["pseudoknot", "PK"], ["motifs", "motifs"],
 ];
 
 function drawTable(rows) {
@@ -236,7 +252,8 @@ function drawTable(rows) {
       <td class="num">${f.length ?? ""}</td><td class="num">${plbar}</td>
       <td class="num">${num(f.best_tm1, 3)}</td><td>${f.near || ""}</td>
       <td class="num">${num(f.overlap_ae, 2)}</td><td>${shape}</td>
-      <td class="num">${num(f.r2a3, 2)}</td><td class="num">${f.n_tert}</td><td class="num">${f.n_rare}</td>
+      <td class="num">${num(f.r2a3, 2)}</td><td class="num">${num(f.contact_ratio, 2)}</td><td class="num">${num(f.bp_fraction, 2)}</td>
+      <td class="num">${f.n_tert}</td><td class="num">${f.n_rare}</td>
       <td>${f.pseudoknot ? "&#10003;" : ""}</td><td>${chips}</td></tr>`;
   }).join("");
   $("tbody").innerHTML = body;
@@ -248,16 +265,42 @@ function drawTable(rows) {
 const FBY = {};
 function foldById(id) { if (!FBY[id]) FOLDS.forEach((f) => FBY[f.id] = f); return FBY[id]; }
 
+function currentMode() { return localStorage.getItem("atlas_deepmode") || "modal"; }
+function updateLayout() {
+  const open = !$("deep").classList.contains("hidden");
+  const m = currentMode();
+  document.body.classList.remove("deepopen-right", "deepopen-bottom");
+  if (open && m === "right") document.body.classList.add("deepopen-right");
+  if (open && m === "bottom") document.body.classList.add("deepopen-bottom");
+  document.querySelectorAll('#layoutctl button[data-mode]').forEach((b) => b.classList.toggle("active", b.dataset.mode === m));
+}
+function setDeepMode(m) {
+  const d = $("deep");
+  d.classList.remove("mode-modal", "mode-right", "mode-bottom");
+  d.classList.add("mode-" + m);
+  localStorage.setItem("atlas_deepmode", m);
+  updateLayout();
+  if (viewer) { try { viewer.resize(); viewer.render(); } catch (e) {} }
+}
+function closeDeep() {
+  $("deep").classList.add("hidden");
+  updateLayout();
+  if (viewer) { try { viewer.resize(); } catch (e) {} }
+}
+
 async function openDeep(id) {
   const f = foldById(id);
   $("deep").classList.remove("hidden");
+  setDeepMode(currentMode());
   $("deep-title").textContent = `${id}${f.name ? "  —  " + f.name : ""}`;
   drawProps(f);
   let react = null;
   try { react = await (await fetch(durl("react/" + id + ".json"))).json(); } catch (e) { react = null; }
+  currentDeep = { f, react };
   drawTracks(f, react);
   load3D(id, react);
 }
+let currentDeep = null;
 
 function drawProps(f) {
   const verdict = f.best_tm1 == null ? "n/a (not scored vs v341)"
@@ -274,6 +317,8 @@ function drawProps(f) {
     ["OpenKnot score", num(f.openknot, 3)],
     ["Pseudoknot", f.pseudoknot ? "yes" : "no"],
     ["Secondary-structure class", f.ss_class],
+    ["Compactness (C1′ contact ratio)", num(f.contact_ratio, 3)],
+    ["Base-paired fraction", num(f.bp_fraction, 3)],
     ["Tertiary motifs", `${f.n_tert} (rare ${f.n_rare})`],
   ];
   const chips = (f.motifs || []).map((m) =>
@@ -323,7 +368,7 @@ function drawTracks(f, react) {
   // sequence
   for (let i = 0; i < n; i++) {
     const ch = seq[i] || "N";
-    svg += `<rect x="${i * cw}" y="${ySeq}" width="${cw - 0.5}" height="13" fill="${NUC_COLORS[ch] || "#ccc"}"/>`;
+    svg += `<rect x="${i * cw}" y="${ySeq}" width="${cw - 0.5}" height="13" fill="${nucColor(ch, altPalette())}"/>`;
     if (cw >= 10) svg += `<text x="${i * cw + cw / 2}" y="${ySeq + 10}" text-anchor="middle" fill="#fff">${ch}</text>`;
   }
   // reactivity rows

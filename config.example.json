@@ -1,0 +1,16 @@
+{
+  "mined_dir": "<path to lsf/20260612_rna_motif_chaitanya>",
+  "struct_bases": {
+    "AE": "<dir holding the A-E curated <seq_id>.cif files>",
+    "FGH": "<dir holding the F-H curated <seq_id>.cif files>"
+  },
+  "metadata_parquet": "<.../per_lib/Ribonanza2{L}.parquet>",
+  "react_override": "<.../summary/react_override_fgh40.parquet>",
+  "hdf5": {
+    "a": "<.../Ribonanza2A...hdf5>",
+    "b": "<.../Ribonanza2B...hdf5>",
+    "c": "<.../Ribonanza2C...hdf5>",
+    "d": "<.../Ribonanza2D...hdf5>",
+    "e": "<.../Ribonanza2E...hdf5>"
+  }
+}

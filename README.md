@@ -29,10 +29,21 @@ A tiny static server is required (browsers can't fetch the local structure/react
 ```
 config.json              # machine-specific absolute base paths — GITIGNORED, copy from config.example.json
 build_feature_table.py   # assembles data/*.json from the mined TSVs (run once / on update)
-serve.py                 # static server + lazy /struct/<id> and /react/<id> endpoints
-web/                     # index.html, app.js, style.css, viz_style.js (palette port), lib/3Dmol-min.js
+build_static.py          # exports dist/ (data + gz structs + react) for S3 hosting
+serve.py                 # local dev server: lazy /structs/<id>.cif and /react/<id>.json
+web/                     # index.html, app.js, style.css, viz_style.js, config.js, lib/3Dmol-min.js
 data/                    # folds.json (table), motifs.json (deep-view spans) — no absolute paths
+DEPLOY.md                # github.io shell + S3/CloudFront data + shared-token runbook
 ```
+
+## Hosting
+
+- **Local / internal:** `python serve.py` (reads structures + reactivity live from `/groups`; no gate).
+- **Shareable (off-network):** **shell + all data on one S3 prefix** (`s3://rnanix/atlas_explorer/`)
+  served via **CloudFront (HTTPS), gated by a single passcode**. `build_static.py` stages the whole
+  site into `dist/`; users open the CloudFront URL, enter the passcode (it becomes the `?t=` token a
+  CloudFront Function validates on data paths). Source code lives in a **private** git repo (version
+  control only — it does not serve the site). Full runbook in [DEPLOY.md](DEPLOY.md).
 
 ### config.json (not committed)
 

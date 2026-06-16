@@ -7,9 +7,20 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div id="gate" class="hidden">
+  <div class="gate-card">
+    <h2>RNA Atlas Explorer</h2>
+    <p class="gate-sub">Enter the access passcode.</p>
+    <input id="gate-input" type="password" autocomplete="off" placeholder="passcode">
+    <button id="gate-go">Enter</button>
+    <p id="gate-msg" class="gate-err"></p>
+  </div>
+</div>
+
 <header>
   <h1>RNA Atlas Explorer</h1>
   <span id="universe" class="universe">curated set</span>
+  <input id="search" type="search" placeholder="search id · name · sublibrary…" autocomplete="off">
   <span id="count" class="count"></span>
 </header>
 
@@ -93,6 +104,7 @@
 </div>
 
 <script src="lib/3Dmol-min.js"></script>
+<script src="config.js"></script>
 <script src="viz_style.js"></script>
 <script src="app.js"></script>
 </body>

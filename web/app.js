@@ -2,12 +2,84 @@
 let FOLDS = [], MOTIFS = {}, MOTIF_SET = [], LETTERS = [];
 let sortOverride = null;  // {key, dir} from header click
 
+// Data source: "" = same origin (local serve.py). Otherwise a CloudFront URL
+// fronting the S3 data, gated by a shared token (prompted once, kept in localStorage).
+const DATA_BASE = (window.DATA_BASE || "").replace(/\/$/, "");
+const GATED = !!window.GATED;
+function token() { return GATED ? (localStorage.getItem("atlas_token") || "") : ""; }
+function durl(path) {
+  const base = DATA_BASE ? `${DATA_BASE}/${path}` : path;
+  if (!GATED) return base;
+  const t = token();
+  return t ? `${base}${base.includes("?") ? "&" : "?"}t=${encodeURIComponent(t)}` : base;
+}
+async function getJSON(path) {
+  const r = await fetch(durl(path));
+  if (!r.ok) { const e = new Error("http " + r.status); e.status = r.status; throw e; }
+  return r.json();
+}
+
 const $ = (id) => document.getElementById(id);
 const num = (x, d = 1) => (x === null || x === undefined || Number.isNaN(x)) ? "" : (+x).toFixed(d);
 
+// --- persist filter settings across reloads ---
+const FKEY = "atlas_filters";
+const FIELD_IDS = ["search", "len_min", "len_max", "plddt_min", "clash_max", "tm_max", "tm_has",
+  "ov_max", "shape_ok", "r2a3_max", "req_tert", "req_rare", "pk", "rank_key", "topn", "per_letter"];
+function snapshot() {
+  const s = {};
+  FIELD_IDS.forEach((id) => { const el = $(id); if (el) s[id] = el.type === "checkbox" ? el.checked : el.value; });
+  s.mf = [...document.querySelectorAll(".mf:checked")].map((c) => c.value);
+  s.lf = [...document.querySelectorAll(".lf:checked")].map((c) => c.value);
+  s.sort = sortOverride;
+  s.collapsed = [...document.querySelectorAll("#config fieldset")].map((fs, i) => fs.classList.contains("collapsed") ? i : -1).filter((i) => i >= 0);
+  s.allcollapsed = $("config").classList.contains("allcollapsed");
+  return s;
+}
+function applyState(s) {
+  if (!s) return;
+  FIELD_IDS.forEach((id) => { const el = $(id); if (el && id in s) { if (el.type === "checkbox") el.checked = !!s[id]; else el.value = s[id]; } });
+  if (s.mf) document.querySelectorAll(".mf").forEach((c) => { c.checked = s.mf.includes(c.value); });
+  if (s.lf) document.querySelectorAll(".lf").forEach((c) => { c.checked = s.lf.includes(c.value); });
+  sortOverride = s.sort || null;
+  if (s.collapsed) { const fs = document.querySelectorAll("#config fieldset"); s.collapsed.forEach((i) => fs[i] && fs[i].classList.add("collapsed")); }
+  if (s.allcollapsed) $("config").classList.add("allcollapsed");
+}
+function saveState() { try { localStorage.setItem(FKEY, JSON.stringify(snapshot())); } catch (e) {} }
+function loadState() { try { return JSON.parse(localStorage.getItem(FKEY) || "null"); } catch (e) { return null; } }
+
+function showGate(msg) {
+  const g = $("gate");
+  g.classList.remove("hidden");
+  $("gate-msg").textContent = msg || "";
+  const inp = $("gate-input");
+  inp.value = "";
+  inp.focus();
+  const submit = () => {
+    const v = inp.value.trim();
+    if (!v) return;
+    localStorage.setItem("atlas_token", v);
+    g.classList.add("hidden");
+    boot();
+  };
+  $("gate-go").onclick = submit;
+  inp.onkeydown = (e) => { if (e.key === "Enter") submit(); };
+}
+
 async function boot() {
-  FOLDS = await (await fetch("data/folds.json")).json();
-  MOTIFS = await (await fetch("data/motifs.json")).json();
+  if (GATED && !token()) return showGate();
+  let folds, motifs;
+  try {
+    folds = await getJSON("data/folds.json");
+    motifs = await getJSON("data/motifs.json");
+  } catch (e) {
+    if (GATED) {
+      localStorage.removeItem("atlas_token");
+      return showGate(e.status === 403 ? "Incorrect passcode — try again." : "Could not load data (" + (e.status || "network") + ").");
+    }
+    throw e;
+  }
+  FOLDS = folds; MOTIFS = motifs;
   const ms = new Set(), ls = new Set();
   let maxLen = 0;
   for (const f of FOLDS) {
@@ -21,6 +93,8 @@ async function boot() {
   buildMotifFilter();
   buildLetterFilter();
   wireControls();
+  applyState(loadState());
+  syncLabels();
   render();
 }
 
@@ -37,7 +111,7 @@ function buildLetterFilter() {
 
 function wireControls() {
   document.querySelectorAll("#config input, #config select").forEach((el) =>
-    el.addEventListener("input", () => { syncLabels(); render(); }));
+    el.addEventListener("input", () => { syncLabels(); saveState(); render(); }));
   $("reset").addEventListener("click", () => {
     document.querySelectorAll(".mf").forEach((c) => c.checked = false);
     document.querySelectorAll(".lf").forEach((c) => c.checked = true);
@@ -46,8 +120,15 @@ function wireControls() {
     $("len_max").value = Math.max(...FOLDS.map((f) => f.length || 0));
     ["shape_ok", "req_tert", "req_rare", "tm_has", "per_letter"].forEach((id) => $(id).checked = false);
     $("pk").value = "any"; $("rank_key").value = "best_tm1:asc"; $("topn").value = 200;
-    sortOverride = null; syncLabels(); render();
+    if ($("search")) $("search").value = "";
+    sortOverride = null; localStorage.removeItem(FKEY); syncLabels(); render();
   });
+  if ($("search")) $("search").addEventListener("input", () => { saveState(); render(); });
+  // collapsible sections (click a legend) + collapse-all (click the panel heading)
+  document.querySelectorAll("#config fieldset legend").forEach((lg) =>
+    lg.addEventListener("click", () => { lg.parentElement.classList.toggle("collapsed"); saveState(); }));
+  const h2 = document.querySelector("#config h2");
+  if (h2) h2.addEventListener("click", () => { $("config").classList.toggle("allcollapsed"); saveState(); });
   $("deep-close").addEventListener("click", () => $("deep").classList.add("hidden"));
   $("deep").addEventListener("click", (e) => { if (e.target.id === "deep") $("deep").classList.add("hidden"); });
   syncLabels();
@@ -63,6 +144,7 @@ function filters() {
   const lf = [...document.querySelectorAll(".lf:checked")].map((c) => c.value);
   const mf = [...document.querySelectorAll(".mf:checked")].map((c) => c.value);
   return {
+    q: ($("search") ? $("search").value : "").trim().toLowerCase(),
     lmin: +$("len_min").value, lmax: +$("len_max").value,
     plddt: +$("plddt_min").value, clash: +$("clash_max").value,
     tmax: +$("tm_max").value, tmhas: $("tm_has").checked,
@@ -75,6 +157,8 @@ function filters() {
 }
 
 function pass(f, c) {
+  if (c.q && !(f.id.toLowerCase().includes(c.q) || (f.name || "").toLowerCase().includes(c.q)
+      || (f.sublibrary || "").toLowerCase().includes(c.q))) return false;
   if (f.length != null && (f.length < c.lmin || f.length > c.lmax)) return false;
   if ((f.plddt || 0) < c.plddt) return false;
   if (f.clashscore != null && f.clashscore > c.clash) return false;
@@ -143,7 +227,10 @@ function drawTable(rows) {
       `<span class="motif-chip" style="background:${motifColor(m)}">${m.replace(/_/g, " ").toLowerCase()}</span>`).join("");
     const pl = f.plddt || 0;
     const plbar = `<span class="bar" style="width:${pl * 0.45}px;background:${pl > 80 ? "#3a7d44" : pl > 60 ? "#edae49" : "#c0504d"}"></span> ${num(pl, 0)}`;
-    const shape = f.shape_ok ? `<span class="pill" style="background:#3a7d44">yes</span>` : `<span class="muted">no</span>`;
+    const hasShape = f.r2a3 != null || f.mean_prot_2a3 != null;
+    const shape = f.shape_ok ? `<span class="pill" style="background:#3a7d44">yes</span>`
+      : (hasShape ? `<span class="muted" title="has SHAPE data but motif residues not protected">no</span>`
+                  : `<span class="muted" title="no usable SHAPE data for this fold">n/d</span>`);
     return `<tr data-id="${f.id}">
       <td>${f.id}</td><td>${f.name || ""}</td><td>${f.letter}</td>
       <td class="num">${f.length ?? ""}</td><td class="num">${plbar}</td>
@@ -167,7 +254,7 @@ async function openDeep(id) {
   $("deep-title").textContent = `${id}${f.name ? "  —  " + f.name : ""}`;
   drawProps(f);
   let react = null;
-  try { react = await (await fetch("react/" + id)).json(); } catch (e) { react = null; }
+  try { react = await (await fetch(durl("react/" + id + ".json"))).json(); } catch (e) { react = null; }
   drawTracks(f, react);
   load3D(id, react);
 }
@@ -260,7 +347,7 @@ async function load3D(id, react) {
   el.innerHTML = "";
   if (typeof $3Dmol === "undefined") { el.innerHTML = '<p style="color:#fff;padding:8px">3Dmol.js not loaded.</p>'; return; }
   let data;
-  try { data = await (await fetch("struct/" + id)).text(); }
+  try { data = await (await fetch(durl("structs/" + id + ".cif"))).text(); }
   catch (e) { el.innerHTML = '<p style="color:#fff;padding:8px">structure unavailable</p>'; return; }
   viewer = $3Dmol.createViewer(el, { backgroundColor: "0x0d1117" });
   const fmt = data.startsWith("data_") || data.includes("_atom_site") ? "cif" : "pdb";

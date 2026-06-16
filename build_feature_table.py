@@ -15,12 +15,17 @@ import argparse
 import csv
 import json
 import os
+import re
+from collections import defaultdict
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 try:
-    EXP_DEFAULT = json.load(open(os.path.join(ROOT, "config.json")))["mined_dir"]
+    _CFG = json.load(open(os.path.join(ROOT, "config.json")))
+    EXP_DEFAULT = _CFG["mined_dir"]
+    PARQ_TMPL = _CFG.get("metadata_parquet", "")
 except Exception:
     EXP_DEFAULT = ""
+    PARQ_TMPL = ""
 
 TERT = {"A_MINOR", "TL_RECEPTOR", "UA_HANDLE", "T_LOOP", "GA_MINOR", "PLATFORM",
         "TANDEM_GA_SHEARED", "TANDEM_GA_WATSON_CRICK", "TETRALOOP_TL_RECEPTOR"}
@@ -40,6 +45,54 @@ def fl(x):
         return v if v == v else None  # drop NaN
     except (TypeError, ValueError):
         return None
+
+
+def human_name(sublibrary, source_id):
+    """Readable name from sublibrary + source_id (mirrors the deck naming)."""
+    sub = (sublibrary or "").strip()
+    sid = (source_id or "").strip()
+    if sub.startswith("gRNAde"):
+        m = re.search(r"id=(\S+)", sid)
+        return f"gRNAde design — target PDB {m.group(1)}" if m else "gRNAde design"
+    if sub.startswith("UW"):
+        return f"UW design {sid}" if sid else "UW design"
+    if sub.startswith("rnamake"):
+        pdbs = sorted(set(re.findall(r"\.([0-9][A-Za-z0-9]{3})\.", sid)))
+        return "RNAMake assembly" + (f" (from {', '.join(pdbs)})" if pdbs else "")
+    if "RNAcentral" in sub:
+        return f"natural RNA · {sub}"
+    if "utrs_windows" in sub:
+        return f"natural UTR · {sub.split('.')[0].replace('_', ' ')}"
+    return sub.replace("_", " ") if sub else ""
+
+
+def load_source_ids(sel):
+    """Batch-read source_id for A-E folds from the per-library metadata parquet."""
+    if not PARQ_TMPL:
+        return {}
+    try:
+        import pyarrow.parquet as pq
+    except Exception:
+        return {}
+    bylib = defaultdict(list)
+    for sid in sel:
+        lib = sid.split("-")[1].replace("ribonanza2", "").upper()
+        if lib in "ABCDE":
+            bylib[lib].append(sid)
+    out = {}
+    for lib, sids in bylib.items():
+        fis = [int(s.split("-")[0]) - 1 for s in sids]
+        try:
+            t = pq.read_table(PARQ_TMPL.format(L=lib), columns=["fasta_index", "source_id"],
+                              filters=[("fasta_index", "in", fis)]).to_pydict()
+            m = dict(zip(t["fasta_index"], t["source_id"]))
+            for s in sids:
+                v = m.get(int(s.split("-")[0]) - 1)
+                if v:
+                    out[s] = v
+        except Exception as e:
+            print(f"  source_id read failed for {lib}: {e}")
+    return out
 
 
 def parse_residues(s):
@@ -117,6 +170,8 @@ def main():
     for fn in ["summary/per_letter_names.tsv", "summary/candidate_names.tsv", "summary/pk_names.tsv"]:
         for r in rows(f"{E}/{fn}"):
             names.setdefault(r["seq_id"], r.get("human_name", ""))
+    # derive names for the rest from sublibrary + source_id
+    src_ids = load_source_ids(sel)
 
     folds = []
     for sid, s in sel.items():
@@ -131,7 +186,7 @@ def main():
         length = md.get("length") or len(s.get("design_sequence", ""))
         rec = {
             "id": sid,
-            "name": names.get(sid, ""),
+            "name": names.get(sid) or human_name(s.get("sublibrary", ""), src_ids.get(sid, "")),
             "letter": s.get("letter", md.get("letter", "")),
             "source": md.get("source", ""),
             "sublibrary": s.get("sublibrary", ""),

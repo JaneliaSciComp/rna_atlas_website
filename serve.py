@@ -128,11 +128,11 @@ class H(BaseHTTPRequestHandler):
         try:
             if path == "/":
                 return self._serve_file(os.path.join(WEB, "index.html"))
-            if path.startswith("/struct/"):
-                data = read_struct(path[len("/struct/"):])
+            if path.startswith("/structs/") and path.endswith(".cif"):
+                data = read_struct(path[len("/structs/"):-len(".cif")])
                 return self._send(data, "text/plain") if data else self._send("not found", code=404)
-            if path.startswith("/react/"):
-                return self._send(json.dumps(reactivity(path[len("/react/"):])), "application/json")
+            if path.startswith("/react/") and path.endswith(".json"):
+                return self._send(json.dumps(reactivity(path[len("/react/"):-len(".json")])), "application/json")
             if path.startswith("/data/"):
                 return self._serve_file(os.path.join(DATA, path[len("/data/"):]))
             return self._serve_file(os.path.join(WEB, path.lstrip("/")))

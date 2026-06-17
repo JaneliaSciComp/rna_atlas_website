@@ -84,11 +84,11 @@ def load_contact_ratios(sel):
 
 
 def load_manifest(sel):
-    """From the annotation manifest: base-paired fraction (fold-rep dbn via global_fold_id),
+    """From the annotation manifest: base-paired fraction + the fold-rep dbn (via global_fold_id),
     and fold-level novelty (best_tm1_v341 / best_v341) for every fold."""
     if not ANNOT or not os.path.exists(ANNOT):
         print("  manifest annotations skipped (no annotation_manifest)")
-        return {}, {}, {}
+        return {}, {}, {}, {}
     import pyarrow.parquet as pq
     t = pq.read_table(ANNOT, columns=["seq_id", "global_fold_id", "is_fold_rep", "dbn",
                                        "best_tm1_v341", "best_v341"]).to_pydict()
@@ -102,12 +102,40 @@ def load_manifest(sel):
         v = fl(t["best_tm1_v341"][i])
         if v is not None:
             tm[sid], near[sid] = v, (t["best_v341"][i] or "")
-    bp = {}
+    bp, dbns = {}, {}
     for sid in sel:
         dbn = rep_dbn.get(mem_gf.get(sid))
         if dbn:
             bp[sid] = round(sum(c in PAIR_CHARS for c in dbn) / len(dbn), 4)
-    return bp, tm, near
+            dbns[sid] = dbn
+    return bp, tm, near, dbns
+
+
+def load_pdb_titles(near_ids):
+    """Fetch RCSB entry titles for the distinct nearest-PDB ids (cached on disk)."""
+    cache_path = os.path.join(ROOT, ".rcsb_titles.json")
+    cache = {}
+    if os.path.exists(cache_path):
+        try:
+            cache = json.load(open(cache_path))
+        except Exception:
+            cache = {}
+    import urllib.request
+    pdbs = sorted({n.split("_")[0].upper() for n in near_ids if n})
+    miss = [p for p in pdbs if p not in cache]
+    for i, p in enumerate(miss):
+        try:
+            with urllib.request.urlopen(f"https://data.rcsb.org/rest/v1/core/entry/{p}", timeout=15) as r:
+                d = json.load(r)
+            cache[p] = ((d.get("struct") or {}).get("title") or "")
+        except Exception:
+            cache[p] = ""
+        if i % 50 == 0:
+            json.dump(cache, open(cache_path, "w"))
+    json.dump(cache, open(cache_path, "w"))
+    if miss:
+        print(f"  RCSB titles: fetched {len(miss)} new, {len(cache)} cached")
+    return cache
 
 
 def regate_fgh(sel, spans, react_parquet):
@@ -289,10 +317,12 @@ def main():
     src_ids = load_source_ids(sel)
     # structuredness metrics + manifest novelty (best_tm1 for all folds)
     contact = load_contact_ratios(sel)
-    bpfrac, tm_manifest, near_manifest = load_manifest(sel)
+    bpfrac, tm_manifest, near_manifest, dbns = load_manifest(sel)
     for sid in sel:
         if sid not in novelty and sid in tm_manifest:
             novelty[sid] = {"best_tm1": tm_manifest[sid], "near": near_manifest.get(sid, "")}
+    # RCSB titles for the closest known fold (sanity-check display)
+    titles = load_pdb_titles([d.get("near", "") for d in novelty.values()])
     # re-gate F-H SHAPE from the full design-aligned chemmap parquet
     fgh_prot = regate_fgh(sel, spans, REACT_OVERRIDE)
 
@@ -325,6 +355,7 @@ def main():
             "contact_ratio": contact.get(sid),
             "bp_fraction": bpfrac.get(sid),
             "r2a3": r2a3,
+            "shape_agr": (round(-r2a3, 4) if r2a3 is not None else None),
             "mean_prot_2a3": mp if mp is not None else fl(sh.get("mean_prot_2a3")),
             "shape_ok": shape_ok,
             "openknot": fl(md.get("openknot_score")),
@@ -332,6 +363,7 @@ def main():
             "is_novel_v341": 1 if md.get("is_novel_v341") == "1" else 0,
             "best_tm1": nv.get("best_tm1"),
             "near": nv.get("near", ""),
+            "near_title": titles.get((nv.get("near", "") or "").split("_")[0].upper(), ""),
             "score": fl(sh.get("score")),
             "in_shortlist": 1 if sid in short else 0,
         }
@@ -342,6 +374,8 @@ def main():
         json.dump(folds, f, separators=(",", ":"))
     with open(f"{args.out}/motifs.json", "w") as f:
         json.dump(spans, f, separators=(",", ":"))
+    with open(f"{args.out}/pairing.json", "w") as f:
+        json.dump(dbns, f, separators=(",", ":"))
 
     n_tm = sum(1 for r in folds if r["best_tm1"] is not None)
     n_sh = sum(1 for r in folds if r["shape_ok"])

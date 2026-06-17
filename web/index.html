@@ -56,7 +56,7 @@
     <fieldset>
       <legend>SHAPE support</legend>
       <label class="chk"><input type="checkbox" id="shape_ok"> require SHAPE-supported</label>
-      <div class="row"><label>r(2A3) &le;</label><input type="range" id="r2a3_max" min="-1" max="1" value="1" step="0.01"><span id="r2a3_max_v">1.00</span></div>
+      <div class="row"><label>SHAPE agr &ge;</label><input type="range" id="agr_min" min="-1" max="1" value="-1" step="0.01"><span id="agr_min_v">-1.00</span></div>
     </fieldset>
 
     <fieldset>
@@ -134,15 +134,16 @@
     <h3>Novelty</h3>
     <dl>
       <dt>best_tm1</dt><dd>USalign <b>TM1 to the closest of the 2,243 v341 PDB-RNA chains</b>. <b>Lower = more novel</b> (≲0.45 novel, ≲0.40 clearly novel). Fold-level for the whole set; the deck candidates use a per-structure value.</dd>
-      <dt>nearest</dt><dd>The closest known PDB chain found for that TM1.</dd>
+      <dt>nearest</dt><dd>The closest known PDB chain found for that TM1; hover (or see the deep view) for the <b>RCSB entry title</b> — handy for sanity checks.</dd>
       <dt>overlap_AE</dt><dd>For an F–H fold, the TM1 to its closest <b>A–E</b> fold — i.e. how structurally redundant it is across the natural/synthetic sets. Lower = more distinct.</dd>
     </dl>
 
     <h3>Chemical mapping (SHAPE/DMS)</h3>
     <dl>
       <dt>SHAPE</dt><dd><b>yes</b> = the fold's tertiary-motif residues are <i>protected</i> (mean 2A3 protection &gt; 0) or the fold's reactivity agrees with its predicted pairing (r(2A3) &lt; −0.2). <b>no</b> = reactivity exists but doesn't indicate protection. <b>n/d</b> = no usable protection signal (no tertiary motif to score, or no reactivity coverage) — the raw reactivity may still be viewable in the fold's deep view. A–E reactivity is read from the experiment HDF5s; F–H from the full design-aligned chemmap.</dd>
-      <dt>r(2A3)</dt><dd>Correlation of 2A3 reactivity with predicted base-pairing. <b>Negative</b> ⇒ paired positions are protected ⇒ supports the fold.</dd>
+      <dt>SHAPE agr</dt><dd>SHAPE–pairing agreement: correlation of 2A3 reactivity with the <i>unpaired</i> positions. <b>Positive = good</b> (reactive where unpaired, protected where paired ⇒ the chemical mapping supports the predicted fold). This is the sign-flipped <code>r(2A3,is-paired)</code>.</dd>
     </dl>
+    <p class="help-intro">In a fold's deep view, the <b>pairing track</b> (white = paired, light red = unpaired) sits under the DMS/2A3 reactivity rows so you can visually check agreement: unpaired (light red) should line up with reactive (red) reactivity. Pairing comes from the fold representative's predicted secondary structure.</p>
 
     <h3>Structure</h3>
     <dl>

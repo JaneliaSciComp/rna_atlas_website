@@ -1,5 +1,5 @@
 // RNA Atlas Explorer — client-side filtering/ranking + lazy deep view.
-let FOLDS = [], MOTIFS = {}, MOTIF_SET = [], LETTERS = [];
+let FOLDS = [], MOTIFS = {}, PAIRING = {}, MOTIF_SET = [], LETTERS = [];
 let sortOverride = null;  // {key, dir} from header click
 
 // Data source: "" = same origin (local serve.py). Otherwise a CloudFront URL
@@ -25,7 +25,7 @@ const num = (x, d = 1) => (x === null || x === undefined || Number.isNaN(x)) ? "
 // --- persist filter settings across reloads ---
 const FKEY = "atlas_filters";
 const FIELD_IDS = ["search", "len_min", "len_max", "plddt_min", "clash_max", "tm_max", "tm_has",
-  "ov_max", "shape_ok", "r2a3_max", "cr_min", "bp_min", "req_tert", "req_rare", "pk", "rank_key", "topn", "per_letter", "alt_palette"];
+  "ov_max", "shape_ok", "agr_min", "cr_min", "bp_min", "req_tert", "req_rare", "pk", "rank_key", "topn", "per_letter", "alt_palette"];
 const altPalette = () => !!($("alt_palette") && $("alt_palette").checked);
 function snapshot() {
   const s = {};
@@ -81,6 +81,7 @@ async function boot() {
     throw e;
   }
   FOLDS = folds; MOTIFS = motifs;
+  try { PAIRING = await getJSON("data/pairing.json"); } catch (e) { PAIRING = {}; }
   const ms = new Set(), ls = new Set();
   let maxLen = 0;
   for (const f of FOLDS) {
@@ -118,7 +119,8 @@ function wireControls() {
   $("reset").addEventListener("click", () => {
     document.querySelectorAll(".mf").forEach((c) => c.checked = false);
     document.querySelectorAll(".lf").forEach((c) => c.checked = true);
-    ["plddt_min", "tm_max", "ov_max", "r2a3_max"].forEach((id) => $(id).value = $(id).max);
+    ["plddt_min", "tm_max", "ov_max"].forEach((id) => $(id).value = $(id).max);
+    $("agr_min").value = -1;
     $("plddt_min").value = 0; $("clash_max").value = 9999; $("len_min").value = 0;
     $("len_max").value = Math.max(...FOLDS.map((f) => f.length || 0));
     ["shape_ok", "req_tert", "req_rare", "tm_has", "per_letter"].forEach((id) => $(id).checked = false);
@@ -148,7 +150,7 @@ function syncLabels() {
   $("plddt_min_v").textContent = $("plddt_min").value;
   $("tm_max_v").textContent = (+$("tm_max").value).toFixed(2);
   $("ov_max_v").textContent = (+$("ov_max").value).toFixed(2);
-  $("r2a3_max_v").textContent = (+$("r2a3_max").value).toFixed(2);
+  $("agr_min_v").textContent = (+$("agr_min").value).toFixed(2);
   $("cr_min_v").textContent = (+$("cr_min").value).toFixed(2);
   $("bp_min_v").textContent = (+$("bp_min").value).toFixed(2);
 }
@@ -162,7 +164,7 @@ function filters() {
     plddt: +$("plddt_min").value, clash: +$("clash_max").value,
     tmax: +$("tm_max").value, tmhas: $("tm_has").checked,
     ovmax: +$("ov_max").value,
-    shape: $("shape_ok").checked, r2a3: +$("r2a3_max").value,
+    shape: $("shape_ok").checked, agr: +$("agr_min").value,
     crmin: +$("cr_min").value, bpmin: +$("bp_min").value,
     tert: $("req_tert").checked, rare: $("req_rare").checked, motifs: mf,
     pk: $("pk").value, letters: new Set(lf),
@@ -180,7 +182,7 @@ function pass(f, c) {
   if (f.best_tm1 != null && f.best_tm1 > c.tmax) return false;
   if (f.overlap_ae != null && f.overlap_ae > c.ovmax) return false;
   if (c.shape && !f.shape_ok) return false;
-  if (f.r2a3 != null && f.r2a3 > c.r2a3) return false;
+  if (c.agr > -1 && (f.shape_agr == null || f.shape_agr < c.agr)) return false;
   if (c.crmin > 0 && (f.contact_ratio == null || f.contact_ratio < c.crmin)) return false;
   if (c.bpmin > 0 && (f.bp_fraction == null || f.bp_fraction < c.bpmin)) return false;
   if (c.tert && f.n_tert < 1) return false;
@@ -222,7 +224,7 @@ function render() {
 const COLS = [
   ["id", "seq_id"], ["name", "name"], ["letter", "L"], ["length", "len"], ["plddt", "pLDDT"],
   ["best_tm1", "best_tm1"], ["near", "nearest"], ["overlap_ae", "ovlp_AE"],
-  ["shape_ok", "SHAPE"], ["r2a3", "r(2A3)"], ["contact_ratio", "compact"], ["bp_fraction", "paired"],
+  ["shape_ok", "SHAPE"], ["shape_agr", "SHAPE agr"], ["contact_ratio", "compact"], ["bp_fraction", "paired"],
   ["n_tert", "tert"], ["n_rare", "rare"], ["pseudoknot", "PK"], ["motifs", "motifs"],
 ];
 
@@ -250,9 +252,9 @@ function drawTable(rows) {
     return `<tr data-id="${f.id}">
       <td>${f.id}</td><td>${f.name || ""}</td><td>${f.letter}</td>
       <td class="num">${f.length ?? ""}</td><td class="num">${plbar}</td>
-      <td class="num">${num(f.best_tm1, 3)}</td><td>${f.near || ""}</td>
+      <td class="num">${num(f.best_tm1, 3)}</td><td title="${(f.near_title || "").replace(/"/g, "&quot;")}">${f.near || ""}</td>
       <td class="num">${num(f.overlap_ae, 2)}</td><td>${shape}</td>
-      <td class="num">${num(f.r2a3, 2)}</td><td class="num">${num(f.contact_ratio, 2)}</td><td class="num">${num(f.bp_fraction, 2)}</td>
+      <td class="num">${num(f.shape_agr, 2)}</td><td class="num">${num(f.contact_ratio, 2)}</td><td class="num">${num(f.bp_fraction, 2)}</td>
       <td class="num">${f.n_tert}</td><td class="num">${f.n_rare}</td>
       <td>${f.pseudoknot ? "&#10003;" : ""}</td><td>${chips}</td></tr>`;
   }).join("");
@@ -311,9 +313,10 @@ function drawProps(f) {
     ["Length", `${f.length} nt`],
     ["pLDDT / gpde", `${num(f.plddt)} / ${num(f.gpde, 3)}`],
     ["Clashscore", num(f.clashscore, 2)],
-    ["Novelty (best_tm1 vs v341)", f.best_tm1 == null ? "&mdash;" : `${num(f.best_tm1, 3)} (nearest ${f.near}) &mdash; ${verdict}`],
+    ["Novelty (best_tm1 vs v341)", f.best_tm1 == null ? "&mdash;" : `${num(f.best_tm1, 3)} &mdash; ${verdict}`],
+    ["Nearest known fold", `${f.near || "&mdash;"}${f.near_title ? ` &mdash; ${f.near_title}` : ""}`],
     ["Distinct vs A&ndash;E (overlap)", num(f.overlap_ae, 3)],
-    ["SHAPE-supported", `${f.shape_ok ? "yes" : "no"} (r(2A3,is-paired) = ${num(f.r2a3, 3)}, mean prot = ${num(f.mean_prot_2a3, 3)})`],
+    ["SHAPE-supported", `${f.shape_ok ? "yes" : "no"} (SHAPE–pairing agreement = ${num(f.shape_agr, 3)}, + = good; mean prot = ${num(f.mean_prot_2a3, 3)})`],
     ["OpenKnot score", num(f.openknot, 3)],
     ["Pseudoknot", f.pseudoknot ? "yes" : "no"],
     ["Secondary-structure class", f.ss_class],
@@ -357,7 +360,7 @@ function drawTracks(f, react) {
     lanes[li] = hi; m.lane = li;
   });
   const laneH = 9, mh = lanes.length * (laneH + 2);
-  const yMot = pad, ySeq = yMot + mh + 4, yDms = ySeq + 16, yA23 = yDms + 16, H = yA23 + 18;
+  const yMot = pad, ySeq = yMot + mh + 4, yDms = ySeq + 16, yA23 = yDms + 16, yPair = yA23 + 16, H = yPair + 18;
   let svg = `<svg width="${W + 40}" height="${H}" font-size="9">`;
   // motif bars
   motifs.forEach((m) => {
@@ -382,8 +385,17 @@ function drawTracks(f, react) {
   };
   svg += rrow(react && react.dms, yDms, "DMS");
   svg += rrow(react && react.a23, yA23, "2A3");
-  svg += "</svg>";
-  $("tracks").innerHTML = `<div style="font-size:11px;color:#5b6670;margin-bottom:3px">motif lanes &middot; sequence &middot; DMS &middot; 2A3 reactivity (white=protected &rarr; red=reactive)</div>` + svg;
+  // predicted pairing track: unpaired = light red, paired = white (eyeball SHAPE agreement)
+  const dbn = PAIRING[f.id] || "";
+  let pr = `<text x="${W + 3}" y="${yPair + 11}" fill="#5b6670">pair</text>`;
+  for (let i = 0; i < n; i++) {
+    const ch = dbn[i];
+    const paired = ch && ch !== "." && ch !== "-";
+    const fill = ch ? (paired ? "#ffffff" : "#f3a0a0") : "#eef2f5";
+    pr += `<rect x="${i * cw}" y="${yPair}" width="${cw - 0.5}" height="13" fill="${fill}" stroke="#dfe3e8" stroke-width="0.5"><title>pos ${i + 1}: ${ch ? (paired ? "paired" : "unpaired") : "n/a"}</title></rect>`;
+  }
+  svg += pr + "</svg>";
+  $("tracks").innerHTML = `<div style="font-size:11px;color:#5b6670;margin-bottom:3px">motif lanes &middot; sequence &middot; DMS &middot; 2A3 reactivity (white=protected &rarr; red=reactive) &middot; pairing (white=paired, light red=unpaired)</div>` + svg;
 }
 
 let viewer = null;

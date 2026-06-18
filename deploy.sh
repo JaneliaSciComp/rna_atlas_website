@@ -55,6 +55,7 @@ push_heavy() {
     echo "dataset $name ... (under /data/ so the existing passcode gate covers it)"
     aws --profile $P s3 sync "$ds/data"    "$B/data/datasets/$name/data"    --content-type application/json --only-show-errors || true
     aws --profile $P s3 sync "$ds/structs" "$B/data/datasets/$name/structs" --content-encoding gzip --content-type text/plain --only-show-errors || true
+    [ -d "$ds/react" ] && aws --profile $P s3 sync "$ds/react" "$B/data/datasets/$name/react" --content-type application/json --only-show-errors || true
   done
 }
 

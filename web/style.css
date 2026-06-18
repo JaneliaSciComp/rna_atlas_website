@@ -93,6 +93,8 @@ tbody tr:hover { background: #eaf3f8; }
 .deep-tools button:hover { background: #eaf3f8; }
 .deep-tools button[data-mode="bottom"] { transform: rotate(90deg); }
 #deep-close { font-size: 18px; }
+#deep-export { font-size: 12px; padding: 4px 10px; font-weight: 600; color: #2e6f95; }
+#deep-export:hover { background: #2e6f95; color: #fff; border-color: #2e6f95; }
 #deep-title { margin: 0 0 8px; font-size: 16px; }
 .deep-body { display: grid; grid-template-columns: 1.1fr 1fr; grid-template-rows: auto auto; gap: 12px; }
 #viewer3d { position: relative; width: 100%; height: 420px; background: #0d1117; border-radius: 6px; grid-row: span 2; }

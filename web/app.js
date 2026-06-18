@@ -210,6 +210,7 @@ function wireStatic() {
   const h2 = document.querySelector("#config h2");
   if (h2) h2.addEventListener("click", () => { $("config").classList.toggle("allcollapsed"); saveState(); });
   $("deep-close").addEventListener("click", closeDeep);
+  if ($("deep-export")) $("deep-export").addEventListener("click", exportFold);
   $("deep").addEventListener("click", (e) => { if (e.target.id === "deep") closeDeep(); });
   document.querySelectorAll('#layoutctl button[data-mode]').forEach((b) =>
     b.addEventListener("click", () => setDeepMode(b.dataset.mode)));
@@ -373,7 +374,7 @@ async function openDeep(id) {
   drawProps(f);
   let react = null;
   if (ds.react) {
-    try { react = await (await fetch(durl(prefix(ds) + "react/" + id + ".json"))).json(); } catch (e) { react = null; }
+    try { react = await (await fetch(durl(prefix(ds) + "react/" + (f.key || id) + ".json"))).json(); } catch (e) { react = null; }
   }
   currentDeep = { f, react };
   drawTracks(f, react);
@@ -476,7 +477,7 @@ function drawTracks(f, react) {
   $("tracks").innerHTML = `<div style="font-size:11px;color:#5b6670;margin-bottom:3px">motif lanes &middot; sequence &middot; DMS &middot; 2A3 reactivity (white=protected &rarr; red=reactive) &middot; pairing (white=paired, light red=unpaired)</div>` + svg;
 }
 
-let viewer = null;
+let viewer = null, viewerModel = null;
 async function load3D(f, react) {
   const el = $("viewer3d");
   el.innerHTML = "";
@@ -484,11 +485,13 @@ async function load3D(f, react) {
   const id = f.id;
   const ds = dsFor(f);
   let data;
+  viewerModel = null; if (currentDeep) { currentDeep.structText = null; currentDeep.structFmt = null; }
   try { data = await (await fetch(durl(prefix(ds) + "structs/" + (f.key || f.id) + "." + (ds.ext || "cif")))).text(); }
   catch (e) { el.innerHTML = '<p style="color:#fff;padding:8px">structure unavailable</p>'; return; }
   viewer = $3Dmol.createViewer(el, { backgroundColor: "0x0d1117" });
   const fmt = data.startsWith("data_") || data.includes("_atom_site") ? "cif" : "pdb";
-  viewer.addModel(data, fmt);
+  if (currentDeep) { currentDeep.structText = data; currentDeep.structFmt = fmt; }
+  viewerModel = viewer.addModel(data, fmt);
   const a23 = react && react.a23, dms = react && react.dms;
   const dbn = (PAIRING_BY_DS[f._dsid] || {})[f.id] || "";
   const mode = ($("color_by") && $("color_by").value) || "a23";
@@ -528,6 +531,103 @@ function reactCF(v) {                              // 2A3/DMS: blue protected ->
 function plddtCF(b) {                              // AlphaFold confidence palette
   if (b == null || Number.isNaN(b)) return "0xcccccc";
   return b >= 90 ? "0x0053d6" : b >= 70 ? "0x65cbf3" : b >= 50 ? "0xffdb13" : "0xff7d45";
+}
+
+// ---------------- export bundle (cif + pdb + png + txt -> zip) ----------------
+const _enc = (s) => new TextEncoder().encode(s);
+function safeName(s) { return String(s || "").replace(/[^A-Za-z0-9._-]+/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "").slice(0, 90); }
+let _CRCT = null;
+function crc32(u8) {
+  if (!_CRCT) { _CRCT = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; _CRCT[n] = c >>> 0; } }
+  let crc = 0xFFFFFFFF;
+  for (let i = 0; i < u8.length; i++) crc = _CRCT[(crc ^ u8[i]) & 0xFF] ^ (crc >>> 8);
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+function zipStore(files) {   // store method (no compression); files: [{name, data:Uint8Array}]
+  const parts = [], central = []; let off = 0;
+  for (const f of files) {
+    const nb = _enc(f.name), d = f.data, crc = crc32(d);
+    const lh = new Uint8Array(30 + nb.length), lv = new DataView(lh.buffer);
+    lv.setUint32(0, 0x04034b50, true); lv.setUint16(4, 20, true); lv.setUint16(8, 0, true);
+    lv.setUint32(14, crc, true); lv.setUint32(18, d.length, true); lv.setUint32(22, d.length, true);
+    lv.setUint16(26, nb.length, true); lh.set(nb, 30);
+    parts.push(lh, d);
+    const ch = new Uint8Array(46 + nb.length), cv = new DataView(ch.buffer);
+    cv.setUint32(0, 0x02014b50, true); cv.setUint16(4, 20, true); cv.setUint16(6, 20, true);
+    cv.setUint32(16, crc, true); cv.setUint32(20, d.length, true); cv.setUint32(24, d.length, true);
+    cv.setUint16(28, nb.length, true); cv.setUint32(42, off, true); ch.set(nb, 46);
+    central.push(ch); off += lh.length + d.length;
+  }
+  const cs = central.reduce((s, c) => s + c.length, 0);
+  const end = new Uint8Array(22), ev = new DataView(end.buffer);
+  ev.setUint32(0, 0x06054b50, true); ev.setUint16(8, files.length, true); ev.setUint16(10, files.length, true);
+  ev.setUint32(12, cs, true); ev.setUint32(16, off, true);
+  return new Blob([...parts, ...central, end], { type: "application/zip" });
+}
+function dataURIBytes(uri) {
+  const bin = atob(uri.split(",")[1]), u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return u8;
+}
+function atomsToPDB(atoms) {
+  const L = [];
+  atoms.forEach((a, i) => {
+    const nm = (a.atom || ""), an = nm.length < 4 ? " " + nm : nm;
+    L.push("ATOM  " + String(a.serial || i + 1).padStart(5) + " " + an.padEnd(4) + " " +
+      (a.resn || "").padStart(3) + " " + (a.chain || "A").slice(0, 1) + String(a.resi || 1).padStart(4) + "    " +
+      a.x.toFixed(3).padStart(8) + a.y.toFixed(3).padStart(8) + a.z.toFixed(3).padStart(8) +
+      "  1.00" + (a.b != null ? a.b : 0).toFixed(2).padStart(6) + "          " + (a.elem || "").padStart(2));
+  });
+  L.push("END");
+  return L.join("\n") + "\n";
+}
+function atomsToCIF(atoms, id) {
+  let s = "data_" + id + "\n#\nloop_\n_atom_site.group_PDB\n_atom_site.id\n_atom_site.type_symbol\n_atom_site.label_atom_id\n" +
+    "_atom_site.label_comp_id\n_atom_site.label_asym_id\n_atom_site.label_seq_id\n_atom_site.Cartn_x\n_atom_site.Cartn_y\n" +
+    "_atom_site.Cartn_z\n_atom_site.occupancy\n_atom_site.B_iso_or_equiv\n";
+  atoms.forEach((a, i) => {
+    s += ["ATOM", i + 1, a.elem || "X", a.atom || "X", a.resn || "X", a.chain || "A", a.resi || 1,
+      a.x.toFixed(3), a.y.toFixed(3), a.z.toFixed(3), "1.00", (a.b != null ? a.b : 0).toFixed(2)].join(" ") + "\n";
+  });
+  return s + "#\n";
+}
+function foldTxt(f, react) {
+  const L = [];
+  L.push("name: " + (f.name || ""));
+  L.push("seq_id: " + f.id);
+  L.push("source: " + (f.source || "") + (f.letter ? " (library " + f.letter + ")" : ""));
+  if (f.sublibrary) L.push("sublibrary: " + f.sublibrary);
+  L.push("length: " + (f.length != null ? f.length : "") + " nt");
+  L.push("pLDDT: " + num(f.plddt, 1) + "   gpde: " + num(f.gpde, 3));
+  L.push("novelty best_tm1 (vs v341): " + (f.best_tm1 == null ? "n/a (unscored)" : num(f.best_tm1, 3)) +
+    (f.near ? "   nearest: " + f.near + (f.near_title ? " (" + f.near_title + ")" : "") : ""));
+  L.push("is_novel_v341: " + (f.is_novel_v341 === 1 ? "yes" : "no"));
+  L.push("SHAPE-supported: " + (f.shape_ok ? "yes" : "no") + (f.shape_agr != null ? "   SHAPE-agr: " + num(f.shape_agr, 3) : ""));
+  L.push("compactness (C1' contact ratio): " + num(f.contact_ratio, 3));
+  L.push("base-paired fraction: " + num(f.bp_fraction, 3));
+  L.push("pseudoknot: " + (f.pseudoknot ? "yes" : "no"));
+  L.push("tertiary motifs: " + (f.motifs || []).join(", ") + (f.n_tert != null ? "  (n_tert=" + f.n_tert + ", n_rare=" + f.n_rare + ")" : ""));
+  const dbn = (PAIRING_BY_DS[f._dsid] || {})[f.id];
+  if (react && react.seq) L.push("sequence:\n" + react.seq);
+  if (dbn) L.push("secondary structure (dbn):\n" + dbn);
+  return L.join("\n") + "\n";
+}
+async function exportFold() {
+  if (!currentDeep) return;
+  const f = currentDeep.f, react = currentDeep.react, base = safeName(f.id) || "fold";
+  const files = [{ name: base + ".txt", data: _enc(foldTxt(f, react)) }];
+  const atoms = viewerModel ? viewerModel.selectedAtoms({}) : [];
+  if (currentDeep.structText && atoms.length) {
+    const native = currentDeep.structFmt;     // keep the original file for its own format; generate the other
+    files.push({ name: base + ".pdb", data: _enc(native === "pdb" ? currentDeep.structText : atomsToPDB(atoms)) });
+    files.push({ name: base + ".cif", data: _enc(native === "cif" ? currentDeep.structText : atomsToCIF(atoms, base)) });
+  }
+  if (viewer) { try { files.push({ name: base + ".png", data: dataURIBytes(viewer.pngURI()) }); } catch (e) {} }
+  const fname = (safeName(f.name) ? safeName(f.name) + "__" : "") + base + ".zip";
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(zipStore(files)); a.download = fname;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 
 boot();

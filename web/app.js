@@ -389,6 +389,7 @@ function drawProps(f) {
     ["Source", `${f.source} (lib ${f.letter})`],
     ["Sublibrary", f.sublibrary],
     f.rnacentral_id ? ["RNAcentral", `<a href="https://rnacentral.org/rna/${esc(f.rnacentral_id)}" target="_blank" rel="noopener">${esc(f.rnacentral_id)}</a>${f.rnacentral_name ? ` &mdash; ${esc(f.rnacentral_name)}` : ""}`] : null,
+    f.rfam_id ? ["Rfam family", `<a href="https://rfam.org/family/${esc(f.rfam_id)}" target="_blank" rel="noopener">${esc(f.rfam_id)}</a>${f.rfam_name ? ` &mdash; ${esc(f.rfam_name)}` : ""}`] : null,
     ["Length", `${f.length} nt`],
     ["pLDDT / gpde", `${num(f.plddt)} / ${num(f.gpde, 3)}`],
     ["Clashscore", num(f.clashscore, 2)],

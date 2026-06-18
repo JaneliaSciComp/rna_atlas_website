@@ -99,6 +99,24 @@ You can DO anything the user can: change filters, search, switch to the Map (sca
     thinking.remove();
   }
 
+  const EXAMPLES = [
+    "Switch to the map and color by RNA type",
+    "Filter to novel FMN riboswitches and open the best one",
+    "Plot a histogram of fold sizes for what's shown",
+    "Show the 10 most novel folds",
+  ];
+  function showWelcome() {
+    const d = document.createElement("div"); d.className = "msg bot welcome";
+    d.innerHTML = "<b>Atlas assistant</b><br>I can drive the explorer for you — change filters, search, "
+      + "switch to the embedding <b>map</b>, open a fold's 3D deep view — and analyze the data with stats &amp; charts. "
+      + "Pick an example or type your own:<div class=\"ex\">"
+      + EXAMPLES.map((e) => `<button class="ex-chip">${esc(e)}</button>`).join("") + "</div>";
+    $("agent-log").appendChild(d);
+    d.querySelectorAll(".ex-chip").forEach((b, i) => b.addEventListener("click", () => {
+      if (!ensureKey()) { bubble("bot err", "No API key set."); return; } run(EXAMPLES[i]);
+    }));
+    scroll();
+  }
   function ensureKey() {
     if (key()) return true;
     const k = prompt("Anthropic API key for the Atlas assistant (stored only in this browser):");
@@ -111,11 +129,11 @@ You can DO anything the user can: change filters, search, switch to the Map (sca
     $("agent-btn").addEventListener("click", () => { $("agent").classList.toggle("hidden"); if (!$("agent").classList.contains("hidden")) $("agent-input").focus(); });
     $("agent-close").addEventListener("click", () => $("agent").classList.add("hidden"));
     const ms = $("agent-model"); if (ms) { const saved = localStorage.getItem("atlas_model"); if (saved) ms.value = saved; ms.addEventListener("change", () => localStorage.setItem("atlas_model", ms.value)); }
-    $("agent-clear").addEventListener("click", () => { messages = []; $("agent-log").innerHTML = ""; });
+    $("agent-clear").addEventListener("click", () => { messages = []; $("agent-log").innerHTML = ""; showWelcome(); });
     const send = () => { const t = $("agent-input").value.trim(); if (!t) return; if (!ensureKey()) { bubble("bot err", "No API key set."); return; } $("agent-input").value = ""; run(t); };
     $("agent-send").addEventListener("click", send);
     $("agent-input").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } });
-    if (!key()) bubble("bot muted", "Ask me to filter, find folds, switch to the map, or analyze & chart the data. (You'll be asked for an API key on first send.)");
+    showWelcome();
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
 })();

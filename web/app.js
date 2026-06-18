@@ -215,6 +215,8 @@ function wireStatic() {
   $("deep").addEventListener("click", (e) => { if (e.target.id === "deep") closeDeep(); });
   document.querySelectorAll('#layoutctl button[data-mode]').forEach((b) =>
     b.addEventListener("click", () => setDeepMode(b.dataset.mode)));
+  document.querySelectorAll('#viewctl button[data-view]').forEach((b) =>
+    b.addEventListener("click", () => setView(b.dataset.view)));
   if ($("help-btn")) $("help-btn").addEventListener("click", () => $("help").classList.remove("hidden"));
   if ($("help-close")) $("help-close").addEventListener("click", () => $("help").classList.add("hidden"));
   $("help").addEventListener("click", (e) => { if (e.target.id === "help") $("help").classList.add("hidden"); });
@@ -298,9 +300,11 @@ function render() {
   } else {
     rows = rows.slice(0, c.topn);
   }
+  lastRows = rows;
   $("count").textContent = `${rows.length} shown`;
-  drawTable(rows);
+  if (viewMode === "map") renderMap(rows); else drawTable(rows);
 }
+let viewMode = "table", lastRows = [];
 
 const COLS = [
   ["id", "seq_id"], ["name", "name"], ["letter", "L"], ["length", "len"], ["plddt", "pLDDT"],
@@ -642,5 +646,129 @@ async function exportFold() {
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
+
+// ---------------- scatter "map" view (t-SNE embedding ex/ey) ----------------
+let mapT = { k: 1, x: 0, y: 0 }, mapPts = [], mapInit = false, mapDrag = null;
+function setView(mode) {
+  viewMode = mode === "map" ? "map" : "table";
+  $("tbl").classList.toggle("hidden", viewMode === "map");
+  $("mapwrap").classList.toggle("hidden", viewMode !== "map");
+  document.querySelectorAll('#viewctl button[data-view]').forEach((b) => b.classList.toggle("active", b.dataset.view === viewMode));
+  if (viewMode === "map") setupMap();
+  render();
+}
+function grad4(t) {
+  const s = [[33, 102, 172], [14, 154, 166], [237, 174, 73], [211, 74, 69]];
+  t = Math.max(0, Math.min(1, t)); const u = t * 3, i = Math.min(2, Math.floor(u)), w = u - i, a = s[i], b = s[i + 1];
+  return `rgb(${a.map((x, j) => Math.round(x + (b[j] - x) * w)).join(",")})`;
+}
+function mapColorFn(field, rows) {
+  if (field === "rna_type" || field === "letter") {
+    const vals = [...new Set(rows.map((f) => f[field]).filter((v) => v != null && v !== ""))].sort();
+    const pal = ["#2e6f95", "#e8a317", "#2e7d32", "#d32f2f", "#7b5ea7", "#1f6fb2", "#c1440e", "#0d9aa6", "#aa3388", "#888", "#55aa77", "#aa7744"];
+    const m = {}; vals.forEach((v, i) => { m[v] = pal[i % pal.length]; });
+    return { fn: (f) => m[f[field]] || "#ccc", legend: vals.slice(0, 12).map((v) => [v, m[v]]) };
+  }
+  const log = field === "fold_size" || field === "seq_cluster_size";
+  let nums = rows.map((f) => f[field]).filter((v) => typeof v === "number");
+  if (log) nums = nums.map((v) => Math.log1p(v));
+  const lo = nums.length ? Math.min(...nums) : 0, hi = nums.length ? Math.max(...nums) : 1, rng = hi > lo ? hi - lo : 1;
+  return { fn: (f) => { let v = f[field]; if (typeof v !== "number") return "#ccc"; if (log) v = Math.log1p(v); return grad4((v - lo) / rng); }, range: [lo, hi, log] };
+}
+function mapProject(ex, ey, W, H) {
+  const pad = 26, bx = pad + ex * (W - 2 * pad), by = pad + (1 - ey) * (H - 2 * pad);
+  return [bx * mapT.k + mapT.x, by * mapT.k + mapT.y];
+}
+function renderMap(rows) {
+  const wrap = $("mapwrap"), cv = $("map");
+  const W = wrap.clientWidth, H = Math.max(100, wrap.clientHeight - 36), dpr = window.devicePixelRatio || 1;
+  cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + "px"; cv.style.height = H + "px";
+  const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+  const pts = rows.filter((f) => f.ex != null);
+  const col = mapColorFn($("map_color").value, pts);
+  mapPts = [];
+  ctx.globalAlpha = 0.8;
+  for (const f of pts) {
+    const [x, y] = mapProject(f.ex, f.ey, W, H);
+    mapPts.push({ x, y, f });
+    if (x < -4 || x > W + 4 || y < -4 || y > H + 4) continue;
+    ctx.beginPath(); ctx.arc(x, y, 3, 0, 6.2832); ctx.fillStyle = col.fn(f); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  const lg = $("maplegend");
+  if (col.legend) lg.innerHTML = col.legend.map(([v, c]) => `<span class="lg"><i style="background:${c}"></i>${esc(v)}</span>`).join("");
+  else { const [lo, hi, log] = col.range, fmt = (v) => log ? Math.round(Math.expm1(v)) : (+v).toFixed(2);
+    lg.innerHTML = `<span class="lg">${fmt(lo)}</span><span class="lgbar" style="background:linear-gradient(90deg,${grad4(0)},${grad4(.5)},${grad4(1)})"></span><span class="lg">${fmt(hi)}</span>`; }
+}
+function mapPick(mx, my, r) { let best = null, bd = r * r; for (const p of mapPts) { const d = (p.x - mx) ** 2 + (p.y - my) ** 2; if (d < bd) { bd = d; best = p; } } return best; }
+function setupMap() {
+  if (mapInit) return; mapInit = true;
+  const cv = $("map");
+  cv.addEventListener("wheel", (e) => { e.preventDefault(); const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top, f = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+    mapT.x = mx - (mx - mapT.x) * f; mapT.y = my - (my - mapT.y) * f; mapT.k *= f; renderMap(lastRows); }, { passive: false });
+  cv.addEventListener("mousedown", (e) => { mapDrag = { x: e.clientX, y: e.clientY, ox: mapT.x, oy: mapT.y, moved: false }; });
+  window.addEventListener("mousemove", (e) => {
+    const cv2 = $("map"), r = cv2.getBoundingClientRect();
+    if (mapDrag) { mapDrag.moved = mapDrag.moved || Math.abs(e.clientX - mapDrag.x) + Math.abs(e.clientY - mapDrag.y) > 3;
+      mapT.x = mapDrag.ox + (e.clientX - mapDrag.x); mapT.y = mapDrag.oy + (e.clientY - mapDrag.y); renderMap(lastRows); return; }
+    if (viewMode !== "map") return;
+    const tip = $("maptip");
+    if (e.target !== cv2) { tip.classList.add("hidden"); return; }
+    const p = mapPick(e.clientX - r.left, e.clientY - r.top, 7);
+    if (p) { tip.classList.remove("hidden"); tip.style.left = (e.clientX - r.left + 14) + "px"; tip.style.top = (e.clientY - r.top + 14) + "px";
+      tip.innerHTML = `<b>${esc(p.f.id)}</b>${p.f.name ? "<br>" + esc(p.f.name) : ""}`; } else tip.classList.add("hidden");
+  });
+  window.addEventListener("mouseup", (e) => { if (mapDrag && !mapDrag.moved && e.target === $("map")) { const r = $("map").getBoundingClientRect(); const p = mapPick(e.clientX - r.left, e.clientY - r.top, 9); if (p) openDeep(p.f.id); } mapDrag = null; });
+  $("map_color").addEventListener("change", () => renderMap(lastRows));
+}
+
+// ---------------- AtlasAPI: programmatic surface the assistant drives ----------------
+const FILTER_MAP = { length_min: "len_min", length_max: "len_max", plddt_min: "plddt_min", clash_max: "clash_max",
+  novelty_max: "tm_max", overlap_max: "ov_max", shape_agr_min: "agr_min", compactness_min: "cr_min",
+  paired_min: "bp_min", fold_size_min: "fold_min", seq_cluster_min: "sclust_min", top_n: "topn", rank: "rank_key" };
+const BOOL_MAP = { novel_only: "novel_only", shape_only: "shape_ok", require_tertiary: "req_tert", require_rare: "req_rare", only_with_tm: "tm_has", per_letter: "per_letter" };
+function applyFilters(obj) {
+  obj = obj || {};
+  const set = (id, v) => { const el = $(id); if (!el) return; if (el.type === "checkbox") el.checked = !!v; else el.value = v; };
+  for (const k in obj) {
+    if (k in FILTER_MAP) set(FILTER_MAP[k], obj[k]);
+    else if (k in BOOL_MAP) set(BOOL_MAP[k], obj[k]);
+    else if (k === "pseudoknot") set("pk", obj[k] === true ? "1" : obj[k] === false ? "0" : String(obj[k]));
+    else if (k === "search") set("search", obj[k]);
+    else if (k === "motifs") { const want = new Set((obj[k] || []).map(String)); document.querySelectorAll(".mf").forEach((c) => { c.checked = want.has(c.value); }); }
+    else if (k === "letters") { const want = new Set((obj[k] || []).map(String)); document.querySelectorAll(".lf").forEach((c) => { c.checked = want.has(c.value); }); }
+  }
+  sortOverride = null; syncLabels(); saveState(); render();
+  return lastRows.length;
+}
+function fieldStats(field, over) {
+  const data = (over === "all" ? FOLDS : lastRows).map((f) => f[field]).filter((v) => v != null && v !== "");
+  if (!data.length) return { field, n: 0 };
+  if (typeof data[0] === "number") {
+    const s = [...data].sort((a, b) => a - b), lo = s[0], hi = s[s.length - 1], mean = s.reduce((a, b) => a + b, 0) / s.length;
+    const nb = 20, w = (hi - lo) / nb || 1, hist = Array.from({ length: nb }, (_, i) => ({ x0: +(lo + i * w).toFixed(3), count: 0 }));
+    s.forEach((v) => { hist[Math.min(nb - 1, Math.floor((v - lo) / w))].count++; });
+    return { field, n: s.length, min: lo, max: hi, mean: +mean.toFixed(4), median: s[s.length >> 1], histogram: hist };
+  }
+  const counts = {}; data.forEach((v) => { counts[v] = (counts[v] || 0) + 1; });
+  return { field, n: data.length, counts: Object.fromEntries(Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 40)) };
+}
+window.AtlasAPI = {
+  setView,
+  setColorBy: (f) => { if ($("map_color")) { $("map_color").value = f; if (viewMode === "map") renderMap(lastRows); } },
+  applyFilters,
+  resetFilters: () => { $("reset").click(); return lastRows.length; },
+  selectFold: (id) => { const f = foldById(id); if (!f) return false; openDeep(id); return true; },
+  getResults: (limit, fields) => {
+    const def = ["id", "name", "letter", "length", "plddt", "best_tm1", "near", "rna_type", "rfam_id", "rfam_name",
+      "fold_size", "global_fold_id", "seq_cluster_size", "contact_ratio", "bp_fraction", "pseudoknot", "n_tert", "n_rare",
+      "shape_ok", "shape_agr", "is_novel_v341", "motifs", "ex", "ey"];
+    const ks = fields && fields.length ? fields : def;
+    return lastRows.slice(0, limit || 50).map((f) => { const o = {}; ks.forEach((k) => { if (f[k] !== undefined) o[k] = f[k]; }); return o; });
+  },
+  fieldStats,
+  getState: () => ({ shown: lastRows.length, total: FOLDS.length, view: viewMode, sources: activeSources(),
+    columns: COLS.map((c) => c[0]), motif_types: MOTIF_SET, letters: LETTERS }),
+};
 
 boot();

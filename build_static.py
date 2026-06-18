@@ -59,7 +59,7 @@ def main():
 
     # stage the web shell into dist/ so the whole site syncs from one dir.
     import shutil
-    for f in ("index.html", "app.js", "style.css", "viz_style.js", "datasets.js"):
+    for f in ("index.html", "app.js", "agent.js", "style.css", "viz_style.js", "datasets.js"):
         shutil.copy(os.path.join(ROOT, "web", f), f"{args.out}/{f}")
     shutil.copy(os.path.join(ROOT, "web", "lib", "3Dmol-min.js"), f"{args.out}/lib/3Dmol-min.js")
     # deploy config: same-origin data, passcode-gated (overrides the local dev config.js)

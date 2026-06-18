@@ -31,11 +31,16 @@
     <div id="source-panel" class="hidden"></div>
   </span>
   <input id="search" type="search" placeholder="search id · name · sublibrary…" autocomplete="off">
+  <span id="viewctl" title="view">
+    <button data-view="table" class="active">Table</button>
+    <button data-view="map">Map</button>
+  </span>
   <span id="layoutctl" title="preview panel layout">
     <button data-mode="modal" title="Centered window">&#9744;</button>
     <button data-mode="right" title="Dock right">&#9707;</button>
     <button data-mode="bottom" title="Dock bottom">&#9707;</button>
   </span>
+  <button id="agent-btn" title="Ask the Atlas assistant">&#10022; Ask</button>
   <button id="help-btn" title="What do the filters & metrics mean?">?</button>
   <span id="count" class="count"></span>
 </header>
@@ -134,7 +139,38 @@
       <thead><tr id="thead"></tr></thead>
       <tbody id="tbody"></tbody>
     </table>
+    <div id="mapwrap" class="hidden">
+      <div id="mapctl">
+        <label>color by</label>
+        <select id="map_color">
+          <option value="best_tm1">novelty (best_tm1)</option>
+          <option value="plddt">pLDDT</option>
+          <option value="fold_size">structural fold size</option>
+          <option value="bp_fraction">base-paired fraction</option>
+          <option value="contact_ratio">compactness</option>
+          <option value="rna_type">RNA type</option>
+          <option value="letter">library</option>
+        </select>
+        <span class="map-hint">scroll = zoom · drag = pan · click a point = open · hover = info</span>
+        <span id="maplegend"></span>
+      </div>
+      <canvas id="map"></canvas>
+      <div id="maptip" class="hidden"></div>
+    </div>
   </main>
+</div>
+
+<div id="agent" class="hidden">
+  <div class="agent-head">
+    <span>&#10022; Atlas assistant</span>
+    <button id="agent-clear" title="Clear conversation">clear</button>
+    <button id="agent-close" title="Close">&times;</button>
+  </div>
+  <div id="agent-log"></div>
+  <div id="agent-input-row">
+    <textarea id="agent-input" rows="2" placeholder="Ask me to filter, find folds, analyze, or draw a chart…"></textarea>
+    <button id="agent-send">Send</button>
+  </div>
 </div>
 
 <div id="help" class="hidden">
@@ -218,5 +254,6 @@
 <script src="datasets.js"></script>
 <script src="viz_style.js"></script>
 <script src="app.js"></script>
+<script src="agent.js"></script>
 </body>
 </html>

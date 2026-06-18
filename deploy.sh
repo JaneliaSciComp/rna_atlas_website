@@ -14,7 +14,7 @@ DIST=E2CV6KWMNI7AQP
 CF=ddc01lh56i5th.cloudfront.net
 cd "$(dirname "$0")"
 
-SHELL_FILES="index.html app.js style.css viz_style.js datasets.js"
+SHELL_FILES="index.html app.js agent.js style.css viz_style.js datasets.js"
 
 # deploy the web shell to a prefix with a generated (target-specific) config.js.
 #   $1 = dest prefix ("" for root, "dev/" for dev)   $2 = DATA_BASE value
@@ -24,9 +24,12 @@ deploy_shell() {
     [ -f "web/$f" ] && aws --profile $P s3 cp "web/$f" "$B/${pfx}$f" --only-show-errors && echo "  ${pfx}$f"
   done
   # config.js is generated per-target (web/config.js is the local-dev one and is never uploaded).
-  printf 'window.DATA_BASE = "%s";\nwindow.GATED = true;\n' "$db" \
+  # Shared Claude key (optional) comes from the gitignored .claude_key file so it's never committed.
+  CFG=$(printf 'window.DATA_BASE = "%s";\nwindow.GATED = true;\n' "$db")
+  [ -f .claude_key ] && CFG="$CFG"$'\n'"window.CLAUDE_KEY = \"$(tr -d '\n' < .claude_key)\";"
+  printf '%s\n' "$CFG" \
     | aws --profile $P s3 cp - "$B/${pfx}config.js" --content-type application/javascript --only-show-errors \
-    && echo "  ${pfx}config.js  (DATA_BASE=\"$db\")"
+    && echo "  ${pfx}config.js  (DATA_BASE=\"$db\"$([ -f .claude_key ] && echo ' +CLAUDE_KEY'))"
   aws --profile $P s3 cp web/lib/3Dmol-min.js "$B/${pfx}lib/3Dmol-min.js" --only-show-errors && echo "  ${pfx}lib/3Dmol-min.js"
   # static image assets (favicon set + header/gate logos)
   for f in icon.png logo_exp.png favicon.ico favicon-16x16.png favicon-32x32.png \
@@ -78,9 +81,11 @@ case "${1:-prod}" in
              apple-touch-icon.png android-chrome-192x192.png android-chrome-512x512.png site.webmanifest; do
       aws --profile $P s3 cp "$B/dev/$f" "$B/$f" --only-show-errors && echo "  $f"
     done
-    printf 'window.DATA_BASE = "";\nwindow.GATED = true;\n' \
+    CFG=$(printf 'window.DATA_BASE = "";\nwindow.GATED = true;\n')
+    [ -f .claude_key ] && CFG="$CFG"$'\n'"window.CLAUDE_KEY = \"$(tr -d '\n' < .claude_key)\";"
+    printf '%s\n' "$CFG" \
       | aws --profile $P s3 cp - "$B/config.js" --content-type application/javascript --only-show-errors \
-      && echo "  config.js  (prod: DATA_BASE=\"\")"
+      && echo "  config.js  (prod$([ -f .claude_key ] && echo ' +CLAUDE_KEY'))"
     echo "invalidating /* ..."; invalidate "/*"
     echo "done — promoted to https://rna-atlas.org/"
     ;;

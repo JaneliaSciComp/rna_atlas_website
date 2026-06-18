@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 DEPLOYED.local.md
 dist/
+.claude_key
+.ssbak/

@@ -30,7 +30,7 @@ deploy_shell() {
   printf '%s\n' "$CFG" \
     | aws --profile $P s3 cp - "$B/${pfx}config.js" --content-type application/javascript --only-show-errors \
     && echo "  ${pfx}config.js  (DATA_BASE=\"$db\"$([ -f .claude_key ] && echo ' +CLAUDE_KEY'))"
-  aws --profile $P s3 cp web/lib/3Dmol-min.js "$B/${pfx}lib/3Dmol-min.js" --only-show-errors && echo "  ${pfx}lib/3Dmol-min.js"
+  for lf in web/lib/*.js; do bn=$(basename "$lf"); aws --profile $P s3 cp "$lf" "$B/${pfx}lib/$bn" --only-show-errors && echo "  ${pfx}lib/$bn"; done
   # static image assets (favicon set + header/gate logos)
   for f in claude.png icon.png logo_exp.png favicon.ico favicon-16x16.png favicon-32x32.png \
            apple-touch-icon.png android-chrome-192x192.png android-chrome-512x512.png site.webmanifest; do
@@ -76,7 +76,7 @@ case "${1:-prod}" in
     ;;
   promote)
     echo "promote dev/ shell -> root (server-side copy of the tested bytes)"
-    for f in $SHELL_FILES lib/3Dmol-min.js claude.png \
+    for f in $SHELL_FILES lib/3Dmol-min.js lib/three.min.js lib/OrbitControls.js claude.png \
              icon.png logo_exp.png favicon.ico favicon-16x16.png favicon-32x32.png \
              apple-touch-icon.png android-chrome-192x192.png android-chrome-512x512.png site.webmanifest; do
       aws --profile $P s3 cp "$B/dev/$f" "$B/$f" --only-show-errors && echo "  $f"

@@ -31,6 +31,8 @@ deploy_shell() {
     | aws --profile $P s3 cp - "$B/${pfx}config.js" --content-type application/javascript --only-show-errors \
     && echo "  ${pfx}config.js  (DATA_BASE=\"$db\"$([ -f .claude_key ] && echo ' +CLAUDE_KEY'))"
   for lf in web/lib/*.js; do bn=$(basename "$lf"); aws --profile $P s3 cp "$lf" "$B/${pfx}lib/$bn" --only-show-errors && echo "  ${pfx}lib/$bn"; done
+  # /inference subpage
+  for f in web/inference/*; do [ -f "$f" ] && aws --profile $P s3 cp "$f" "$B/${pfx}inference/$(basename "$f")" --only-show-errors && echo "  ${pfx}inference/$(basename "$f")"; done
   # static image assets (favicon set + header/gate logos)
   for f in claude.png icon.png logo_exp.png favicon.ico favicon-16x16.png favicon-32x32.png \
            apple-touch-icon.png android-chrome-192x192.png android-chrome-512x512.png site.webmanifest; do
@@ -78,7 +80,8 @@ case "${1:-prod}" in
     echo "promote dev/ shell -> root (server-side copy of the tested bytes)"
     for f in $SHELL_FILES lib/3Dmol-min.js lib/three.min.js lib/OrbitControls.js claude.png \
              icon.png logo_exp.png favicon.ico favicon-16x16.png favicon-32x32.png \
-             apple-touch-icon.png android-chrome-192x192.png android-chrome-512x512.png site.webmanifest; do
+             apple-touch-icon.png android-chrome-192x192.png android-chrome-512x512.png site.webmanifest \
+             inference/index.html inference/inference.js inference/inference.css; do
       aws --profile $P s3 cp "$B/dev/$f" "$B/$f" --only-show-errors && echo "  $f"
     done
     CFG=$(printf 'window.DATA_BASE = "";\nwindow.GATED = true;\n')

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RNAnix — predict a structure</title>
+<link rel="icon" type="image/png" sizes="32x32" href="../favicon-32x32.png">
+<link rel="shortcut icon" href="../favicon.ico">
+<link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="inference.css">
+</head>
+<body>
+<div id="gate" class="hidden">
+  <div class="gate-card">
+    <img class="gate-logo" src="../logo_exp.png" alt="RNA Atlas Explorer">
+    <p class="gate-sub">Enter the access passcode.</p>
+    <input id="gate-input" type="password" autocomplete="off" placeholder="passcode">
+    <button id="gate-go">Enter</button>
+    <p id="gate-msg" class="gate-err"></p>
+  </div>
+</div>
+
+<header>
+  <img class="hdr-logo" src="../icon.png" alt="">
+  <h1>RNAnix · predict a structure</h1>
+  <a id="back-link" href="../">&larr; Atlas Explorer</a>
+  <span id="infer-status" class="count"></span>
+</header>
+
+<div id="ilayout">
+  <aside id="ipanel">
+    <h2>Input</h2>
+    <label class="ilbl" for="seq">RNA sequence</label>
+    <textarea id="seq" rows="6" placeholder="Paste an RNA sequence (A C G U). FASTA header optional."></textarea>
+    <div class="seqinfo"><span id="seqlen">0 nt</span><button id="example-btn" class="linkbtn" type="button">load example</button></div>
+    <label class="ilbl" for="jobname">Name (optional)</label>
+    <input id="jobname" type="text" placeholder="my RNA">
+    <fieldset>
+      <legend>Options</legend>
+      <label class="chk"><input type="checkbox" id="opt_msa" checked> refine with MSA when ready (two-stage)</label>
+      <label class="chk"><input type="checkbox" id="opt_chemmap"> condition on chemical mapping (if provided)</label>
+    </fieldset>
+    <button id="predict-btn">Predict</button>
+    <p id="predict-note" class="muted"></p>
+  </aside>
+
+  <main id="iresult">
+    <div id="stages"></div>
+    <div id="iview">
+      <div id="iviewer"></div>
+      <div id="ibadges"></div>
+    </div>
+    <div id="iplaceholder">Submit a sequence to predict its 3D structure. You'll get a fast draft first, then an MSA-refined model when the MSA finishes.</div>
+  </main>
+</div>
+
+<script src="../lib/3Dmol-min.js"></script>
+<script src="../config.js"></script>
+<script src="inference.js"></script>
+</body>
+</html>

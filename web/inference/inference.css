@@ -1,0 +1,40 @@
+#back-link { color: #cdd6dd; text-decoration: none; font-size: 13px; margin-left: 14px; }
+#back-link:hover { color: #fff; }
+
+#ilayout { display: flex; height: calc(100vh - 46px); width: 100%; }
+#ipanel { width: 340px; overflow-y: auto; padding: 14px 16px; background: #fff; border-right: 1px solid #dde3e8; }
+#ipanel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: #5b6670; margin: 2px 0 12px; }
+.ilbl { display: block; font-size: 12px; color: #5b6670; margin: 10px 0 3px; font-weight: 600; }
+#seq { width: 100%; resize: vertical; font: 12px ui-monospace, Menlo, monospace; border: 1px solid #cdd6dd; border-radius: 6px; padding: 8px; letter-spacing: .5px; }
+#jobname { width: 100%; border: 1px solid #cdd6dd; border-radius: 6px; padding: 6px 8px; font: 13px sans-serif; }
+.seqinfo { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #8a96a0; margin-top: 3px; }
+.linkbtn { background: none; border: 0; color: #2e6f95; cursor: pointer; font-size: 11px; }
+.linkbtn:hover { text-decoration: underline; }
+#predict-btn { width: 100%; margin-top: 12px; padding: 9px; background: #2e6f95; color: #fff; border: 0; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px; }
+#predict-btn:hover { background: #245a7a; }
+#predict-note { font-size: 12px; margin-top: 8px; line-height: 1.45; }
+#predict-note code { background: #eef2f5; padding: 0 4px; border-radius: 3px; }
+
+#iresult { flex: 1; position: relative; display: flex; flex-direction: column; padding: 14px 18px; overflow: auto; }
+
+/* stage timeline */
+#stages { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.stage { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 5px 11px; border-radius: 16px; border: 1px solid #e3e8ec; color: #8a96a0; background: #fff; }
+.stage i { width: 9px; height: 9px; border-radius: 50%; background: #cdd6dd; display: inline-block; }
+.stage.run { color: #2e6f95; border-color: #2e6f95; }
+.stage.run i { background: #2e6f95; animation: ipulse 1s ease-in-out infinite; }
+.stage.done { color: #2f8f57; border-color: #b7dcc4; }
+.stage.done i { background: #2f8f57; }
+.stage.err { color: #c0504d; border-color: #e6b3b0; }
+.stage.err i { background: #c0504d; }
+@keyframes ipulse { 0%, 100% { opacity: .4; } 50% { opacity: 1; } }
+
+#iview { display: none; flex: 1; min-height: 360px; display: flex; flex-direction: column; }
+#iviewer { position: relative; width: 100%; flex: 1; min-height: 360px; background: #0d1117; border-radius: 8px; }
+#ibadges { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.rbadge { font-size: 12px; border: 1px solid #cdd6dd; background: #fff; color: #2e6f95; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+.rbadge.active { background: #2e6f95; color: #fff; border-color: #2e6f95; }
+.rbadge:hover { background: #eaf3f8; }
+.rbadge.active:hover { background: #245a7a; }
+.rbadge.dl { color: #5b6670; margin-left: auto; }
+#iplaceholder { color: #8a96a0; font-size: 13px; max-width: 520px; line-height: 1.5; margin-top: 20px; }

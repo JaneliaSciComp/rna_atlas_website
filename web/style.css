@@ -171,3 +171,5 @@ tbody tr:hover { background: #eaf3f8; }
 #agent-log .agent-tbl { border-collapse: collapse; font-size: 11px; margin: 3px 0; }
 #agent-log .agent-tbl th, #agent-log .agent-tbl td { border: 1px solid #cdd6dd; padding: 2px 6px; text-align: left; white-space: nowrap; }
 #agent-log .agent-tbl th { background: #eef2f5; font-weight: 600; }
+#agent-log .msg.thinking { color: #5b6670; background: #f0f3f6; animation: agentpulse 1.1s ease-in-out infinite; }
+@keyframes agentpulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }

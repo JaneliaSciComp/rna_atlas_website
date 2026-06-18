@@ -100,22 +100,38 @@ You can DO anything the user can: change filters, search, switch to the Map (sca
     return r.json();
   }
 
+  function describe(name, inp) {
+    inp = inp || {};
+    if (name === "set_filters") { const e = Object.entries(inp.filters || {}); const s = e.slice(0, 4).map(([k, v]) => `${k}=${Array.isArray(v) ? v.join("/") : v}`).join(", "); return "Filtering" + (s ? ` — ${s}${e.length > 4 ? " …" : ""}` : ""); }
+    if (name === "reset_filters") return "Resetting filters";
+    if (name === "search") return `Searching "${inp.query || ""}"`;
+    if (name === "set_view") return `Switching to ${inp.mode} view` + (inp.color_by ? ` · color by ${inp.color_by}` : "");
+    if (name === "select_fold") return `Opening ${inp.id}`;
+    if (name === "get_results") return `Reading ${inp.limit || 50} results`;
+    if (name === "get_field_stats") return `Computing ${inp.field} stats over ${inp.over || "results"}`;
+    if (name === "get_state") return "Checking current state";
+    if (name === "draw_chart") return `Drawing ${inp.chart_type || ""} chart` + (inp.title ? ` — ${inp.title}` : "");
+    return name;
+  }
   async function run(userText) {
     messages.push({ role: "user", content: userText });
     bubble("user", md(userText));
-    const thinking = bubble("bot muted", "…");
+    const status = bubble("bot thinking", "Thinking…");
+    const setStatus = (t) => { status.textContent = t + "…"; $("agent-log").appendChild(status); scroll(); };
     try {
       for (let i = 0; i < 10; i++) {
+        setStatus("Claude is thinking");
         const resp = await callAPI();
         messages.push({ role: "assistant", content: resp.content });
         for (const b of resp.content) if (b.type === "text" && b.text.trim()) bubble("bot", md(b.text));
         const calls = resp.content.filter((b) => b.type === "tool_use");
         if (!calls.length || resp.stop_reason !== "tool_use") break;
+        setStatus(calls.map((c) => describe(c.name, c.input)).join(" · "));
         const results = calls.map((c) => ({ type: "tool_result", tool_use_id: c.id, content: JSON.stringify(tool(c.name, c.input || {})) }));
         messages.push({ role: "user", content: results });
       }
     } catch (e) { bubble("bot err", "⚠ " + esc(e.message)); }
-    thinking.remove();
+    status.remove();
   }
 
   const EXAMPLES = [

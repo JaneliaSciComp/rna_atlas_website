@@ -3,8 +3,8 @@
 // Token: localStorage "atlas_claude_key" (user-supplied) else window.CLAUDE_KEY (shared,
 // injected into the gated config). Calls the Anthropic Messages API directly from the browser.
 (function () {
-  const MODEL = window.CLAUDE_MODEL || "claude-sonnet-4-6";
   const API = "https://api.anthropic.com/v1/messages";
+  function model() { const s = $("agent-model"); return (s && s.value) || localStorage.getItem("atlas_model") || window.CLAUDE_MODEL || "claude-sonnet-4-6"; }
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   let messages = [];
@@ -75,7 +75,7 @@ You can DO anything the user can: change filters, search, switch to the Map (sca
     const r = await fetch(API, {
       method: "POST",
       headers: { "content-type": "application/json", "x-api-key": key(), "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
-      body: JSON.stringify({ model: MODEL, max_tokens: 1500, system: SYSTEM, tools: TOOLS, messages }),
+      body: JSON.stringify({ model: model(), max_tokens: 1500, system: SYSTEM, tools: TOOLS, messages }),
     });
     if (!r.ok) throw new Error("API " + r.status + ": " + (await r.text()).slice(0, 300));
     return r.json();
@@ -110,6 +110,7 @@ You can DO anything the user can: change filters, search, switch to the Map (sca
     if (!$("agent-btn")) return;
     $("agent-btn").addEventListener("click", () => { $("agent").classList.toggle("hidden"); if (!$("agent").classList.contains("hidden")) $("agent-input").focus(); });
     $("agent-close").addEventListener("click", () => $("agent").classList.add("hidden"));
+    const ms = $("agent-model"); if (ms) { const saved = localStorage.getItem("atlas_model"); if (saved) ms.value = saved; ms.addEventListener("change", () => localStorage.setItem("atlas_model", ms.value)); }
     $("agent-clear").addEventListener("click", () => { messages = []; $("agent-log").innerHTML = ""; });
     const send = () => { const t = $("agent-input").value.trim(); if (!t) return; if (!ensureKey()) { bubble("bot err", "No API key set."); return; } $("agent-input").value = ""; run(t); };
     $("agent-send").addEventListener("click", send);

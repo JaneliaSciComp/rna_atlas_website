@@ -40,7 +40,7 @@
     <button data-mode="right" title="Dock right">&#9707;</button>
     <button data-mode="bottom" title="Dock bottom">&#9707;</button>
   </span>
-  <button id="agent-btn" title="Ask the Atlas assistant">&#10022; Ask</button>
+  <button id="agent-btn" title="Ask the Atlas assistant"><img src="claude.png" alt="Ask Claude"></button>
   <button id="help-btn" title="What do the filters & metrics mean?">?</button>
   <span id="count" class="count"></span>
 </header>
@@ -162,7 +162,14 @@
 
 <div id="agent" class="hidden">
   <div class="agent-head">
-    <span>&#10022; Atlas assistant</span>
+    <img src="claude.png" alt="" class="agent-logo">
+    <span>Atlas assistant</span>
+    <select id="agent-model" title="model">
+      <option value="claude-sonnet-4-6">Sonnet 4.6</option>
+      <option value="claude-opus-4-8">Opus 4.8</option>
+      <option value="claude-haiku-4-5-20251001">Haiku 4.5</option>
+      <option value="claude-fable-5">Fable 5</option>
+    </select>
     <button id="agent-clear" title="Clear conversation">clear</button>
     <button id="agent-close" title="Close">&times;</button>
   </div>

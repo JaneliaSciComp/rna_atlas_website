@@ -32,7 +32,7 @@ deploy_shell() {
     && echo "  ${pfx}config.js  (DATA_BASE=\"$db\"$([ -f .claude_key ] && echo ' +CLAUDE_KEY'))"
   aws --profile $P s3 cp web/lib/3Dmol-min.js "$B/${pfx}lib/3Dmol-min.js" --only-show-errors && echo "  ${pfx}lib/3Dmol-min.js"
   # static image assets (favicon set + header/gate logos)
-  for f in icon.png logo_exp.png favicon.ico favicon-16x16.png favicon-32x32.png \
+  for f in claude.png icon.png logo_exp.png favicon.ico favicon-16x16.png favicon-32x32.png \
            apple-touch-icon.png android-chrome-192x192.png android-chrome-512x512.png site.webmanifest; do
     [ -f "web/$f" ] && aws --profile $P s3 cp "web/$f" "$B/${pfx}$f" --only-show-errors && echo "  ${pfx}$f"
   done
@@ -76,7 +76,7 @@ case "${1:-prod}" in
     ;;
   promote)
     echo "promote dev/ shell -> root (server-side copy of the tested bytes)"
-    for f in $SHELL_FILES lib/3Dmol-min.js \
+    for f in $SHELL_FILES lib/3Dmol-min.js claude.png \
              icon.png logo_exp.png favicon.ico favicon-16x16.png favicon-32x32.png \
              apple-touch-icon.png android-chrome-192x192.png android-chrome-512x512.png site.webmanifest; do
       aws --profile $P s3 cp "$B/dev/$f" "$B/$f" --only-show-errors && echo "  $f"

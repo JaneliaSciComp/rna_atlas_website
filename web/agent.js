@@ -69,7 +69,26 @@ You can DO anything the user can: change filters, search, switch to the Map (sca
 
   function bubble(role, html) { const d = document.createElement("div"); d.className = "msg " + role; d.innerHTML = html; $("agent-log").appendChild(d); scroll(); return d; }
   function scroll() { const l = $("agent-log"); l.scrollTop = l.scrollHeight; }
-  function md(t) { return esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\n/g, "<br>"); }
+  function inlineMd(s) { return esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/`([^`]+)`/g, "<code>$1</code>"); }
+  function splitRow(line) { let s = line.trim(); if (s.startsWith("|")) s = s.slice(1); if (s.endsWith("|")) s = s.slice(0, -1); return s.split("|").map((c) => c.trim()); }
+  function md(t) {
+    const lines = String(t == null ? "" : t).split("\n");
+    const html = []; let buf = [];
+    const flush = () => { if (buf.length) { html.push("<div>" + buf.map(inlineMd).join("<br>") + "</div>"); buf = []; } };
+    let i = 0;
+    while (i < lines.length) {
+      const isTbl = lines[i].includes("|") && i + 1 < lines.length && lines[i + 1].includes("-") && /^[\s|:-]+$/.test(lines[i + 1].trim());
+      if (isTbl) {
+        flush();
+        const head = splitRow(lines[i]); i += 2; const body = [];
+        while (i < lines.length && lines[i].includes("|") && lines[i].trim()) { body.push(splitRow(lines[i])); i++; }
+        html.push("<table class='agent-tbl'><thead><tr>" + head.map((h) => "<th>" + inlineMd(h) + "</th>").join("") + "</tr></thead><tbody>"
+          + body.map((r) => "<tr>" + r.map((c) => "<td>" + inlineMd(c) + "</td>").join("") + "</tr>").join("") + "</tbody></table>");
+      } else { buf.push(lines[i]); i++; }
+    }
+    flush();
+    return html.join("");
+  }
 
   async function callAPI() {
     const r = await fetch(API, {

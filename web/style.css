@@ -167,3 +167,7 @@ tbody tr:hover { background: #eaf3f8; }
 #agent-log .welcome .ex { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
 #agent-log .ex-chip { text-align: left; background: #fff; border: 1px solid #cdd6dd; border-radius: 7px; padding: 6px 9px; font: 12px inherit; color: #2e6f95; cursor: pointer; }
 #agent-log .ex-chip:hover { background: #2e6f95; color: #fff; border-color: #2e6f95; }
+#agent-log .msg.bot { overflow-x: auto; }
+#agent-log .agent-tbl { border-collapse: collapse; font-size: 11px; margin: 3px 0; }
+#agent-log .agent-tbl th, #agent-log .agent-tbl td { border: 1px solid #cdd6dd; padding: 2px 6px; text-align: left; white-space: nowrap; }
+#agent-log .agent-tbl th { background: #eef2f5; font-weight: 600; }

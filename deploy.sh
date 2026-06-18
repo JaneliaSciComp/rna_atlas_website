@@ -73,7 +73,9 @@ case "${1:-prod}" in
     ;;
   promote)
     echo "promote dev/ shell -> root (server-side copy of the tested bytes)"
-    for f in $SHELL_FILES lib/3Dmol-min.js; do
+    for f in $SHELL_FILES lib/3Dmol-min.js \
+             icon.png logo_exp.png favicon.ico favicon-16x16.png favicon-32x32.png \
+             apple-touch-icon.png android-chrome-192x192.png android-chrome-512x512.png site.webmanifest; do
       aws --profile $P s3 cp "$B/dev/$f" "$B/$f" --only-show-errors && echo "  $f"
     done
     printf 'window.DATA_BASE = "";\nwindow.GATED = true;\n' \

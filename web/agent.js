@@ -67,7 +67,6 @@ CRITICAL: actually CALL the tools — never just say "let me…" or "now I'll dr
     if (spec.title) ctx.fillText(spec.title, pad, 12);
     const x0 = pad, y0 = H - pad, x1 = W - 10, y1 = 22;
     ctx.strokeStyle = "#cdd6dd"; ctx.beginPath(); ctx.moveTo(x0, y1); ctx.lineTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke();
-    const type = spec.chart_type;
     if (type === "bar" || type === "histogram") {
       const vals = data.map((d) => +d.value || 0), mx = Math.max(...vals, 1), n = data.length, bw = (x1 - x0) / n;
       data.forEach((d, i) => { const h = (d.value / mx) * (y0 - y1); ctx.fillStyle = "#2e6f95";

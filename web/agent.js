@@ -13,7 +13,9 @@
 
   const SYSTEM = `You are the assistant embedded in the RNA Atlas Explorer, a web tool over a predicted RNA structure atlas (Ribonanza-2 curated A–H plus Ribo-1 pseudolabel / OpenKnot / RFAM-PDB). Each row is an RNA "fold" with fields like: id, name, letter (library A–H), length, plddt, best_tm1 (novelty vs PDB; lower=more novel), is_novel_v341, near (nearest PDB), rna_type, rfam_id/rfam_name, fold_size & global_fold_id (structural cluster + member count), seq_cluster_size & global_seq_cluster_id, contact_ratio (compactness), bp_fraction, pseudoknot, n_tert/n_rare (tertiary motifs), motifs, shape_ok/shape_agr, ex/ey (2D t-SNE embedding coords).
 
-You can DO anything the user can: change filters, search, switch to the Map (scatter of the embedding), select/open a fold. And you can analyze: pull the current results, compute field stats, and draw charts. Use the tools — don't just describe actions, perform them. After acting, briefly say what you did and what's shown. When asked to analyze or "draw"/"plot", fetch data with get_results or get_field_stats, then call draw_chart. Keep replies short. Filters are AND-combined and apply to whichever data sources are active.`;
+You can DO anything the user can: change filters, search, switch to the Map (scatter of the embedding), select/open a fold. And you can analyze: pull the current results, compute field stats, and draw charts.
+
+CRITICAL: actually CALL the tools — never just say "let me…" or "now I'll draw…" and end your turn. Every action you describe must be an actual tool call in the SAME turn; only stop once the work is truly done. To chart, the simplest and most reliable way is to give draw_chart FIELD references and let the app build the data: scatter/line need x_field and y_field; histogram/bar need field. You usually do NOT need get_results first just to chart. Use over:'results' (current view) unless asked otherwise. Keep replies short. Filters are AND-combined over the active data sources.`;
 
   const TOOLS = [
     { name: "get_state", description: "Current view, # shown, active data sources, available columns, motif types, libraries.", input_schema: { type: "object", properties: {} } },
@@ -23,7 +25,7 @@ You can DO anything the user can: change filters, search, switch to the Map (sca
     { name: "select_fold", description: "Open the deep view (3D + tracks + metadata) for a fold by its id.", input_schema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } },
     { name: "get_results", description: "Return the current filtered+sorted folds (after top-N). Use to read/analyze data, incl. ex/ey embedding coords.", input_schema: { type: "object", properties: { limit: { type: "integer" }, fields: { type: "array", items: { type: "string" } } } } },
     { name: "get_field_stats", description: "Summary stats + histogram (numeric) or value counts (categorical) for a field, over 'results' (current) or 'all' folds in the active sources.", input_schema: { type: "object", properties: { field: { type: "string" }, over: { type: "string", enum: ["results", "all"] } }, required: ["field"] } },
-    { name: "draw_chart", description: "Render a chart in the chat. chart_type histogram/bar use data:[{label,value}]; scatter/line use data:[{x,y,label?}]. Provide data you obtained from get_results/get_field_stats.", input_schema: { type: "object", properties: { chart_type: { type: "string", enum: ["histogram", "bar", "scatter", "line"] }, title: { type: "string" }, x_label: { type: "string" }, y_label: { type: "string" }, data: { type: "array", items: { type: "object" } } }, required: ["chart_type", "data"] } },
+    { name: "draw_chart", description: "Render a chart in the chat. PREFERRED: give field references and the app builds the data — histogram/bar: field (a fold field); scatter/line: x_field and y_field (fold fields, e.g. length, n_tert, n_rare, best_tm1, plddt, fold_size, bp_fraction, contact_ratio, seq_cluster_size, ex, ey). over='results' (current view, default) or 'all'. Alternatively pass explicit data: [{label,value}] for histogram/bar or [{x,y,label?}] for scatter/line.", input_schema: { type: "object", properties: { chart_type: { type: "string", enum: ["histogram", "bar", "scatter", "line"] }, title: { type: "string" }, field: { type: "string" }, x_field: { type: "string" }, y_field: { type: "string" }, over: { type: "string", enum: ["results", "all"] }, x_label: { type: "string" }, y_label: { type: "string" }, data: { type: "array", items: { type: "object" } } }, required: ["chart_type"] } },
   ];
 
   function tool(name, inp) {
@@ -36,13 +38,29 @@ You can DO anything the user can: change filters, search, switch to the Map (sca
       if (name === "select_fold") return { ok: A.selectFold(inp.id) };
       if (name === "get_results") return { results: A.getResults(inp.limit || 50, inp.fields) };
       if (name === "get_field_stats") return A.fieldStats(inp.field, inp.over || "results");
-      if (name === "draw_chart") { drawChart(inp); return { ok: true }; }
+      if (name === "draw_chart") { return { ok: true, points: drawChart(inp) }; }
       return { error: "unknown tool " + name };
     } catch (e) { return { error: String(e && e.message || e) }; }
   }
 
   function drawChart(spec) {
-    const data = spec.data || []; if (!data.length) return;
+    const A = window.AtlasAPI, type = spec.chart_type, over = spec.over || "results";
+    let data = spec.data;
+    if (!data || !data.length) {                     // build from field references
+      if ((type === "histogram" || type === "bar") && spec.field) {
+        const st = A.fieldStats(spec.field, over);
+        data = st.counts ? Object.entries(st.counts).map(([l, v]) => ({ label: l, value: v }))
+          : (st.histogram || []).map((h) => ({ label: h.x0, value: h.count }));
+        spec.title = spec.title || spec.field;
+      } else if ((type === "scatter" || type === "line") && spec.x_field && spec.y_field) {
+        data = A.getResults(5000, [spec.x_field, spec.y_field, "id"])
+          .map((f) => ({ x: f[spec.x_field], y: f[spec.y_field], label: f.id }))
+          .filter((d) => typeof d.x === "number" && typeof d.y === "number");
+        spec.x_label = spec.x_label || spec.x_field; spec.y_label = spec.y_label || spec.y_field;
+      }
+    }
+    data = data || [];
+    if (!data.length) { bubble("bot err", "⚠ nothing to chart (no data / unknown field)"); return 0; }
     const W = 380, H = 220, pad = 36, cv = document.createElement("canvas");
     cv.width = W * 2; cv.height = H * 2; cv.style.width = W + "px"; cv.style.height = H + "px"; cv.className = "agent-chart";
     const ctx = cv.getContext("2d"); ctx.scale(2, 2); ctx.font = "10px sans-serif"; ctx.fillStyle = "#15242c";
@@ -65,6 +83,7 @@ You can DO anything the user can: change filters, search, switch to the Map (sca
       ctx.fillStyle = "#647179"; ctx.fillText((spec.x_label || "x") + "", x1 - 30, y0 + 14); ctx.save(); ctx.translate(10, y1 + 20); ctx.rotate(-Math.PI / 2); ctx.fillText((spec.y_label || "y") + "", 0, 0); ctx.restore();
     }
     const b = document.createElement("div"); b.className = "msg bot"; b.appendChild(cv); $("agent-log").appendChild(b); scroll();
+    return data.length;
   }
 
   function bubble(role, html) { const d = document.createElement("div"); d.className = "msg " + role; d.innerHTML = html; $("agent-log").appendChild(d); scroll(); return d; }

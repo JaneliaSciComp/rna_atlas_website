@@ -37,7 +37,7 @@ const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</
 // --- persist filter settings across reloads ---
 const FKEY = "atlas_filters";
 const FIELD_IDS = ["search", "len_min", "len_max", "plddt_min", "clash_max", "tm_max", "tm_has", "novel_only",
-  "ov_max", "shape_ok", "agr_min", "cr_min", "bp_min", "req_tert", "req_rare", "pk", "rank_key", "topn", "per_letter", "alt_palette", "color_by"];
+  "ov_max", "shape_ok", "agr_min", "cr_min", "bp_min", "fold_min", "sclust_min", "req_tert", "req_rare", "pk", "rank_key", "topn", "per_letter", "alt_palette", "color_by"];
 const altPalette = () => !!($("alt_palette") && $("alt_palette").checked);
 function snapshot() {
   const s = {};
@@ -196,6 +196,7 @@ function wireStatic() {
     $("len_max").value = Math.max(...FOLDS.map((f) => f.length || 0));
     ["shape_ok", "req_tert", "req_rare", "tm_has", "novel_only", "per_letter"].forEach((id) => $(id).checked = false);
     $("cr_min").value = 0; $("bp_min").value = 0;
+    if ($("fold_min")) $("fold_min").value = 0; if ($("sclust_min")) $("sclust_min").value = 0;
     $("pk").value = "any"; $("rank_key").value = "best_tm1:asc"; $("topn").value = 200;
     if ($("color_by")) $("color_by").value = "a23";
     if ($("search")) $("search").value = "";
@@ -240,6 +241,7 @@ function filters() {
     ovmax: +$("ov_max").value,
     shape: $("shape_ok").checked, agr: +$("agr_min").value,
     crmin: +$("cr_min").value, bpmin: +$("bp_min").value,
+    foldMin: +($("fold_min") ? $("fold_min").value : 0), sclustMin: +($("sclust_min") ? $("sclust_min").value : 0),
     tert: $("req_tert").checked, rare: $("req_rare").checked, motifs: mf,
     pk: $("pk").value, letters: new Set(lf),
     rank: $("rank_key").value, topn: +$("topn").value, perLetter: $("per_letter").checked,
@@ -249,7 +251,8 @@ function filters() {
 function pass(f, c) {
   if (c.q && !(f.id.toLowerCase().includes(c.q) || (f.name || "").toLowerCase().includes(c.q)
       || (f.sublibrary || "").toLowerCase().includes(c.q) || (f.rna_type || "").toLowerCase().includes(c.q)
-      || (f.rfam_name || "").toLowerCase().includes(c.q))) return false;
+      || (f.rfam_name || "").toLowerCase().includes(c.q)
+      || String(f.global_fold_id || "") === c.q || String(f.global_seq_cluster_id || "") === c.q)) return false;
   if (f.length != null && (f.length < c.lmin || f.length > c.lmax)) return false;
   if ((f.plddt || 0) < c.plddt) return false;
   if (f.clashscore != null && f.clashscore > c.clash) return false;
@@ -261,6 +264,8 @@ function pass(f, c) {
   if (c.agr > -1 && (f.shape_agr == null || f.shape_agr < c.agr)) return false;
   if (c.crmin > 0 && (f.contact_ratio == null || f.contact_ratio < c.crmin)) return false;
   if (c.bpmin > 0 && (f.bp_fraction == null || f.bp_fraction < c.bpmin)) return false;
+  if (c.foldMin > 0 && (f.fold_size == null || f.fold_size < c.foldMin)) return false;
+  if (c.sclustMin > 0 && (f.seq_cluster_size == null || f.seq_cluster_size < c.sclustMin)) return false;
   if (c.tert && f.n_tert < 1) return false;
   if (c.rare && f.n_rare < 1) return false;
   if (c.motifs.length && !c.motifs.some((m) => (f.motifs || []).includes(m))) return false;
@@ -301,7 +306,7 @@ const COLS = [
   ["id", "seq_id"], ["name", "name"], ["letter", "L"], ["length", "len"], ["plddt", "pLDDT"],
   ["best_tm1", "best_tm1"], ["near", "nearest"], ["overlap_ae", "ovlp_AE"],
   ["shape_ok", "SHAPE"], ["shape_agr", "SHAPE agr"], ["contact_ratio", "compact"], ["bp_fraction", "paired"],
-  ["n_tert", "tert"], ["n_rare", "rare"], ["pseudoknot", "PK"], ["motifs", "motifs"],
+  ["fold_size", "cluster"], ["n_tert", "tert"], ["n_rare", "rare"], ["pseudoknot", "PK"], ["motifs", "motifs"],
 ];
 
 function drawTable(rows) {
@@ -331,6 +336,7 @@ function drawTable(rows) {
       <td class="num">${num(f.best_tm1, 3)}</td><td title="${(f.near_title || "").replace(/"/g, "&quot;")}">${f.near || ""}</td>
       <td class="num">${num(f.overlap_ae, 2)}</td><td>${shape}</td>
       <td class="num">${num(f.shape_agr, 2)}</td><td class="num">${num(f.contact_ratio, 2)}</td><td class="num">${num(f.bp_fraction, 2)}</td>
+      <td class="num" title="${f.global_fold_id ? "structural fold #" + f.global_fold_id : ""}">${f.fold_size ?? ""}</td>
       <td class="num">${f.n_tert}</td><td class="num">${f.n_rare}</td>
       <td>${f.pseudoknot ? "&#10003;" : ""}</td><td>${chips}</td></tr>`;
   }).join("");
@@ -406,7 +412,9 @@ function drawProps(f) {
     ["Compactness (C1′ contact ratio)", num(f.contact_ratio, 3)],
     ["Base-paired fraction", num(f.bp_fraction, 3)],
     ["Tertiary motifs", `${f.n_tert} (rare ${f.n_rare})`],
-  ];
+    f.global_fold_id ? ["Structural fold (A–H)", `#${f.global_fold_id} &mdash; ${f.fold_size} member${f.fold_size === 1 ? "" : "s"}${f.overlap_global_fold_id ? ` &middot; nearest A–E fold #${f.overlap_global_fold_id}` : ""}`] : null,
+    f.global_seq_cluster_id ? ["Sequence cluster (A–H)", `#${f.global_seq_cluster_id} &mdash; ${f.seq_cluster_size} member${f.seq_cluster_size === 1 ? "" : "s"}`] : null,
+  ].filter(Boolean);
   const chips = (f.motifs || []).map((m) =>
     `<span class="motif-chip" style="background:${motifColor(m)}">${m.replace(/_/g, " ").toLowerCase()}</span>`).join(" ");
   $("props").innerHTML = "<table>" + rowsHtml.filter(Boolean).map(([k, v]) => `<tr><td class="muted">${k}</td><td>${v}</td></tr>`).join("")

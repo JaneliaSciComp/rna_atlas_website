@@ -77,6 +77,12 @@
     </fieldset>
 
     <fieldset>
+      <legend>Clusters (A&ndash;H)</legend>
+      <div class="row"><label>fold size &ge;</label><input type="number" id="fold_min" value="0" min="0"></div>
+      <div class="row"><label>seq clust &ge;</label><input type="number" id="sclust_min" value="0" min="0"></div>
+    </fieldset>
+
+    <fieldset>
       <legend>Motifs</legend>
       <label class="chk"><input type="checkbox" id="req_tert"> require &ge;1 tertiary motif</label>
       <label class="chk"><input type="checkbox" id="req_rare"> require a rare tertiary motif</label>
@@ -99,6 +105,8 @@
         <option value="n_rare:desc">rare motifs</option>
         <option value="contact_ratio:desc">compactness</option>
         <option value="bp_fraction:desc">base-paired fraction</option>
+        <option value="fold_size:desc">structural fold size (largest cluster)</option>
+        <option value="seq_cluster_size:desc">sequence cluster size</option>
       </select>
       <div class="row"><label>top-N</label><input type="number" id="topn" value="200" min="1"></div>
       <label class="chk"><input type="checkbox" id="per_letter"> top-N per letter</label>

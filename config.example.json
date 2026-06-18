@@ -6,6 +6,7 @@
   },
   "metadata_parquet": "<.../per_lib/Ribonanza2{L}.parquet>",
   "react_override": "<.../summary/react_override_fgh40.parquet>",
+  "crossed_tsv": "<.../202606-roi-1000selection/out/atlas_export/crossed_pairs_by_fold.tsv>",
   "hdf5": {
     "a": "<.../Ribonanza2A...hdf5>",
     "b": "<.../Ribonanza2B...hdf5>",

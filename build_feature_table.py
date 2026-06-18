@@ -27,12 +27,14 @@ try:
     STRUCT_BASES = _CFG.get("struct_bases", {})
     ANNOT = _CFG.get("annotation_manifest", "")
     REACT_OVERRIDE = _CFG.get("react_override", "")
+    CROSSED_TSV = _CFG.get("crossed_tsv", "")
 except Exception:
     EXP_DEFAULT = ""
     PARQ_TMPL = ""
     STRUCT_BASES = {}
     ANNOT = ""
     REACT_OVERRIDE = ""
+    CROSSED_TSV = ""
 
 PAIR_CHARS = set("()[]{}<>") | set(string.ascii_letters)
 
@@ -258,6 +260,22 @@ def parse_residues(s):
     return out
 
 
+def load_crossed(path):
+    """crossed-pairs tertiary-complexity (Max/Rhiju), precomputed in 202606-roi-1000selection via
+    lib.eval_defs.pct_crossed. seq_id -> {crossed_frac, n_crossed_pairs, mohca_regime_frac}. Joined,
+    NOT recomputed here (single source of truth lives in the mohca-contact-cnn repo)."""
+    out = {}
+    if not path or not os.path.exists(path):
+        print("  crossed_pairs skipped (no crossed_tsv in config.json)")
+        return out
+    for r in rows(path):
+        out[r["seq_id"]] = {"crossed_frac": fl(r.get("crossed_frac")),
+                            "n_crossed_pairs": fl(r.get("n_crossed_pairs")),
+                            "mohca_regime_frac": fl(r.get("mohca_regime_frac"))}
+    print(f"  crossed_pairs: {len(out)} folds from {os.path.basename(path)}")
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--exp", default=EXP_DEFAULT, help="mined-set dir (chaitanya)")
@@ -318,6 +336,7 @@ def main():
     src_ids = load_source_ids(sel)
     # structuredness metrics + manifest novelty (best_tm1 for all folds)
     contact = load_contact_ratios(sel)
+    crossed = load_crossed(CROSSED_TSV)
     bpfrac, tm_manifest, near_manifest, dbns = load_manifest(sel)
     for sid in sel:
         if sid not in novelty and sid in tm_manifest:
@@ -355,6 +374,9 @@ def main():
             "ss_class": md.get("ss_class", ""),
             "contact_ratio": contact.get(sid),
             "bp_fraction": bpfrac.get(sid),
+            "crossed_frac": crossed.get(sid, {}).get("crossed_frac"),
+            "n_crossed_pairs": crossed.get(sid, {}).get("n_crossed_pairs"),
+            "mohca_regime_frac": crossed.get(sid, {}).get("mohca_regime_frac"),
             "r2a3": r2a3,
             "shape_agr": (round(-r2a3, 4) if r2a3 is not None else None),
             "mean_prot_2a3": mp if mp is not None else fl(sh.get("mean_prot_2a3")),

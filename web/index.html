@@ -79,6 +79,7 @@
       <legend>Structure</legend>
       <div class="row"><label>compactness &ge;</label><input type="range" id="cr_min" min="0" max="5" value="0" step="0.05"><span id="cr_min_v">0</span></div>
       <div class="row"><label>paired frac &ge;</label><input type="range" id="bp_min" min="0" max="1" value="0" step="0.01"><span id="bp_min_v">0.00</span></div>
+      <div class="row"><label title="fraction of residues in a crossed (tertiary) contact pair — tangled fold, distinct from compactness">tertiary (crossed) &ge;</label><input type="range" id="cf_min" min="0" max="1" value="0" step="0.01"><span id="cf_min_v">0.00</span></div>
     </fieldset>
 
     <fieldset>
@@ -130,6 +131,8 @@
         <option value="n_rare:desc">rare motifs</option>
         <option value="contact_ratio:desc">compactness</option>
         <option value="bp_fraction:desc">base-paired fraction</option>
+        <option value="crossed_frac:desc">tertiary complexity (crossed-pairs)</option>
+        <option value="mohca_regime_frac:desc">MOHCA-regime fraction (25&ndash;50 nt)</option>
         <option value="fold_size:desc">structural fold size (largest cluster)</option>
         <option value="seq_cluster_size:desc">sequence cluster size</option>
       </select>
@@ -146,6 +149,7 @@
         <option value="plddt">pLDDT confidence</option>
         <option value="pairing">base pairing (paired/unpaired)</option>
         <option value="nuc">nucleotide (A/C/G/U)</option>
+        <option value="crossed">tertiary crossed-pairs (pinned residues)</option>
         <option value="spectrum">spectrum (5&prime;&rarr;3&prime;)</option>
       </select>
       <label class="chk" for="ss_view">2D secondary structure</label>
@@ -247,6 +251,8 @@
     <h3>Motifs &amp; topology</h3>
     <dl>
       <dt>Motifs</dt><dd>Tertiary RNA motifs detected by Rosetta <code>rna_motif</code> (A-minor, TL-receptor, T-loop, U-turn, platform, …). Filter by "≥1 tertiary", "a rare tertiary", or specific types. <b>tert</b>/<b>rare</b> columns count them.</dd>
+      <dt>Tertiary complexity (crossed-pairs)</dt><dd><b>Fraction of residues in a ‘crossed’ contact pair</b> (Max/Rhiju): a 3D contact pair (i,j) is crossed when another contact (k,l) interleaves it (i&lt;k&lt;j&lt;l) — the residue is pinned by tertiary structure, not just nested 2D pairing. bpp-free 3D topology. <b>Distinct from compactness</b> (density) and a continuous 3D-contact generalization of <b>pseudoknot</b>: it separates genuinely tangled tertiary folds from merely compact hairpins. Threshold contact &lt; 12 Å, |i&minus;j| &ge; 8 (Rhiju to finalize). The “tertiary crossed-pairs” 3D coloring mode paints these pinned residues.</dd>
+      <dt>MOHCA-regime fraction</dt><dd>Fraction of predicted contacts in MOHCA-seq’s strongest range (medium-range, 25&ndash;50 nt separation) — a proxy for where a MOHCA map would most add signal.</dd>
       <dt>Pseudoknot</dt><dd>The predicted secondary structure contains crossed base pairs.</dd>
     </dl>
 

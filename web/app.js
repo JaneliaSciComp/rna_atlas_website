@@ -684,6 +684,19 @@ function renderMap(rows) {
   const W = wrap.clientWidth, H = Math.max(100, wrap.clientHeight - 36), dpr = window.devicePixelRatio || 1;
   cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + "px"; cv.style.height = H + "px";
   const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+  // axes: gridded embedding box (moves with zoom/pan) + fixed t-SNE axis labels
+  const c00 = mapProject(0, 0, W, H), c11 = mapProject(1, 1, W, H);
+  const bL = Math.min(c00[0], c11[0]), bR = Math.max(c00[0], c11[0]), bT = Math.min(c00[1], c11[1]), bB = Math.max(c00[1], c11[1]);
+  ctx.strokeStyle = "#eef2f5"; ctx.lineWidth = 1;
+  for (let g = 0; g <= 1.0001; g += 0.25) {
+    const gx = mapProject(g, 0, W, H)[0], gy = mapProject(0, g, W, H)[1];
+    ctx.beginPath(); ctx.moveTo(gx, bT); ctx.lineTo(gx, bB); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(bL, gy); ctx.lineTo(bR, gy); ctx.stroke();
+  }
+  ctx.strokeStyle = "#dde3e8"; ctx.strokeRect(bL, bT, bR - bL, bB - bT);
+  ctx.fillStyle = "#8a96a0"; ctx.font = "11px sans-serif";
+  ctx.fillText("t-SNE 1", W / 2 - 18, H - 6);
+  ctx.save(); ctx.translate(11, H / 2 + 20); ctx.rotate(-Math.PI / 2); ctx.fillText("t-SNE 2", 0, 0); ctx.restore();
   const pts = rows.filter((f) => f.ex != null);
   const col = mapColorFn($("map_color").value, pts);
   mapPts = [];

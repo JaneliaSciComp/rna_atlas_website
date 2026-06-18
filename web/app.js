@@ -248,7 +248,8 @@ function filters() {
 
 function pass(f, c) {
   if (c.q && !(f.id.toLowerCase().includes(c.q) || (f.name || "").toLowerCase().includes(c.q)
-      || (f.sublibrary || "").toLowerCase().includes(c.q))) return false;
+      || (f.sublibrary || "").toLowerCase().includes(c.q) || (f.rna_type || "").toLowerCase().includes(c.q)
+      || (f.rfam_name || "").toLowerCase().includes(c.q))) return false;
   if (f.length != null && (f.length < c.lmin || f.length > c.lmax)) return false;
   if ((f.plddt || 0) < c.plddt) return false;
   if (f.clashscore != null && f.clashscore > c.clash) return false;
@@ -389,6 +390,8 @@ function drawProps(f) {
     ["Source", `${f.source} (lib ${f.letter})`],
     ["Sublibrary", f.sublibrary],
     f.rnacentral_id ? ["RNAcentral", `<a href="https://rnacentral.org/rna/${esc(f.rnacentral_id)}" target="_blank" rel="noopener">${esc(f.rnacentral_id)}</a>${f.rnacentral_name ? ` &mdash; ${esc(f.rnacentral_name)}` : ""}`] : null,
+    f.rna_type ? ["RNA type", esc(f.rna_type)] : null,
+    (f.member_dbs && f.member_dbs.length) ? ["Member databases", f.member_dbs.map(esc).join(", ")] : null,
     f.rfam_id ? ["Rfam family", `<a href="https://rfam.org/family/${esc(f.rfam_id)}" target="_blank" rel="noopener">${esc(f.rfam_id)}</a>${f.rfam_name ? ` &mdash; ${esc(f.rfam_name)}` : ""}`] : null,
     ["Length", `${f.length} nt`],
     ["pLDDT / gpde", `${num(f.plddt)} / ${num(f.gpde, 3)}`],

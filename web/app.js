@@ -388,6 +388,7 @@ function drawProps(f) {
   const rowsHtml = [
     ["Source", `${f.source} (lib ${f.letter})`],
     ["Sublibrary", f.sublibrary],
+    f.rnacentral_id ? ["RNAcentral", `<a href="https://rnacentral.org/rna/${esc(f.rnacentral_id)}" target="_blank" rel="noopener">${esc(f.rnacentral_id)}</a>${f.rnacentral_name ? ` &mdash; ${esc(f.rnacentral_name)}` : ""}`] : null,
     ["Length", `${f.length} nt`],
     ["pLDDT / gpde", `${num(f.plddt)} / ${num(f.gpde, 3)}`],
     ["Clashscore", num(f.clashscore, 2)],
@@ -404,7 +405,7 @@ function drawProps(f) {
   ];
   const chips = (f.motifs || []).map((m) =>
     `<span class="motif-chip" style="background:${motifColor(m)}">${m.replace(/_/g, " ").toLowerCase()}</span>`).join(" ");
-  $("props").innerHTML = "<table>" + rowsHtml.map(([k, v]) => `<tr><td class="muted">${k}</td><td>${v}</td></tr>`).join("")
+  $("props").innerHTML = "<table>" + rowsHtml.filter(Boolean).map(([k, v]) => `<tr><td class="muted">${k}</td><td>${v}</td></tr>`).join("")
     + `<tr><td class="muted">Motifs</td><td>${chips}</td></tr></table>`;
 }
 

@@ -718,7 +718,9 @@ function setupMap() {
   if (mapInit) return; mapInit = true;
   const cv = $("map");
   cv.addEventListener("wheel", (e) => { e.preventDefault(); const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top, f = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-    mapT.x = mx - (mx - mapT.x) * f; mapT.y = my - (my - mapT.y) * f; mapT.k *= f; renderMap(lastRows); }, { passive: false });
+    const nk = Math.max(0.75, Math.min(40, mapT.k * f)), af = nk / mapT.k;   // clamp zoom-out (fit ~panel) and zoom-in
+    mapT.x = mx - (mx - mapT.x) * af; mapT.y = my - (my - mapT.y) * af; mapT.k = nk; renderMap(lastRows); }, { passive: false });
+  cv.addEventListener("dblclick", () => { mapT = { k: 1, x: 0, y: 0 }; renderMap(lastRows); });   // double-click resets to fit
   cv.addEventListener("mousedown", (e) => { mapDrag = { x: e.clientX, y: e.clientY, ox: mapT.x, oy: mapT.y, moved: false }; });
   window.addEventListener("mousemove", (e) => {
     const cv2 = $("map"), r = cv2.getBoundingClientRect();

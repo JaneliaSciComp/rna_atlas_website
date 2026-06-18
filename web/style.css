@@ -1,7 +1,8 @@
 * { box-sizing: border-box; }
 body { margin: 0; font: 13px/1.45 -apple-system, Segoe UI, Roboto, sans-serif; color: #1f324d; background: #f4f6f8; }
-header { display: flex; align-items: baseline; gap: 14px; padding: 10px 16px; background: #1f324d; color: #fff; }
+header { display: flex; align-items: center; gap: 14px; padding: 10px 16px; background: #1f324d; color: #fff; }
 header h1 { font-size: 17px; margin: 0; font-weight: 600; }
+.hdr-logo { height: 30px; width: auto; margin-right: -6px; }
 .universe { font-size: 12px; background: #2e6f95; padding: 2px 8px; border-radius: 10px; }
 #sourcewrap { position: relative; }
 #source-btn { font-size: 13px; border: 1px solid #3a4a63; background: #2a3b54; color: #fff; cursor: pointer; border-radius: 5px; padding: 5px 11px; }
@@ -108,7 +109,11 @@ tbody tr:hover { background: #eaf3f8; }
 #gate.hidden { display: none; }
 .gate-card { background: #fff; padding: 30px 34px; border-radius: 10px; width: 320px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
 .gate-card h2 { margin: 0 0 2px; font-size: 18px; color: #1f324d; }
+.gate-logo { display: block; width: 240px; max-width: 82%; height: auto; margin: 0 auto 12px; }
 .gate-sub { margin: 0 0 14px; color: #5b6670; font-size: 13px; }
 .gate-card input { width: 100%; padding: 9px; border: 1px solid #cdd6dd; border-radius: 5px; font-size: 14px; }
 .gate-card button { width: 100%; padding: 9px; margin-top: 10px; background: #2e6f95; color: #fff; border: 0; border-radius: 5px; cursor: pointer; font-size: 14px; }
 .gate-err { color: #c0504d; min-height: 1em; margin: 10px 0 0; font-size: 12px; }
+.gate-note { margin: 18px 0 10px; padding-top: 14px; border-top: 1px solid #e3e8ec; color: #5b6670; font-size: 12px; line-height: 1.5; }
+.gate-mail { display: inline-block; text-decoration: none; padding: 8px 14px; border: 1px solid #2e6f95; color: #2e6f95; border-radius: 5px; font-size: 13px; font-weight: 600; }
+.gate-mail:hover { background: #2e6f95; color: #fff; }

@@ -1,5 +1,7 @@
 # RNA Atlas Explorer
 
+![RNA Atlas Explorer](imgs/screenshot.png)
+
 Interactive, configurable web explorer over the Ribonanza-2 A–H prediction-atlas mining
 results. Replaces the static PowerPoint decks (`per_letter_top10_novel.pptx`, etc.) — you tune
 the selection arguments live (length, novelty, SHAPE support, motifs, pseudoknot, source,

@@ -4,20 +4,27 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>RNA Atlas Explorer — cryo-EM target selection</title>
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+<link rel="shortcut icon" href="favicon.ico">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div id="gate" class="hidden">
   <div class="gate-card">
-    <h2>RNA Atlas Explorer</h2>
+    <img class="gate-logo" src="logo_exp.png" alt="RNA Atlas Explorer">
     <p class="gate-sub">Enter the access passcode.</p>
     <input id="gate-input" type="password" autocomplete="off" placeholder="passcode">
     <button id="gate-go">Enter</button>
     <p id="gate-msg" class="gate-err"></p>
+    <p class="gate-note">Invitation-based access only for now. To get access, reach out to the team:</p>
+    <a class="gate-mail" href="mailto:rhiju@stanford.edu,zouinkhim@janelia.hhmi.org?subject=RNA%20Atlas%20Explorer%20%E2%80%94%20access%20request&amp;body=Hi%2C%0A%0AI%27d%20like%20to%20request%20access%20to%20the%20RNA%20Atlas%20Explorer.%0A%0AName%3A%0AAffiliation%3A%0A">&#9993; Request access</a>
   </div>
 </div>
 
 <header>
+  <img class="hdr-logo" src="icon.png" alt="">
   <h1>RNA Atlas Explorer</h1>
   <span id="sourcewrap">
     <button id="source-btn" title="Choose data sources">Source &#9662;</button>

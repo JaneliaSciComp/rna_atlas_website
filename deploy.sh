@@ -28,6 +28,11 @@ deploy_shell() {
     | aws --profile $P s3 cp - "$B/${pfx}config.js" --content-type application/javascript --only-show-errors \
     && echo "  ${pfx}config.js  (DATA_BASE=\"$db\")"
   aws --profile $P s3 cp web/lib/3Dmol-min.js "$B/${pfx}lib/3Dmol-min.js" --only-show-errors && echo "  ${pfx}lib/3Dmol-min.js"
+  # static image assets (favicon set + header/gate logos)
+  for f in icon.png logo_exp.png favicon.ico favicon-16x16.png favicon-32x32.png \
+           apple-touch-icon.png android-chrome-192x192.png android-chrome-512x512.png site.webmanifest; do
+    [ -f "web/$f" ] && aws --profile $P s3 cp "web/$f" "$B/${pfx}$f" --only-show-errors && echo "  ${pfx}$f"
+  done
 }
 
 invalidate() {

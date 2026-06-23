@@ -37,7 +37,7 @@ const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</
 // --- persist filter settings across reloads ---
 const FKEY = "atlas_filters";
 const FIELD_IDS = ["search", "len_min", "len_max", "plddt_min", "clash_max", "tm_max", "tm_has", "novel_only",
-  "ov_max", "shape_ok", "agr_min", "cr_min", "bp_min", "fold_min", "sclust_min", "req_tert", "req_rare", "motif_mode", "pk", "rank_key", "topn", "per_letter", "alt_palette", "color_by"];
+  "ov_max", "shape_ok", "agr_min", "cr_min", "bp_min", "fold_min", "sclust_min", "req_tert", "req_rare", "motif_mode", "pk", "rank_key", "topn", "per_letter", "alt_palette", "color_by", "ss_view"];
 const altPalette = () => !!($("alt_palette") && $("alt_palette").checked);
 function snapshot() {
   const s = {};
@@ -200,12 +200,14 @@ function wireStatic() {
     $("pk").value = "any"; $("rank_key").value = "best_tm1:asc"; $("topn").value = 200;
     if ($("color_by")) $("color_by").value = "a23";
     if ($("motif_mode")) $("motif_mode").value = "any";
+    if ($("ss_view")) $("ss_view").value = "forna";
     if ($("search")) $("search").value = "";
     sortOverride = null; localStorage.removeItem(FKEY); syncLabels(); render();
   });
   if ($("search")) $("search").addEventListener("input", () => { saveState(); render(); });
   if ($("alt_palette")) $("alt_palette").addEventListener("change", () => { if (currentDeep) { drawTracks(currentDeep.f, currentDeep.react); load3D(currentDeep.f, currentDeep.react); } });
   if ($("color_by")) $("color_by").addEventListener("change", () => { if (currentDeep) load3D(currentDeep.f, currentDeep.react); });
+  if ($("ss_view")) $("ss_view").addEventListener("change", () => { if (currentDeep) drawTracks(currentDeep.f, currentDeep.react); });
   // collapsible sections (click a legend) + collapse-all (click the panel heading)
   document.querySelectorAll("#config fieldset legend").forEach((lg) =>
     lg.addEventListener("click", () => { lg.parentElement.classList.toggle("collapsed"); saveState(); }));
@@ -480,6 +482,51 @@ function arcDiagram(dbn, n, cw, W) {   // SVG arc plot of the predicted secondar
   });
   return s + "</svg>";
 }
+// forna-style 2D layout: spring-embed the nucleotide graph (backbone + base pairs), draw nodes.
+let _ssCache = {};
+function ssLayout(n, pairs) {
+  const L = 16, pos = new Array(n);
+  for (let i = 0; i < n; i++) { const a = i / n * 6.2832; pos[i] = { x: Math.cos(a) * L * n / 6.2832, y: Math.sin(a) * L * n / 6.2832 }; }
+  const iters = n > 400 ? 260 : 420;
+  const fx = new Float64Array(n), fy = new Float64Array(n);
+  for (let it = 0; it < iters; it++) {
+    const cool = 1 - it / iters * 0.8;
+    fx.fill(0); fy.fill(0);
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+      const dx = pos[i].x - pos[j].x, dy = pos[i].y - pos[j].y, d2 = dx * dx + dy * dy || 0.01;
+      if (d2 < 9000) { const r = 150 / d2; fx[i] += dx * r; fy[i] += dy * r; fx[j] -= dx * r; fy[j] -= dy * r; }
+    }
+    const sp = (a, b, str) => { const dx = pos[b].x - pos[a].x, dy = pos[b].y - pos[a].y, d = Math.sqrt(dx * dx + dy * dy) || 0.01, f = (d - L) * str, ux = dx / d * f, uy = dy / d * f; fx[a] += ux; fy[a] += uy; fx[b] -= ux; fy[b] -= uy; };
+    for (let i = 0; i < n - 1; i++) sp(i, i + 1, 0.22);
+    for (const p of pairs) sp(p.i, p.j, 0.28);
+    for (let i = 0; i < n; i++) { pos[i].x += Math.max(-8, Math.min(8, fx[i])) * cool; pos[i].y += Math.max(-8, Math.min(8, fy[i])) * cool; }
+  }
+  return pos;
+}
+function forna2D(id, dbn, seq, react, box) {
+  const n = (seq && seq.length) || (dbn || "").length || 0;
+  if (n < 2) return "";
+  if (n > 900) return arcDiagram(dbn, n, Math.max(6, Math.min(16, Math.floor(900 / n))), n * Math.max(6, Math.min(16, Math.floor(900 / n))));
+  const pairs = ssPairs((dbn || "").slice(0, n));
+  let pos = _ssCache[id];
+  if (!pos || pos.length !== n) { pos = ssLayout(n, pairs); _ssCache[id] = pos; }
+  const xs = pos.map((p) => p.x), ys = pos.map((p) => p.y);
+  const minx = Math.min(...xs), maxx = Math.max(...xs), miny = Math.min(...ys), maxy = Math.max(...ys);
+  const pad = 12, sc = Math.min((box - 2 * pad) / ((maxx - minx) || 1), (box - 2 * pad) / ((maxy - miny) || 1));
+  const X = (v) => (pad + (v - minx) * sc).toFixed(1), Y = (v) => (pad + (v - miny) * sc).toFixed(1);
+  const r = Math.max(2.4, Math.min(7, sc * 7)), alt = altPalette();
+  let s = `<svg width="${box}" height="${box}" font-size="7">`;
+  let path = "M";
+  for (let i = 0; i < n; i++) path += `${X(pos[i].x)} ${Y(pos[i].y)}${i < n - 1 ? " L" : ""} `;
+  s += `<path d="${path}" fill="none" stroke="#cdd6dd" stroke-width="1.4"/>`;
+  for (const p of pairs) s += `<line x1="${X(pos[p.i].x)}" y1="${Y(pos[p.i].y)}" x2="${X(pos[p.j].x)}" y2="${Y(pos[p.j].y)}" stroke="${p.pk ? "#c1440e" : "#9aa7b0"}" stroke-width="1"/>`;
+  for (let i = 0; i < n; i++) {
+    const ch = (seq && seq[i]) || "N";
+    s += `<circle cx="${X(pos[i].x)}" cy="${Y(pos[i].y)}" r="${r.toFixed(1)}" fill="${nucColor(ch, alt)}" stroke="#fff" stroke-width="0.5"><title>${i + 1} ${ch}</title></circle>`;
+    if (r >= 6 && seq) s += `<text x="${X(pos[i].x)}" y="${(+Y(pos[i].y) + 2.3).toFixed(1)}" text-anchor="middle" fill="#fff">${ch}</text>`;
+  }
+  return s + "</svg>";
+}
 function drawTracks(f, react) {
   const seq = (react && react.seq) || "";
   const ra = react && (react.a23 || react.dms);
@@ -532,9 +579,11 @@ function drawTracks(f, react) {
     pr += `<rect x="${i * cw}" y="${yPair}" width="${cw - 0.5}" height="13" fill="${fill}" stroke="#dfe3e8" stroke-width="0.5"><title>pos ${i + 1}: ${ch ? (paired ? "paired" : "unpaired") : "n/a"}</title></rect>`;
   }
   svg += pr + "</svg>";
-  const arc = arcDiagram(dbn, n, cw, W);
-  const arcBlock = arc ? `<div style="font-size:11px;color:#5b6670;margin:10px 0 3px">predicted secondary structure (arcs link base pairs; <span style="color:#c1440e">orange = pseudoknot</span>)</div>${arc}` : "";
-  $("tracks").innerHTML = `<div style="font-size:11px;color:#5b6670;margin-bottom:3px">motif lanes &middot; sequence &middot; DMS &middot; 2A3 reactivity (white=protected &rarr; red=reactive) &middot; pairing (white=paired, light red=unpaired)</div>` + svg + arcBlock;
+  const ssMode = ($("ss_view") ? $("ss_view").value : "forna");
+  const ss = (dbn && ssMode === "arc") ? arcDiagram(dbn, n, cw, W) : (dbn ? forna2D(f.id, dbn, seq, react, 340) : "");
+  const ssLbl = ssMode === "arc" ? "arcs link base pairs" : "2D layout — nodes colored by base";
+  const ssBlock = ss ? `<div style="font-size:11px;color:#5b6670;margin:10px 0 3px">predicted secondary structure (${ssLbl}; <span style="color:#c1440e">orange = pseudoknot</span>)</div>${ss}` : "";
+  $("tracks").innerHTML = `<div style="font-size:11px;color:#5b6670;margin-bottom:3px">motif lanes &middot; sequence &middot; DMS &middot; 2A3 reactivity (white=protected &rarr; red=reactive) &middot; pairing (white=paired, light red=unpaired)</div>` + svg + ssBlock;
 }
 
 let viewer = null, viewerModel = null;

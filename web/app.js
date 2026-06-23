@@ -37,7 +37,7 @@ const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</
 // --- persist filter settings across reloads ---
 const FKEY = "atlas_filters";
 const FIELD_IDS = ["search", "len_min", "len_max", "plddt_min", "clash_max", "tm_max", "tm_has", "novel_only",
-  "ov_max", "shape_ok", "agr_min", "cr_min", "bp_min", "fold_min", "sclust_min", "req_tert", "req_rare", "pk", "rank_key", "topn", "per_letter", "alt_palette", "color_by"];
+  "ov_max", "shape_ok", "agr_min", "cr_min", "bp_min", "fold_min", "sclust_min", "req_tert", "req_rare", "motif_mode", "pk", "rank_key", "topn", "per_letter", "alt_palette", "color_by"];
 const altPalette = () => !!($("alt_palette") && $("alt_palette").checked);
 function snapshot() {
   const s = {};
@@ -199,6 +199,7 @@ function wireStatic() {
     if ($("fold_min")) $("fold_min").value = 0; if ($("sclust_min")) $("sclust_min").value = 0;
     $("pk").value = "any"; $("rank_key").value = "best_tm1:asc"; $("topn").value = 200;
     if ($("color_by")) $("color_by").value = "a23";
+    if ($("motif_mode")) $("motif_mode").value = "any";
     if ($("search")) $("search").value = "";
     sortOverride = null; localStorage.removeItem(FKEY); syncLabels(); render();
   });
@@ -245,6 +246,7 @@ function filters() {
     crmin: +$("cr_min").value, bpmin: +$("bp_min").value,
     foldMin: +($("fold_min") ? $("fold_min").value : 0), sclustMin: +($("sclust_min") ? $("sclust_min").value : 0),
     tert: $("req_tert").checked, rare: $("req_rare").checked, motifs: mf,
+    motifMode: ($("motif_mode") ? $("motif_mode").value : "any"),
     pk: $("pk").value, letters: new Set(lf),
     rank: $("rank_key").value, topn: +$("topn").value, perLetter: $("per_letter").checked,
   };
@@ -270,7 +272,7 @@ function pass(f, c) {
   if (c.sclustMin > 0 && (f.seq_cluster_size == null || f.seq_cluster_size < c.sclustMin)) return false;
   if (c.tert && f.n_tert < 1) return false;
   if (c.rare && f.n_rare < 1) return false;
-  if (c.motifs.length && !c.motifs.some((m) => (f.motifs || []).includes(m))) return false;
+  if (c.motifs.length) { const has = (m) => (f.motifs || []).includes(m); if (c.motifMode === "all" ? !c.motifs.every(has) : !c.motifs.some(has)) return false; }
   if (c.pk !== "any" && String(f.pseudoknot) !== c.pk) return false;
   if (DSBYID[f._dsid] && DSBYID[f._dsid].motifs && f.letter && !c.letters.has(f.letter)) return false;
   return true;
@@ -290,20 +292,36 @@ function ranker(c) {
   };
 }
 
+let pageLimit = 0, keepPage = false;
 function render() {
   const c = filters();
+  if (!keepPage) pageLimit = c.topn;   // filter/sort changes reset paging; showMore() keeps it
+  keepPage = false;
   let rows = FOLDS.filter((f) => pass(f, c));
   rows.sort(ranker(c));
+  let disp;
   if (c.perLetter) {
     const seen = {};
-    rows = rows.filter((f) => { seen[f.letter] = (seen[f.letter] || 0) + 1; return seen[f.letter] <= c.topn; });
+    disp = rows.filter((f) => { seen[f.letter] = (seen[f.letter] || 0) + 1; return seen[f.letter] <= pageLimit; });
   } else {
-    rows = rows.slice(0, c.topn);
+    disp = rows.slice(0, pageLimit);
   }
-  lastRows = rows;
-  $("count").textContent = `${rows.length} shown`;
-  if (viewMode === "map") renderMap(rows); else drawTable(rows);
+  lastRows = disp;
+  const total = rows.length;
+  $("count").textContent = disp.length < total ? `${disp.length} of ${total} shown` : `${total} shown`;
+  if (viewMode === "map") renderMap(disp); else drawTable(disp);
+  drawShowMore(disp.length, total);
 }
+function drawShowMore(shown, total) {
+  const el = $("showmore"); if (!el) return;
+  if (viewMode === "map" || shown >= total) { el.classList.add("hidden"); el.innerHTML = ""; return; }
+  el.classList.remove("hidden");
+  el.innerHTML = `<button id="more-btn">Show more (+${+$("topn").value || 200})</button>`
+    + `<button id="all-btn">Show all (${total})</button><span class="sm-note">showing ${shown} of ${total}</span>`;
+  $("more-btn").onclick = () => showMore(false);
+  $("all-btn").onclick = () => { if (total > 4000 && !confirm(`Render all ${total} rows? This can be slow.`)) return; showMore(true); };
+}
+function showMore(all) { pageLimit = all ? Infinity : pageLimit + (+$("topn").value || 200); keepPage = true; render(); }
 let viewMode = "table", lastRows = [];
 
 const COLS = [
@@ -439,6 +457,29 @@ function spansFor(f) {
   });
 }
 
+function ssPairs(dbn) {   // dot-bracket (multi-level) -> [{i,j,pk}] (pk = crossing/pseudoknot bracket)
+  const OPENB = "([{<", CLOSEB = ")]}>", st = [[], [], [], []], pairs = [];
+  for (let i = 0; i < dbn.length; i++) {
+    const o = OPENB.indexOf(dbn[i]);
+    if (o >= 0) { st[o].push(i); continue; }
+    const c = CLOSEB.indexOf(dbn[i]);
+    if (c >= 0 && st[c].length) pairs.push({ i: st[c].pop(), j: i, pk: c > 0 });
+  }
+  return pairs;
+}
+function arcDiagram(dbn, n, cw, W) {   // SVG arc plot of the predicted secondary structure
+  const pairs = ssPairs((dbn || "").slice(0, n));
+  if (!pairs.length) return "";
+  const cap = 120; let maxH = 12;
+  const segs = pairs.map((p) => { const h = Math.min(cap, 6 + (p.j - p.i) * cw * 0.55); maxH = Math.max(maxH, h); return { p, h }; });
+  const aH = maxH + 8, base = aH - 2;
+  let s = `<svg width="${W + 40}" height="${aH}" font-size="9"><line x1="0" y1="${base}" x2="${W}" y2="${base}" stroke="#dfe3e8"/>`;
+  segs.forEach(({ p, h }) => {
+    const xi = p.i * cw + cw / 2, xj = p.j * cw + cw / 2, mx = (xi + xj) / 2;
+    s += `<path d="M${xi.toFixed(1)} ${base} Q ${mx.toFixed(1)} ${(base - h).toFixed(1)} ${xj.toFixed(1)} ${base}" fill="none" stroke="${p.pk ? "#c1440e" : "#2e6f95"}" stroke-width="1.2" opacity="0.55"><title>${p.i + 1}–${p.j + 1}${p.pk ? " (pseudoknot)" : ""}</title></path>`;
+  });
+  return s + "</svg>";
+}
 function drawTracks(f, react) {
   const seq = (react && react.seq) || "";
   const ra = react && (react.a23 || react.dms);
@@ -491,7 +532,9 @@ function drawTracks(f, react) {
     pr += `<rect x="${i * cw}" y="${yPair}" width="${cw - 0.5}" height="13" fill="${fill}" stroke="#dfe3e8" stroke-width="0.5"><title>pos ${i + 1}: ${ch ? (paired ? "paired" : "unpaired") : "n/a"}</title></rect>`;
   }
   svg += pr + "</svg>";
-  $("tracks").innerHTML = `<div style="font-size:11px;color:#5b6670;margin-bottom:3px">motif lanes &middot; sequence &middot; DMS &middot; 2A3 reactivity (white=protected &rarr; red=reactive) &middot; pairing (white=paired, light red=unpaired)</div>` + svg;
+  const arc = arcDiagram(dbn, n, cw, W);
+  const arcBlock = arc ? `<div style="font-size:11px;color:#5b6670;margin:10px 0 3px">predicted secondary structure (arcs link base pairs; <span style="color:#c1440e">orange = pseudoknot</span>)</div>${arc}` : "";
+  $("tracks").innerHTML = `<div style="font-size:11px;color:#5b6670;margin-bottom:3px">motif lanes &middot; sequence &middot; DMS &middot; 2A3 reactivity (white=protected &rarr; red=reactive) &middot; pairing (white=paired, light red=unpaired)</div>` + svg + arcBlock;
 }
 
 let viewer = null, viewerModel = null;

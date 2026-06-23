@@ -91,6 +91,7 @@
       <legend>Motifs</legend>
       <label class="chk"><input type="checkbox" id="req_tert"> require &ge;1 tertiary motif</label>
       <label class="chk"><input type="checkbox" id="req_rare"> require a rare tertiary motif</label>
+      <div class="row"><label>match</label><select id="motif_mode"><option value="any">any selected</option><option value="all">all selected</option></select></div>
       <div id="motif_filter"></div>
     </fieldset>
 
@@ -139,6 +140,7 @@
       <thead><tr id="thead"></tr></thead>
       <tbody id="tbody"></tbody>
     </table>
+    <div id="showmore" class="hidden"></div>
     <div id="mapwrap" class="hidden">
       <div id="mapctl">
         <label>color by</label>

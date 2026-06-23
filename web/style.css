@@ -199,3 +199,11 @@ tbody tr:hover { background: #eaf3f8; }
 #cm-body { flex: 1; position: relative; padding: 0; background: #fff; }
 #cm-body canvas { display: block; }
 .cm-loading { color: #8a96a0; padding: 20px; }
+
+/* show-more (pagination) */
+#showmore { padding: 12px; text-align: center; }
+#showmore.hidden { display: none; }
+#showmore button { background: #2e6f95; color: #fff; border: 0; border-radius: 5px; padding: 6px 14px; margin: 0 4px; cursor: pointer; font-size: 13px; }
+#showmore #all-btn { background: #5b6670; }
+#showmore button:hover { opacity: .9; }
+.sm-note { color: #8a96a0; font-size: 12px; margin-left: 8px; }

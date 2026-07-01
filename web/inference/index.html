@@ -35,6 +35,8 @@
     <div class="seqinfo"><span id="seqlen">0 nt</span><button id="example-btn" class="linkbtn" type="button">load example</button></div>
     <label class="ilbl" for="jobname">Name (optional)</label>
     <input id="jobname" type="text" placeholder="my RNA">
+    <label class="ilbl" for="model">Model</label>
+    <select id="model"><option value="">default</option></select>
     <fieldset>
       <legend>Options</legend>
       <label class="chk"><input type="checkbox" id="opt_msa" checked> refine with MSA when ready (two-stage)</label>
@@ -42,6 +44,7 @@
     </fieldset>
     <button id="predict-btn">Predict</button>
     <p id="predict-note" class="muted"></p>
+    <div id="jobs" class="jobs"></div>
   </aside>
 
   <main id="iresult">

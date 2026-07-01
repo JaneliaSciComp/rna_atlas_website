@@ -101,6 +101,25 @@
     </fieldset>
 
     <fieldset>
+      <legend>Termini &amp; scaffolding</legend>
+      <select id="termini">
+        <option value="any">5&prime;/3&prime; termini: any</option>
+        <option value="bp">ends base-paired (1&harr;N)</option>
+        <option value="trim">ends paired &mdash; trimmable overhangs</option>
+      </select>
+      <div class="row"><label>max overhang (nt)</label><input type="number" id="overhang_max" value="10" min="0"></div>
+      <label class="chk"><input type="checkbox" id="uucg"> UUCG tetraloop only</label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Conditioning</legend>
+      <label class="chk"><input type="checkbox" class="cf" value="msa"> MSA-conditioned</label>
+      <label class="chk"><input type="checkbox" class="cf" value="tbm"> TBM (template-based)</label>
+      <label class="chk"><input type="checkbox" class="cf" value="chemmap"> Chemmap input (SHAPE-guided)</label>
+      <label class="chk"><input type="checkbox" class="cf" value="none"> Sequence-only (unconditioned)</label>
+    </fieldset>
+
+    <fieldset>
       <legend>Ranking</legend>
       <select id="rank_key">
         <option value="best_tm1:asc">novelty (best_tm1 ascending)</option>

@@ -38,3 +38,18 @@
 .rbadge.active:hover { background: #245a7a; }
 .rbadge.dl { color: #5b6670; margin-left: auto; }
 #iplaceholder { color: #8a96a0; font-size: 13px; max-width: 520px; line-height: 1.5; margin-top: 20px; }
+
+/* model selector + jobs monitor (added for submit/model/monitor/cancel) */
+#model { width: 100%; padding: 6px 8px; border: 1px solid #cdd6dd; border-radius: 5px; font-size: 13px; margin: 2px 0 6px; background: #fff; }
+.jobs { margin-top: 14px; }
+.jobs-h { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #5b6670; font-weight: 600; margin-bottom: 4px; }
+.job { display: flex; align-items: center; gap: 7px; font-size: 12px; padding: 5px 0; border-top: 1px solid #eef2f5; }
+.job .jn { font-weight: 600; color: #1f324d; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.job .jm { color: #5b6670; flex: 0 0 auto; }
+.job .js { flex: 0 0 auto; padding: 1px 7px; border-radius: 8px; font-size: 10px; text-transform: uppercase; background: #eef2f5; color: #5b6670; }
+.js-done { background: #e9f5ec; color: #3a7d44; }
+.js-running, .js-submitted, .js-queued, .js-pending { background: #eaf3f8; color: #2e6f95; }
+.js-error { background: #fdecea; color: #c0504d; }
+.js-cancelled { background: #f3e9e4; color: #c1440e; }
+.jkill { flex: 0 0 auto; border: 1px solid #e0b3a2; background: #fbeee7; color: #c1440e; border-radius: 4px; font-size: 11px; padding: 1px 8px; cursor: pointer; }
+.jkill:hover { background: #c1440e; color: #fff; border-color: #c1440e; }

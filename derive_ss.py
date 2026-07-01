@@ -185,9 +185,33 @@ def process(args):
             cls = "two-helix"
         else:
             cls = "multiloop (3+ helices)"
-        return (sid, bpf, pk, cls, dbn)
+        # 5'/3' termini pairing (for the scaffolding filters) + UUCG tetraloop, from canonical pairs.
+        #   termini_bp   = the very ends pair (nt 1 <-> nt N)  [strict]
+        #   termini_trim = the first-paired base pairs with the last-paired base, so the
+        #                  single-stranded ends (overhang5 / overhang3 nt) can be trimmed to leave
+        #                  the termini directly paired. termini_bp is the overhang5==overhang3==0 case.
+        pd = {}
+        for (i, j) in pairs:
+            pd[i] = j
+            pd[j] = i
+        if pd:
+            lo, hi = min(pd), max(pd)
+            term_bp = 1 if pd.get(0) == n - 1 else 0
+            term_trim = 1 if pd.get(lo) == hi else 0
+            oh5 = lo if term_trim else None
+            oh3 = (n - 1 - hi) if term_trim else None
+        else:
+            term_bp = term_trim = 0
+            oh5 = oh3 = None
+        uucg = 0
+        for (i, j) in pairs:
+            if j - i - 1 == 4 and not any(k in pd for k in range(i + 1, j)) \
+                    and "".join(bases[i + 1:j]) == "UUCG":
+                uucg = 1
+                break
+        return (sid, bpf, pk, cls, dbn, term_bp, term_trim, oh5, oh3, uucg)
     except Exception as e:
-        return (sid, None, None, None, f"ERR:{type(e).__name__}")
+        return (sid, None, None, None, f"ERR:{type(e).__name__}", None, None, None, None, None)
 
 
 def main():
@@ -208,24 +232,28 @@ def main():
     print(f"{args.name}: {len(work)}/{len(folds)} structures")
     out = {}
     with Pool(args.workers) as pool:
-        for sid, bpf, pk, cls, dbn in pool.imap_unordered(process, work, chunksize=16):
-            out[sid] = (bpf, pk, cls, dbn)
+        for r in pool.imap_unordered(process, work, chunksize=16):
+            out[r[0]] = r[1:]
     pair = {}
     from collections import Counter
     dist = Counter()
-    nerr = 0
+    nerr = nterm = ntrim = nuucg = 0
     for f in folds:
         r = out.get(f["id"])
         if not r or r[0] is None:
             nerr += 1
             continue
-        bpf, pk, cls, dbn = r
+        bpf, pk, cls, dbn, term_bp, term_trim, oh5, oh3, uucg = r
         f["bp_fraction"] = bpf; f["pseudoknot"] = pk; f["ss_class"] = cls
+        f["termini_bp"] = term_bp; f["termini_trim"] = term_trim
+        f["overhang5"] = oh5; f["overhang3"] = oh3; f["uucg_tetraloop"] = uucg
         pair[f["id"]] = dbn
         dist[cls] += 1
+        nterm += term_bp; ntrim += term_trim; nuucg += uucg
     json.dump(folds, open(fp, "w"), separators=(",", ":"))
     json.dump(pair, open(pp, "w"), separators=(",", ":"))
     print(f"{args.name}: errors={nerr}  ss_class={dict(dist.most_common())}")
+    print(f"{args.name}: termini_bp={nterm}  termini_trim={ntrim}  uucg_tetraloop={nuucg}")
 
 
 if __name__ == "__main__":

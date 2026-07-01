@@ -29,6 +29,10 @@ STRUCT_BASES = CFG["struct_bases"]
 PARQUET = CFG["metadata_parquet"]
 HDF5 = CFG["hdf5"]
 REACT_OVERRIDE = CFG.get("react_override") or os.path.join(MINED, "summary/react_override_fgh40.parquet")
+# uniform-spread (cmuts126 --uniform-spread) chemmap for all A-H (see build_static.py for the contract)
+UNIFORM_DIR = CFG["uniform_spread_dir"]
+FGH_DEFAULT_DIR = CFG["fgh_default_h5_dir"]
+FGH_LIBOFF = {"F": 0, "G": 8_000_000, "H": 16_000_000}
 
 SEQ = {}
 with open(os.path.join(MINED, "selection.tsv")) as fh:
@@ -68,34 +72,53 @@ def cif_sequence(seq_id):
 def reactivity(seq_id):
     import numpy as np
     import pyarrow.parquet as pq
+    import h5py
     seq = SEQ.get(seq_id, "") or cif_sequence(seq_id)
-    lib = seq_id.split("-")[1].replace("ribonanza2", "")
+    lib = seq_id.split("-")[1].replace("ribonanza2", "").upper()
     fi = int(seq_id.split("-")[0]) - 1
     out = {"seq": seq, "dms": None, "a23": None, "sn": [None, None]}
-    # F-H: design-aligned override parquet (only the len>40 coverage subset exists)
-    if os.path.exists(REACT_OVERRIDE):
-        t = pq.read_table(REACT_OVERRIDE, filters=[("sequence_id", "==", seq_id)]).to_pydict()
-        if t["sequence_id"]:
-            a23 = np.asarray(t["reactivity_2A3"][0], np.float32)
-            dms = np.asarray(t["reactivity_DMS"][0], np.float32)
-            dlen = len(seq) or len(a23)
-            out["dms"], out["a23"] = _nan_list(dms[:dlen]), _nan_list(a23[:dlen])
-            return out
-    # A-E: HDF5 r_norm sliced by sub_start
-    if lib in HDF5 and seq:
-        import h5py
+    # A-E: uniform-spread per-library h5 (reactivity), sliced to the design region by sub_start
+    if lib in ("A", "B", "C", "D", "E") and seq:
         dlen = len(seq)
-        ss = pq.read_table(PARQUET.format(L=lib.upper()), columns=["fasta_index", "sub_start"],
+        ss = pq.read_table(PARQUET.format(L=lib), columns=["fasta_index", "sub_start"],
                            filters=[("fasta_index", "==", fi)]).to_pydict()["sub_start"]
         if ss:
             ss = ss[0]
-            with h5py.File(HDF5[lib], "r") as fh:
-                rn = fh["r_norm"][fi]
-                sn = fh["signal_to_noise"][fi]
-            seg = rn[ss - 1: ss - 1 + dlen]
-            dms = np.array([seg[i, 0] if seq[i] in "AC" else np.nan for i in range(dlen)])
-            out["dms"], out["a23"] = _nan_list(dms), _nan_list(seg[:, 1])
-            out["sn"] = [round(float(sn[0]), 2), round(float(sn[1]), 2)]
+            with h5py.File(f"{UNIFORM_DIR}Ribonanza2{lib}_2A3.h5", "r") as f2, \
+                 h5py.File(f"{UNIFORM_DIR}Ribonanza2{lib}_DMS.h5", "r") as fd:
+                a23 = np.asarray(f2["reactivity"][fi][ss - 1: ss - 1 + dlen], np.float32)
+                dms = np.asarray(fd["reactivity"][fi][ss - 1: ss - 1 + dlen], np.float32)
+                out["sn"] = [round(float(fd["SNR"][fi]), 2), round(float(f2["SNR"][fi]), 2)]
+            out["a23"] = _nan_list(a23)
+            out["dms"] = _nan_list([dms[i] if seq[i] in "AC" else np.nan for i in range(dlen)])
+        return out
+    # F-H: recover the design offset from the default-spread parquet vs the default FGH h5,
+    # then read that same row+offset from the uniform-spread FGH h5.
+    if lib in ("F", "G", "H") and os.path.exists(REACT_OVERRIDE):
+        t = pq.read_table(REACT_OVERRIDE, filters=[("sequence_id", "==", seq_id)]).to_pydict()
+        if t["sequence_id"]:
+            pa2 = np.asarray(t["reactivity_2A3"][0], np.float32)
+            L = len(pa2)
+            row = FGH_LIBOFF[lib] + fi
+            if np.isfinite(pa2).sum() >= 5:
+                with h5py.File(f"{FGH_DEFAULT_DIR}combined_2A3_samples_normalized.h5", "r") as fdef:
+                    hrow = np.asarray(fdef["reactivity"][row], np.float32)
+                best = None
+                for sh in range(0, 177 - L + 1):
+                    seg = hrow[sh:sh + L]
+                    m = ~(np.isnan(seg) | np.isnan(pa2))
+                    if m.sum() < 5:
+                        continue
+                    md = float(np.max(np.abs(seg[m] - pa2[m])))
+                    if best is None or md < best[0]:
+                        best = (md, sh)
+                if best is not None and best[0] < 0.02:
+                    sh = best[1]
+                    with h5py.File(f"{UNIFORM_DIR}Ribonanza2FGH_2A3.h5", "r") as u2, \
+                         h5py.File(f"{UNIFORM_DIR}Ribonanza2FGH_DMS.h5", "r") as ud:
+                        out["a23"] = _nan_list(np.asarray(u2["reactivity"][row][sh:sh + L], np.float32))
+                        out["dms"] = _nan_list(np.asarray(ud["reactivity"][row][sh:sh + L], np.float32))
+                        out["sn"] = [round(float(ud["SNR"][row]), 2), round(float(u2["SNR"][row]), 2)]
     return out
 
 

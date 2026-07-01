@@ -9,6 +9,8 @@ const DATASETS = window.DATASETS || [{ id: "ribo2", label: "curated", base: "", 
 const DSBYID = {}; DATASETS.forEach((d) => { DSBYID[d.id] = d; });
 const LOADED = {};        // dsid -> {folds, motifs, pairing} cache (loaded once)
 function dsFor(f) { return DSBYID[f._dsid] || DATASETS[0]; }
+const COND_LABELS = { msa: "MSA", tbm: "TBM (template-based)", chemmap: "chemmap input (SHAPE-guided)", exp: "experimental (PDB)" };
+function condLabel(cond) { const t = cond || []; return t.length ? t.map((x) => COND_LABELS[x] || x).join(", ") : "sequence-only (unconditioned)"; }
 function prefix(ds) { return ds && ds.base ? ds.base + "/" : ""; }
 function activeSources() { return [...document.querySelectorAll(".src:checked")].map((c) => c.value); }
 
@@ -37,13 +39,14 @@ const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</
 // --- persist filter settings across reloads ---
 const FKEY = "atlas_filters";
 const FIELD_IDS = ["search", "len_min", "len_max", "plddt_min", "clash_max", "tm_max", "tm_has", "novel_only",
-  "ov_max", "shape_ok", "agr_min", "cr_min", "bp_min", "fold_min", "sclust_min", "req_tert", "req_rare", "motif_mode", "pk", "rank_key", "topn", "per_letter", "alt_palette", "color_by", "ss_view"];
+  "ov_max", "shape_ok", "agr_min", "cr_min", "bp_min", "fold_min", "sclust_min", "req_tert", "req_rare", "motif_mode", "pk", "termini", "overhang_max", "uucg", "rank_key", "topn", "per_letter", "alt_palette", "color_by", "ss_view"];
 const altPalette = () => !!($("alt_palette") && $("alt_palette").checked);
 function snapshot() {
   const s = {};
   FIELD_IDS.forEach((id) => { const el = $(id); if (el) s[id] = el.type === "checkbox" ? el.checked : el.value; });
   s.mf = [...document.querySelectorAll(".mf:checked")].map((c) => c.value);
   s.lf = [...document.querySelectorAll(".lf:checked")].map((c) => c.value);
+  s.cf = [...document.querySelectorAll(".cf:checked")].map((c) => c.value);
   s.src = activeSources();
   s.sort = sortOverride;
   s.collapsed = [...document.querySelectorAll("#config fieldset")].map((fs, i) => fs.classList.contains("collapsed") ? i : -1).filter((i) => i >= 0);
@@ -55,6 +58,7 @@ function applyState(s) {
   FIELD_IDS.forEach((id) => { const el = $(id); if (el && id in s) { if (el.type === "checkbox") el.checked = !!s[id]; else el.value = s[id]; } });
   if (s.mf) document.querySelectorAll(".mf").forEach((c) => { c.checked = s.mf.includes(c.value); });
   if (s.lf) document.querySelectorAll(".lf").forEach((c) => { c.checked = s.lf.includes(c.value); });
+  if (s.cf) document.querySelectorAll(".cf").forEach((c) => { c.checked = s.cf.includes(c.value); });
   sortOverride = s.sort || null;
   if (s.collapsed) { const fs = document.querySelectorAll("#config fieldset"); s.collapsed.forEach((i) => fs[i] && fs[i].classList.add("collapsed")); }
   if (s.allcollapsed) $("config").classList.add("allcollapsed");
@@ -123,7 +127,8 @@ async function ensureLoaded(dsid) {
   if (LOADED[dsid]) return;
   const ds = DSBYID[dsid];
   const folds = await getJSON(prefix(ds) + "data/folds.json");
-  folds.forEach((f) => { f._dsid = dsid; });
+  const dcond = ds.cond || [];
+  folds.forEach((f) => { f._dsid = dsid; f._cond = f.conditioning || f.cond || dcond; f._uid = dsid + "|" + f.id; });
   let motifs = {}, pairing = {};
   if (ds.motifs) {
     try { motifs = await getJSON(prefix(ds) + "data/motifs.json"); } catch (e) {}
@@ -190,6 +195,7 @@ function wireStatic() {
   $("reset").addEventListener("click", () => {
     document.querySelectorAll(".mf").forEach((c) => c.checked = false);
     document.querySelectorAll(".lf").forEach((c) => c.checked = true);
+    document.querySelectorAll(".cf").forEach((c) => c.checked = false);
     ["plddt_min", "tm_max", "ov_max"].forEach((id) => $(id).value = $(id).max);
     $("agr_min").value = -1;
     $("plddt_min").value = 0; $("clash_max").value = 9999; $("len_min").value = 0;
@@ -238,6 +244,7 @@ function syncLabels() {
 function filters() {
   const lf = [...document.querySelectorAll(".lf:checked")].map((c) => c.value);
   const mf = [...document.querySelectorAll(".mf:checked")].map((c) => c.value);
+  const cf = [...document.querySelectorAll(".cf:checked")].map((c) => c.value);
   return {
     q: ($("search") ? $("search").value : "").trim().toLowerCase(),
     lmin: +$("len_min").value, lmax: +$("len_max").value,
@@ -249,7 +256,10 @@ function filters() {
     foldMin: +($("fold_min") ? $("fold_min").value : 0), sclustMin: +($("sclust_min") ? $("sclust_min").value : 0),
     tert: $("req_tert").checked, rare: $("req_rare").checked, motifs: mf,
     motifMode: ($("motif_mode") ? $("motif_mode").value : "any"),
-    pk: $("pk").value, letters: new Set(lf),
+    pk: $("pk").value, letters: new Set(lf), cond: new Set(cf),
+    termini: ($("termini") ? $("termini").value : "any"),
+    ohmax: ($("overhang_max") && $("overhang_max").value !== "") ? +$("overhang_max").value : Infinity,
+    uucg: $("uucg") ? $("uucg").checked : false,
     rank: $("rank_key").value, topn: +$("topn").value, perLetter: $("per_letter").checked,
   };
 }
@@ -276,6 +286,14 @@ function pass(f, c) {
   if (c.rare && f.n_rare < 1) return false;
   if (c.motifs.length) { const has = (m) => (f.motifs || []).includes(m); if (c.motifMode === "all" ? !c.motifs.every(has) : !c.motifs.some(has)) return false; }
   if (c.pk !== "any" && String(f.pseudoknot) !== c.pk) return false;
+  if (c.termini === "bp" && f.termini_bp !== 1) return false;
+  if (c.termini === "trim" && (f.termini_trim !== 1 || Math.max(f.overhang5 || 0, f.overhang3 || 0) > c.ohmax)) return false;
+  if (c.uucg && f.uucg_tetraloop !== 1) return false;
+  if (c.cond.size) {
+    const tags = f._cond || [];
+    const ok = (c.cond.has("none") && tags.length === 0) || tags.some((t) => c.cond.has(t));
+    if (!ok) return false;
+  }
   if (DSBYID[f._dsid] && DSBYID[f._dsid].motifs && f.letter && !c.letters.has(f.letter)) return false;
   return true;
 }
@@ -354,7 +372,7 @@ function drawTable(rows) {
     const shape = f.shape_ok ? `<span class="pill" style="background:#3a7d44">yes</span>`
       : (hasShape ? `<span class="muted" title="has SHAPE data but motif residues not protected">no</span>`
                   : `<span class="muted" title="no usable SHAPE data for this fold">n/d</span>`);
-    return `<tr data-id="${esc(f.id)}">
+    return `<tr data-id="${esc(f.id)}" data-uid="${esc(f._uid)}">
       <td>${esc(f.id)}</td><td>${esc(f.name || "")}</td><td>${f.letter}</td>
       <td class="num">${f.length ?? ""}</td><td class="num">${plbar}</td>
       <td class="num">${num(f.best_tm1, 3)}</td><td title="${(f.near_title || "").replace(/"/g, "&quot;")}">${f.near || ""}</td>
@@ -366,12 +384,14 @@ function drawTable(rows) {
   }).join("");
   $("tbody").innerHTML = body;
   $("tbody").querySelectorAll("tr").forEach((tr) =>
-    tr.addEventListener("click", () => openDeep(tr.dataset.id)));
+    tr.addEventListener("click", () => openDeep(tr.dataset.uid)));
 }
 
 // ---------------- deep view ----------------
 let FBYK = {};
-function foldById(id) { if (!FBYK[id]) FOLDS.forEach((f) => FBYK[f.id] = f); return FBYK[id]; }
+// key by composite _uid (dsid|id) so same-id folds across datasets stay distinct;
+// also index plain id (first-wins) as a fallback for external callers (API, links).
+function foldById(key) { if (!FBYK[key]) FOLDS.forEach((f) => { FBYK[f._uid] = f; if (!(f.id in FBYK)) FBYK[f.id] = f; }); return FBYK[key]; }
 
 function currentMode() { return localStorage.getItem("atlas_deepmode") || "modal"; }
 function updateLayout() {
@@ -396,8 +416,10 @@ function closeDeep() {
   if (viewer) { try { viewer.resize(); } catch (e) {} }
 }
 
-async function openDeep(id) {
-  const f = foldById(id);
+async function openDeep(key) {
+  const f = foldById(key);
+  if (!f) return;
+  const id = f.id;
   const ds = dsFor(f);
   $("deep").classList.remove("hidden");
   setDeepMode(currentMode());
@@ -425,6 +447,7 @@ function drawProps(f) {
     f.rfam_id ? ["Rfam family", `<a href="https://rfam.org/family/${esc(f.rfam_id)}" target="_blank" rel="noopener">${esc(f.rfam_id)}</a>${f.rfam_name ? ` &mdash; ${esc(f.rfam_name)}` : ""}`] : null,
     ["Length", `${f.length} nt`],
     ["pLDDT / gpde", `${num(f.plddt)} / ${num(f.gpde, 3)}`],
+    ["Conditioning", condLabel(f._cond)],
     ["Clashscore", num(f.clashscore, 2)],
     ["Novelty (best_tm1 vs v341)", f.best_tm1 == null ? "&mdash;" : `${num(f.best_tm1, 3)} &mdash; ${verdict}`],
     ["Nearest known fold", `${f.near || "&mdash;"}${f.near_title ? ` &mdash; ${f.near_title}` : ""}`],
@@ -433,6 +456,10 @@ function drawProps(f) {
     ["OpenKnot score", num(f.openknot, 3)],
     ["Pseudoknot", f.pseudoknot ? "yes" : "no"],
     ["Secondary-structure class", f.ss_class],
+    ["5′/3′ termini", f.termini_bp ? "ends base-paired (1↔N)"
+      : f.termini_trim ? `ends paired &mdash; trimmable overhangs (5′ ${f.overhang5} nt, 3′ ${f.overhang3} nt)`
+      : "ends not directly paired"],
+    f.uucg_tetraloop ? ["UUCG tetraloop", "present"] : null,
     ["Compactness (C1′ contact ratio)", num(f.contact_ratio, 3)],
     ["Base-paired fraction", num(f.bp_fraction, 3)],
     ["Tertiary motifs", `${f.n_tert} (rare ${f.n_rare})`],
@@ -825,15 +852,16 @@ function setupMap() {
     if (p) { tip.classList.remove("hidden"); tip.style.left = (e.clientX - r.left + 14) + "px"; tip.style.top = (e.clientY - r.top + 14) + "px";
       tip.innerHTML = `<b>${esc(p.f.id)}</b>${p.f.name ? "<br>" + esc(p.f.name) : ""}`; } else tip.classList.add("hidden");
   });
-  window.addEventListener("mouseup", (e) => { if (mapDrag && !mapDrag.moved && e.target === $("map")) { const r = $("map").getBoundingClientRect(); const p = mapPick(e.clientX - r.left, e.clientY - r.top, 9); if (p) openDeep(p.f.id); } mapDrag = null; });
+  window.addEventListener("mouseup", (e) => { if (mapDrag && !mapDrag.moved && e.target === $("map")) { const r = $("map").getBoundingClientRect(); const p = mapPick(e.clientX - r.left, e.clientY - r.top, 9); if (p) openDeep(p.f._uid); } mapDrag = null; });
   $("map_color").addEventListener("change", () => renderMap(lastRows));
 }
 
 // ---------------- AtlasAPI: programmatic surface the assistant drives ----------------
 const FILTER_MAP = { length_min: "len_min", length_max: "len_max", plddt_min: "plddt_min", clash_max: "clash_max",
   novelty_max: "tm_max", overlap_max: "ov_max", shape_agr_min: "agr_min", compactness_min: "cr_min",
-  paired_min: "bp_min", fold_size_min: "fold_min", seq_cluster_min: "sclust_min", top_n: "topn", rank: "rank_key" };
-const BOOL_MAP = { novel_only: "novel_only", shape_only: "shape_ok", require_tertiary: "req_tert", require_rare: "req_rare", only_with_tm: "tm_has", per_letter: "per_letter" };
+  paired_min: "bp_min", fold_size_min: "fold_min", seq_cluster_min: "sclust_min", top_n: "topn", rank: "rank_key",
+  termini: "termini", overhang_max: "overhang_max" };
+const BOOL_MAP = { novel_only: "novel_only", shape_only: "shape_ok", require_tertiary: "req_tert", require_rare: "req_rare", only_with_tm: "tm_has", per_letter: "per_letter", uucg: "uucg" };
 function applyFilters(obj) {
   obj = obj || {};
   const set = (id, v) => { const el = $(id); if (!el) return; if (el.type === "checkbox") el.checked = !!v; else el.value = v; };
@@ -844,6 +872,7 @@ function applyFilters(obj) {
     else if (k === "search") set("search", obj[k]);
     else if (k === "motifs") { const want = new Set((obj[k] || []).map(String)); document.querySelectorAll(".mf").forEach((c) => { c.checked = want.has(c.value); }); }
     else if (k === "letters") { const want = new Set((obj[k] || []).map(String)); document.querySelectorAll(".lf").forEach((c) => { c.checked = want.has(c.value); }); }
+    else if (k === "conditioning") { const want = new Set((obj[k] || []).map(String)); document.querySelectorAll(".cf").forEach((c) => { c.checked = want.has(c.value); }); }
   }
   sortOverride = null; syncLabels(); saveState(); render();
   return lastRows.length;
@@ -865,7 +894,7 @@ window.AtlasAPI = {
   setColorBy: (f) => { if ($("map_color")) { $("map_color").value = f; if (viewMode === "map") renderMap(lastRows); } },
   applyFilters,
   resetFilters: () => { $("reset").click(); return lastRows.length; },
-  selectFold: (id) => { const f = foldById(id); if (!f) return false; openDeep(id); return true; },
+  selectFold: (id) => { const f = foldById(id); if (!f) return false; openDeep(f._uid); return true; },
   getResults: (limit, fields) => {
     const def = ["id", "name", "letter", "length", "plddt", "best_tm1", "near", "rna_type", "rfam_id", "rfam_name",
       "fold_size", "global_fold_id", "seq_cluster_size", "contact_ratio", "bp_fraction", "pseudoknot", "n_tert", "n_rare",

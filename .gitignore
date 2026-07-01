@@ -5,3 +5,5 @@ DEPLOYED.local.md
 dist/
 .claude_key
 .ssbak/
+.lavish/
+cryo_tmp/

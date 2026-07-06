@@ -39,8 +39,14 @@
     <select id="model"><option value="">default</option></select>
     <fieldset>
       <legend>Options</legend>
-      <label class="chk"><input type="checkbox" id="opt_msa" checked> refine with MSA when ready (two-stage)</label>
-      <label class="chk"><input type="checkbox" id="opt_chemmap"> condition on chemical mapping (if provided)</label>
+      <label class="ilbl" for="msa_mode">Alignments</label>
+      <select id="msa_mode">
+        <option value="none" selected>Use None (single-sequence, fastest)</option>
+        <option value="protenix-mt">Use MSA</option>
+        <option value="rmsa">Use rMSA</option>
+        <option value="both">Use MSA + rMSA (slower, thorough)</option>
+      </select>
+      <div class="ihint" id="msa_hint">None = single-sequence (fastest). MSA / rMSA condition on alignments (slower, usually more accurate).</div>
     </fieldset>
     <button id="predict-btn">Predict</button>
     <p id="predict-note" class="muted"></p>
@@ -50,10 +56,14 @@
   <main id="iresult">
     <div id="stages"></div>
     <div id="iview">
+      <div class="vtoggle" id="vtoggle">
+        <button type="button" data-v="molstar">Mol*</button>
+        <button type="button" data-v="3dmol">3Dmol</button>
+      </div>
       <div id="iviewer"></div>
       <div id="ibadges"></div>
     </div>
-    <div id="iplaceholder">Submit a sequence to predict its 3D structure. You'll get a fast draft first, then an MSA-refined model when the MSA finishes.</div>
+    <div id="iplaceholder">Submit a sequence to predict its 3D structure. Runs single-sequence by default (fast); tick “compute MSA” for a slower, usually more accurate model.</div>
   </main>
 </div>
 

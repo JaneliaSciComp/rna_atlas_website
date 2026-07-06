@@ -221,6 +221,7 @@ function wireStatic() {
   if (h2) h2.addEventListener("click", () => { $("config").classList.toggle("allcollapsed"); saveState(); });
   $("deep-close").addEventListener("click", closeDeep);
   if ($("deep-export")) $("deep-export").addEventListener("click", exportFold);
+  if ($("deep-vtoggle")) { markDeepEngine(); $("deep-vtoggle").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => setDeepEngine(b.dataset.v))); }
   $("deep").addEventListener("click", (e) => { if (e.target.id === "deep") closeDeep(); });
   document.querySelectorAll('#layoutctl button[data-mode]').forEach((b) =>
     b.addEventListener("click", () => setDeepMode(b.dataset.mode)));
@@ -613,20 +614,62 @@ function drawTracks(f, react) {
   $("tracks").innerHTML = `<div style="font-size:11px;color:#5b6670;margin-bottom:3px">motif lanes &middot; sequence &middot; DMS &middot; 2A3 reactivity (white=protected &rarr; red=reactive) &middot; pairing (white=paired, light red=unpaired)</div>` + svg + ssBlock;
 }
 
-let viewer = null, viewerModel = null;
+let viewer = null, viewerModel = null, mstar = null, molstarLoading = null;
+let deepEngine = (() => { try { return localStorage.getItem("deep_viewer") || "3dmol"; } catch (e) { return "3dmol"; } })();
+function loadMolstarLib() {                          // reuse the bundle already vendored for /inference
+  if (window.molstar) return Promise.resolve();
+  if (molstarLoading) return molstarLoading;
+  molstarLoading = new Promise((res, rej) => {
+    const css = document.createElement("link"); css.rel = "stylesheet"; css.href = "inference/molstar.css"; document.head.appendChild(css);
+    const s = document.createElement("script"); s.src = "inference/molstar.js"; s.onload = () => res(); s.onerror = () => rej(new Error("molstar")); document.head.appendChild(s);
+  });
+  return molstarLoading;
+}
+function markDeepEngine() {
+  const t = $("deep-vtoggle"); if (t) t.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.v === deepEngine));
+  if ($("color_by")) $("color_by").disabled = (deepEngine === "molstar");   // color-by is 3Dmol-only
+}
+function setDeepEngine(v) {
+  if (v === deepEngine) return;
+  deepEngine = v; try { localStorage.setItem("deep_viewer", v); } catch (e) {}
+  markDeepEngine();
+  if (currentDeep) load3D(currentDeep.f, currentDeep.react);
+}
+async function renderMolstar(el, data, fmt) {
+  try { if (mstar && mstar.dispose) mstar.dispose(); } catch (e) {}
+  mstar = null; viewer = null; viewerModel = null; el.innerHTML = "";
+  try { await loadMolstarLib(); } catch (e) { el.innerHTML = '<p style="color:#fff;padding:8px">Mol* failed to load.</p>'; return; }
+  try {
+    mstar = await molstar.Viewer.create(el, { layoutIsExpanded: false, layoutShowControls: true, layoutShowSequence: true, layoutShowLog: false, viewportShowExpand: true });
+    await mstar.loadStructureFromData(data, fmt === "cif" ? "mmcif" : "pdb");
+  } catch (e) { el.innerHTML = '<p style="color:#fff;padding:8px">Mol* render failed.</p>'; }
+}
+let _v3dRO = null;
+function ensureViewerResizeObserver(el) {            // re-fit the active viewer when #viewer3d is drag-resized
+  if (_v3dRO || typeof ResizeObserver === "undefined" || !el) return;
+  _v3dRO = new ResizeObserver(() => {
+    try { if (viewer && viewer.resize) viewer.resize(); } catch (e) {}
+    try { if (mstar && mstar.handleResize) mstar.handleResize(); } catch (e) {}
+  });
+  _v3dRO.observe(el);
+}
 async function load3D(f, react) {
   const el = $("viewer3d");
   el.innerHTML = "";
-  if (typeof $3Dmol === "undefined") { el.innerHTML = '<p style="color:#fff;padding:8px">3Dmol.js not loaded.</p>'; return; }
+  ensureViewerResizeObserver(el);
+  try { if (mstar && mstar.dispose) mstar.dispose(); } catch (e) {}
+  mstar = null;
   const id = f.id;
   const ds = dsFor(f);
   let data;
   viewerModel = null; if (currentDeep) { currentDeep.structText = null; currentDeep.structFmt = null; }
   try { data = await (await fetch(durl(prefix(ds) + "structs/" + (f.key || f.id) + "." + (ds.ext || "cif")))).text(); }
   catch (e) { el.innerHTML = '<p style="color:#fff;padding:8px">structure unavailable</p>'; return; }
-  viewer = $3Dmol.createViewer(el, { backgroundColor: "0x0d1117" });
   const fmt = data.startsWith("data_") || data.includes("_atom_site") ? "cif" : "pdb";
   if (currentDeep) { currentDeep.structText = data; currentDeep.structFmt = fmt; }
+  if (deepEngine === "molstar") { renderMolstar(el, data, fmt); return; }
+  if (typeof $3Dmol === "undefined") { el.innerHTML = '<p style="color:#fff;padding:8px">3Dmol.js not loaded.</p>'; return; }
+  viewer = $3Dmol.createViewer(el, { backgroundColor: "0x0d1117" });
   viewerModel = viewer.addModel(data, fmt);
   const a23 = react && react.a23, dms = react && react.dms;
   const dbn = (PAIRING_BY_DS[f._dsid] || {})[f.id] || "";
@@ -752,13 +795,17 @@ async function exportFold() {
   if (!currentDeep) return;
   const f = currentDeep.f, react = currentDeep.react, base = safeName(f.id) || "fold";
   const files = [{ name: base + ".txt", data: _enc(foldTxt(f, react)) }];
-  const atoms = viewerModel ? viewerModel.selectedAtoms({}) : [];
-  if (currentDeep.structText && atoms.length) {
-    const native = currentDeep.structFmt;     // keep the original file for its own format; generate the other
-    files.push({ name: base + ".pdb", data: _enc(native === "pdb" ? currentDeep.structText : atomsToPDB(atoms)) });
-    files.push({ name: base + ".cif", data: _enc(native === "cif" ? currentDeep.structText : atomsToCIF(atoms, base)) });
+  if (currentDeep.structText) {
+    const native = currentDeep.structFmt;     // always ship the fetched file in its own format
+    files.push({ name: base + "." + native, data: _enc(currentDeep.structText) });
+    const atoms = viewerModel ? viewerModel.selectedAtoms({}) : [];   // 3Dmol only -> convert to the other format
+    if (atoms.length) files.push({ name: base + "." + (native === "pdb" ? "cif" : "pdb"),
+      data: _enc(native === "pdb" ? atomsToCIF(atoms, base) : atomsToPDB(atoms)) });
   }
-  if (viewer) { try { files.push({ name: base + ".png", data: dataURIBytes(viewer.pngURI()) }); } catch (e) {} }
+  let png = null;                              // snapshot from whichever engine is active
+  try { if (viewer) png = dataURIBytes(viewer.pngURI()); } catch (e) {}
+  if (!png) { try { const c = $("viewer3d").querySelector("canvas"); if (c) { const u = c.toDataURL("image/png"); if (u && u.length > 3000) png = dataURIBytes(u); } } catch (e) {} }
+  if (png) files.push({ name: base + ".png", data: png });
   const fname = (safeName(f.name) ? safeName(f.name) + "__" : "") + base + ".zip";
   const a = document.createElement("a");
   a.href = URL.createObjectURL(zipStore(files)); a.download = fname;

@@ -7,3 +7,4 @@ dist/
 .ssbak/
 .lavish/
 cryo_tmp/
+.infer_api

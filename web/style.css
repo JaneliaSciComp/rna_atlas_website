@@ -93,12 +93,17 @@ tbody tr:hover { background: #eaf3f8; }
 .deep-tools button { font-size: 16px; line-height: 1; border: 1px solid #dde3e8; background: #f4f6f8; cursor: pointer; color: #5b6670; border-radius: 4px; padding: 3px 7px; }
 .deep-tools button:hover { background: #eaf3f8; }
 .deep-tools button[data-mode="bottom"] { transform: rotate(90deg); }
+.vtoggle { display: inline-flex; gap: 0; margin-right: 4px; }
+.vtoggle button { font-size: 11px; padding: 3px 9px; border: 1px solid #dde3e8; background: #f4f6f8; color: #5b6670; cursor: pointer; }
+.vtoggle button:first-child { border-radius: 4px 0 0 4px; }
+.vtoggle button:last-child { border-radius: 0 4px 4px 0; border-left: 0; }
+.vtoggle button.active { background: #2e6f95; color: #fff; border-color: #2e6f95; }
 #deep-close { font-size: 18px; }
 #deep-export { font-size: 12px; padding: 4px 10px; font-weight: 600; color: #2e6f95; }
 #deep-export:hover { background: #2e6f95; color: #fff; border-color: #2e6f95; }
 #deep-title { margin: 0 0 8px; font-size: 16px; }
 .deep-body { display: grid; grid-template-columns: 1.1fr 1fr; grid-template-rows: auto auto; gap: 12px; }
-#viewer3d { position: relative; width: 100%; height: 420px; background: #0d1117; border-radius: 6px; grid-row: span 2; }
+#viewer3d { position: relative; width: 100%; height: 420px; min-height: 240px; background: #0d1117; border-radius: 6px; grid-row: span 2; resize: vertical; overflow: hidden; }
 #tracks { width: 100%; overflow-x: auto; }
 #props { font-size: 12px; }
 #props table { width: 100%; }

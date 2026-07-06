@@ -27,9 +27,10 @@ deploy_shell() {
   # Shared Claude key (optional) comes from the gitignored .claude_key file so it's never committed.
   CFG=$(printf 'window.DATA_BASE = "%s";\nwindow.GATED = true;\n' "$db")
   [ -f .claude_key ] && CFG="$CFG"$'\n'"window.CLAUDE_KEY = \"$(tr -d '\n' < .claude_key)\";"
+  [ -f .infer_api ] && CFG="$CFG"$'\n'"window.INFER_API = \"$(tr -d '\n' < .infer_api)\";"
   printf '%s\n' "$CFG" \
     | aws --profile $P s3 cp - "$B/${pfx}config.js" --content-type application/javascript --only-show-errors \
-    && echo "  ${pfx}config.js  (DATA_BASE=\"$db\"$([ -f .claude_key ] && echo ' +CLAUDE_KEY'))"
+    && echo "  ${pfx}config.js  (DATA_BASE=\"$db\"$([ -f .claude_key ] && echo ' +CLAUDE_KEY')$([ -f .infer_api ] && echo ' +INFER_API'))"
   for lf in web/lib/*.js; do bn=$(basename "$lf"); aws --profile $P s3 cp "$lf" "$B/${pfx}lib/$bn" --only-show-errors && echo "  ${pfx}lib/$bn"; done
   # /inference subpage
   for f in web/inference/*; do [ -f "$f" ] && aws --profile $P s3 cp "$f" "$B/${pfx}inference/$(basename "$f")" --only-show-errors && echo "  ${pfx}inference/$(basename "$f")"; done
@@ -81,14 +82,16 @@ case "${1:-prod}" in
     for f in $SHELL_FILES lib/3Dmol-min.js lib/three.min.js lib/OrbitControls.js claude.png \
              icon.png logo_exp.png favicon.ico favicon-16x16.png favicon-32x32.png \
              apple-touch-icon.png android-chrome-192x192.png android-chrome-512x512.png site.webmanifest \
-             inference/index.html inference/inference.js inference/inference.css; do
+             inference/index.html inference/inference.js inference/inference.css \
+             inference/molstar.js inference/molstar.css; do
       aws --profile $P s3 cp "$B/dev/$f" "$B/$f" --only-show-errors && echo "  $f"
     done
     CFG=$(printf 'window.DATA_BASE = "";\nwindow.GATED = true;\n')
     [ -f .claude_key ] && CFG="$CFG"$'\n'"window.CLAUDE_KEY = \"$(tr -d '\n' < .claude_key)\";"
+    [ -f .infer_api ] && CFG="$CFG"$'\n'"window.INFER_API = \"$(tr -d '\n' < .infer_api)\";"
     printf '%s\n' "$CFG" \
       | aws --profile $P s3 cp - "$B/config.js" --content-type application/javascript --only-show-errors \
-      && echo "  config.js  (prod$([ -f .claude_key ] && echo ' +CLAUDE_KEY'))"
+      && echo "  config.js  (prod$([ -f .claude_key ] && echo ' +CLAUDE_KEY')$([ -f .infer_api ] && echo ' +INFER_API'))"
     echo "invalidating /* ..."; invalidate "/*"
     echo "done — promoted to https://rna-atlas.org/"
     ;;

@@ -29,8 +29,14 @@
 .stage.err i { background: #c0504d; }
 @keyframes ipulse { 0%, 100% { opacity: .4; } 50% { opacity: 1; } }
 
-#iview { display: none; flex: 1; min-height: 360px; display: flex; flex-direction: column; }
-#iviewer { position: relative; width: 100%; flex: 1; min-height: 360px; background: #0d1117; border-radius: 8px; }
+#iview { display: none; flex: 1 1 auto; min-height: 360px; flex-direction: column; }
+#iview.show { display: flex; }
+#iviewer { position: relative; width: 100%; flex: 1 1 auto; min-height: 360px; background: #0d1117; border-radius: 8px; overflow: hidden; }
+.vtoggle { display: flex; gap: 0; margin-bottom: 8px; align-self: flex-end; }
+.vtoggle button { font-size: 12px; border: 1px solid #cdd6dd; background: #fff; color: #5b6670; padding: 3px 12px; cursor: pointer; }
+.vtoggle button:first-child { border-radius: 6px 0 0 6px; }
+.vtoggle button:last-child { border-radius: 0 6px 6px 0; border-left: 0; }
+.vtoggle button.active { background: #2e6f95; color: #fff; border-color: #2e6f95; }
 #ibadges { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
 .rbadge { font-size: 12px; border: 1px solid #cdd6dd; background: #fff; color: #2e6f95; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
 .rbadge.active { background: #2e6f95; color: #fff; border-color: #2e6f95; }
@@ -40,11 +46,14 @@
 #iplaceholder { color: #8a96a0; font-size: 13px; max-width: 520px; line-height: 1.5; margin-top: 20px; }
 
 /* model selector + jobs monitor (added for submit/model/monitor/cancel) */
-#model { width: 100%; padding: 6px 8px; border: 1px solid #cdd6dd; border-radius: 5px; font-size: 13px; margin: 2px 0 6px; background: #fff; }
+#model, #msa_mode { width: 100%; padding: 6px 8px; border: 1px solid #cdd6dd; border-radius: 5px; font-size: 13px; margin: 2px 0 6px; background: #fff; }
+.ihint { font-size: 11px; color: #7a848c; line-height: 1.4; margin: 2px 0 2px; }
 .jobs { margin-top: 14px; }
 .jobs-h { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #5b6670; font-weight: 600; margin-bottom: 4px; }
 .job { display: flex; align-items: center; gap: 7px; font-size: 12px; padding: 5px 0; border-top: 1px solid #eef2f5; }
 .job .jn { font-weight: 600; color: #1f324d; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.job .jopen { cursor: pointer; }
+.job .jopen:hover { color: #2e6f95; text-decoration: underline; }
 .job .jm { color: #5b6670; flex: 0 0 auto; }
 .job .js { flex: 0 0 auto; padding: 1px 7px; border-radius: 8px; font-size: 10px; text-transform: uppercase; background: #eef2f5; color: #5b6670; }
 .js-done { background: #e9f5ec; color: #3a7d44; }

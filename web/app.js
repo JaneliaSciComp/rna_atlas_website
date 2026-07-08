@@ -3,7 +3,7 @@
 // union of every checked dataset, each fold tagged with f._dsid so the deep view can
 // dispatch struct/ext/reactivity/motifs per row.
 let FOLDS = [], MOTIF_SET = [], LETTERS = [];
-let MOTIFS_BY_DS = {}, PAIRING_BY_DS = {};  // {dsid: {foldId: ...}} — only motif-bearing datasets populate these
+let MOTIFS_BY_DS = {}, PAIRING_BY_DS = {}, TSPANS_BY_DS = {};  // {dsid: {foldId: ...}} — only motif-bearing datasets populate these
 let sortOverride = null;  // {key, dir} from header click
 const DATASETS = window.DATASETS || [{ id: "ribo2", label: "curated", base: "", ext: "cif", react: true, motifs: true }];
 const DSBYID = {}; DATASETS.forEach((d) => { DSBYID[d.id] = d; });
@@ -50,7 +50,7 @@ const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</
 // --- persist filter settings across reloads ---
 const FKEY = "atlas_filters";
 const FIELD_IDS = ["search", "len_min", "len_max", "plddt_min", "clash_max", "tm_max", "tm_has", "novel_only",
-  "ov_max", "shape_ok", "agr_min", "cr_min", "bp_min", "fold_min", "sclust_min", "req_tert", "req_rare", "motif_mode", "pk", "termini", "overhang_max", "uucg", "rank_key", "topn", "per_letter", "alt_palette", "color_by", "ss_view"];
+  "ov_max", "shape_ok", "agr_min", "cr_min", "bp_min", "cf_min", "fold_min", "sclust_min", "req_tert", "req_rare", "motif_mode", "pk", "termini", "overhang_max", "uucg", "rank_key", "topn", "per_letter", "alt_palette", "color_by", "ss_view"];
 const altPalette = () => !!($("alt_palette") && $("alt_palette").checked);
 function snapshot() {
   const s = {};
@@ -143,12 +143,13 @@ async function ensureLoaded(dsid) {
   const folds = await getJSON(prefix(ds) + "data/folds.json");
   const dcond = ds.cond || [];
   folds.forEach((f) => { f._dsid = dsid; f._cond = f.conditioning || f.cond || dcond; f._uid = dsid + "|" + f.id; });
-  let motifs = {}, pairing = {};
+  let motifs = {}, pairing = {}, tspans = {};
   if (ds.motifs) {
     try { motifs = await getJSON(prefix(ds) + "data/motifs.json"); } catch (e) {}
     try { pairing = await getJSON(prefix(ds) + "data/pairing.json"); } catch (e) {}
+    try { tspans = await getJSON(prefix(ds) + "data/tertiary_spans.json"); } catch (e) {}
   }
-  LOADED[dsid] = { folds, motifs, pairing };
+  LOADED[dsid] = { folds, motifs, pairing, tspans };
 }
 
 async function loadSources() {
@@ -166,11 +167,11 @@ async function loadSources() {
     if (GATED) return showGate("Could not load data (" + (e.status || "network") + ").");
     throw e;
   }
-  FOLDS = []; MOTIFS_BY_DS = {}; PAIRING_BY_DS = {}; FBYK = {};
+  FOLDS = []; MOTIFS_BY_DS = {}; PAIRING_BY_DS = {}; TSPANS_BY_DS = {}; FBYK = {};
   for (const id of toLoad) {
     const L = LOADED[id]; if (!L) continue;
     FOLDS = FOLDS.concat(L.folds);
-    MOTIFS_BY_DS[id] = L.motifs; PAIRING_BY_DS[id] = L.pairing;
+    MOTIFS_BY_DS[id] = L.motifs; PAIRING_BY_DS[id] = L.pairing; TSPANS_BY_DS[id] = L.tspans || {};
   }
   const ms = new Set(), ls = new Set();
   let maxLen = 0;
@@ -240,7 +241,7 @@ function wireStatic() {
     $("plddt_min").value = 0; $("clash_max").value = 9999; $("len_min").value = 0;
     $("len_max").value = Math.max(...FOLDS.map((f) => f.length || 0));
     ["shape_ok", "req_tert", "req_rare", "tm_has", "novel_only", "per_letter"].forEach((id) => $(id).checked = false);
-    $("cr_min").value = 0; $("bp_min").value = 0;
+    $("cr_min").value = 0; $("bp_min").value = 0; $("cf_min").value = 0;
     if ($("fold_min")) $("fold_min").value = 0; if ($("sclust_min")) $("sclust_min").value = 0;
     $("pk").value = "any"; $("rank_key").value = "best_tm1:asc"; $("topn").value = 200;
     if ($("color_by")) $("color_by").value = "a23";
@@ -279,6 +280,7 @@ function syncLabels() {
   $("agr_min_v").textContent = (+$("agr_min").value).toFixed(2);
   $("cr_min_v").textContent = (+$("cr_min").value).toFixed(2);
   $("bp_min_v").textContent = (+$("bp_min").value).toFixed(2);
+  $("cf_min_v").textContent = (+$("cf_min").value).toFixed(2);
 }
 
 function filters() {
@@ -292,7 +294,7 @@ function filters() {
     tmax: +$("tm_max").value, tmhas: $("tm_has").checked, novelOnly: $("novel_only").checked,
     ovmax: +$("ov_max").value,
     shape: $("shape_ok").checked, agr: +$("agr_min").value,
-    crmin: +$("cr_min").value, bpmin: +$("bp_min").value,
+    crmin: +$("cr_min").value, bpmin: +$("bp_min").value, cfmin: +$("cf_min").value,
     foldMin: +($("fold_min") ? $("fold_min").value : 0), sclustMin: +($("sclust_min") ? $("sclust_min").value : 0),
     tert: $("req_tert").checked, rare: $("req_rare").checked, motifs: mf,
     motifMode: ($("motif_mode") ? $("motif_mode").value : "any"),
@@ -319,6 +321,7 @@ function pass(f, c) {
   if (c.shape && !f.shape_ok) return false;
   if (c.agr > -1 && (f.shape_agr == null || f.shape_agr < c.agr)) return false;
   if (c.crmin > 0 && (f.contact_ratio == null || f.contact_ratio < c.crmin)) return false;
+  if (c.cfmin > 0 && (f.crossed_frac == null || f.crossed_frac < c.cfmin)) return false;
   if (c.bpmin > 0 && (f.bp_fraction == null || f.bp_fraction < c.bpmin)) return false;
   if (c.foldMin > 0 && (f.fold_size == null || f.fold_size < c.foldMin)) return false;
   if (c.sclustMin > 0 && (f.seq_cluster_size == null || f.seq_cluster_size < c.sclustMin)) return false;
@@ -388,7 +391,7 @@ const COLS = [
   ["id", "seq_id"], ["name", "name"], ["letter", "L"], ["length", "len"], ["plddt", "pLDDT"],
   ["best_tm1", "best_tm1"], ["near", "nearest"], ["overlap_ae", "ovlp_AE"],
   ["shape_ok", "SHAPE"], ["shape_agr", "SHAPE agr"], ["contact_ratio", "compact"], ["bp_fraction", "paired"],
-  ["fold_size", "cluster"], ["n_tert", "tert"], ["n_rare", "rare"], ["pseudoknot", "PK"], ["motifs", "motifs"],
+  ["crossed_frac", "crossed"], ["fold_size", "cluster"], ["n_tert", "tert"], ["n_rare", "rare"], ["pseudoknot", "PK"], ["motifs", "motifs"],
 ];
 
 function drawTable(rows) {
@@ -418,6 +421,7 @@ function drawTable(rows) {
       <td class="num">${num(f.best_tm1, 3)}</td><td title="${(f.near_title || "").replace(/"/g, "&quot;")}">${f.near || ""}</td>
       <td class="num">${num(f.overlap_ae, 2)}</td><td>${shape}</td>
       <td class="num">${num(f.shape_agr, 2)}</td><td class="num">${num(f.contact_ratio, 2)}</td><td class="num">${num(f.bp_fraction, 2)}</td>
+      <td class="num">${num(f.crossed_frac, 2)}</td>
       <td class="num" title="${f.global_fold_id ? "structural fold #" + f.global_fold_id : ""}">${f.fold_size ?? ""}</td>
       <td class="num">${f.n_tert}</td><td class="num">${f.n_rare}</td>
       <td>${f.pseudoknot ? "&#10003;" : ""}</td><td>${chips}</td></tr>`;
@@ -502,6 +506,8 @@ function drawProps(f) {
     f.uucg_tetraloop ? ["UUCG tetraloop", "present"] : null,
     ["Compactness (C1′ contact ratio)", num(f.contact_ratio, 3)],
     ["Base-paired fraction", num(f.bp_fraction, 3)],
+    ["Tertiary complexity (crossed-pairs)", `${num(f.crossed_frac, 3)}${f.n_crossed_pairs != null ? ` &middot; ${f.n_crossed_pairs} crossed pairs` : ""}`],
+    ["MOHCA-regime fraction (25–50 nt)", num(f.mohca_regime_frac, 3)],
     ["Tertiary motifs", `${f.n_tert} (rare ${f.n_rare})`],
     f.global_fold_id ? ["Structural fold (A–H)", `#${f.global_fold_id} &mdash; ${f.fold_size} member${f.fold_size === 1 ? "" : "s"}${f.overlap_global_fold_id ? ` &middot; nearest A–E fold #${f.overlap_global_fold_id}` : ""}`] : null,
     f.global_seq_cluster_id ? ["Sequence cluster (A–H)", `#${f.global_seq_cluster_id} &mdash; ${f.seq_cluster_size} member${f.seq_cluster_size === 1 ? "" : "s"}`] : null,
@@ -512,6 +518,12 @@ function drawProps(f) {
     + `<tr><td class="muted">Motifs</td><td>${chips}</td></tr></table>`;
 }
 
+function crossedResiSet(f) {
+  // crossed (tertiary) residue indices from data/tertiary_spans.json: {seq_id: [[start,end],...]} (1-based incl)
+  const set = new Set();
+  ((TSPANS_BY_DS[f._dsid] || {})[f.id] || []).forEach(([a, b]) => { for (let r = a; r <= b; r++) set.add(r); });
+  return set;
+}
 function spansFor(f) {
   const M = MOTIFS_BY_DS[f._dsid] || {};
   return (M[f.id] || []).map(([type, res]) => {
@@ -721,6 +733,9 @@ async function load3D(f, react) {
   } else if (mode === "nuc") {                   // nucleotide identity (same palette as the sequence track)
     const alt = altPalette();
     style = { cartoon: { colorfunc: (a) => hexCF(nucColor((a.resn || "").trim(), alt)), ringMode: 3 } };
+  } else if (mode === "crossed") {              // tertiary crossed-pairs: pinned residues red, rest grey
+    const cs = crossedResiSet(f);
+    style = { cartoon: { colorfunc: (a) => cs.has(a.resi) ? "0xb5121b" : "0x9aa7b0", ringMode: 3 } };
   } else if (mode === "spectrum") {
     style = { cartoon: { color: "spectrum", ringMode: 3 } };
   } else {                                       // a23 / dms reactivity (blue protected -> red reactive); spectrum if absent

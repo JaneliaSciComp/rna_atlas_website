@@ -56,14 +56,25 @@
     if (!j.length) { el.innerHTML = ""; return; }
     el.innerHTML = '<div class="jobs-h">Recent jobs</div>' + j.map((x) => {
       const run = RUNNING.has(String(x.state || "").toLowerCase());
-      return `<div class="job"><span class="jn jopen" data-id="${esc(x.id)}" title="open this result">${esc(x.name || x.id.slice(0, 10))}</span>`
+      // server-recovered jobs (fromServer) show the internal target_id — the friendly label
+      // was browser-only. Show it muted + a ✎ to relabel; user labels persist in localStorage.
+      const label = x.name || x.id.slice(0, 10);
+      return `<div class="job"><span class="jn jopen${x.fromServer && x.name === x.id.split(":")[1] ? " jn-id" : ""}" data-id="${esc(x.id)}" title="open this result">${esc(label)}</span>`
+        + `<button class="jren" data-id="${esc(x.id)}" title="rename this job">&#9998;</button>`
         + `<span class="jm">${esc(x.model || "default")}</span>`
         + `<span class="js js-${esc(String(x.state || "").toLowerCase())}">${esc(x.state || "")}</span>`
         + (run ? `<button class="jkill" data-id="${esc(x.id)}" title="stop this job">kill</button>` : "")
         + `</div>`;
     }).join("");
     el.querySelectorAll(".jkill").forEach((b) => b.onclick = (e) => { e.stopPropagation(); cancelJob(b.dataset.id); });
+    el.querySelectorAll(".jren").forEach((b) => b.onclick = (e) => { e.stopPropagation(); renameJob(b.dataset.id); });
     el.querySelectorAll(".jopen").forEach((b) => b.onclick = () => reopenJob(b.dataset.id));
+  }
+  function renameJob(id) {
+    const cur = loadJobs().find((x) => x.id === id) || {};
+    const nm = prompt("Label for this job:", cur.name && cur.name !== id.split(":")[1] ? cur.name : "");
+    if (nm == null) return;
+    upsertJob({ id, name: nm.trim() || id.split(":")[1] || id.slice(0, 10) });
   }
   async function cancelJob(id) {
     if (API) { try { await fetch(`${API}/cancel`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ job_id: id, token: tok() }) }); } catch (e) {} }
@@ -343,6 +354,27 @@
       } catch (e) {}
     }
   }
+  // Recent-jobs list lives in localStorage (per browser), so clearing site data loses it.
+  // The server still knows recent web executions (+ cached results) — merge them back so the
+  // list self-heals. Server ids are 3-part (model:target:exec); /status re-opens them fine.
+  async function syncServerJobs() {
+    if (!API) return;
+    let data;
+    try { data = await (await fetch(`${API}/jobs${tok() ? "?t=" + encodeURIComponent(tok()) : ""}`)).json(); }
+    catch (e) { return; }
+    const server = (data && data.jobs) || [];
+    if (!server.length) return;
+    const local = loadJobs();
+    const haveExec = new Set(local.map((x) => String(x.id).split(":")[2]).filter(Boolean));
+    let added = 0;
+    for (const s of server) {
+      const exec = String(s.job_id || "").split(":")[2];
+      if (!exec || haveExec.has(exec)) continue;   // already tracked locally
+      local.push({ id: s.job_id, name: s.name, model: s.model, state: s.state, fromServer: true });
+      haveExec.add(exec); added++;
+    }
+    if (added) { saveJobs(local); renderJobs(); }
+  }
   function init() {
     $("seq").addEventListener("input", seqLen);
     $("example-btn").addEventListener("click", () => { $("seq").value = EXAMPLE; seqLen(); });
@@ -350,7 +382,7 @@
     if (!API) $("predict-note").innerHTML = "Backend not connected yet — Predict runs a demo of the flow.";
     markViewerButtons();
     $("vtoggle").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => setViewer(b.dataset.v)));
-    loadModels(); renderJobs(); refreshJobs();
+    loadModels(); renderJobs(); refreshJobs(); syncServerJobs();
     seqLen();
   }
   if (GATED && !tok()) showGate(); else (document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", init) : init());

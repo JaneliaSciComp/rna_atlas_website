@@ -54,6 +54,9 @@
 .job .jn { font-weight: 600; color: #1f324d; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .job .jopen { cursor: pointer; }
 .job .jopen:hover { color: #2e6f95; text-decoration: underline; }
+.job .jn-id { font-weight: 500; color: #8a94a0; font-family: ui-monospace, monospace; font-size: 11px; }  /* server target_id, unlabeled */
+.jren { flex: 0 0 auto; border: 1px solid #d3dae0; background: #f6f8fa; color: #5b6670; border-radius: 4px; font-size: 11px; padding: 1px 6px; cursor: pointer; }
+.jren:hover { background: #2e6f95; color: #fff; border-color: #2e6f95; }
 .job .jm { color: #5b6670; flex: 0 0 auto; }
 .job .js { flex: 0 0 auto; padding: 1px 7px; border-radius: 8px; font-size: 10px; text-transform: uppercase; background: #eef2f5; color: #5b6670; }
 .js-done { background: #e9f5ec; color: #3a7d44; }

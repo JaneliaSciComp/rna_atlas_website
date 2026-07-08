@@ -9,6 +9,17 @@ const DATASETS = window.DATASETS || [{ id: "ribo2", label: "curated", base: "", 
 const DSBYID = {}; DATASETS.forEach((d) => { DSBYID[d.id] = d; });
 const LOADED = {};        // dsid -> {folds, motifs, pairing} cache (loaded once)
 function dsFor(f) { return DSBYID[f._dsid] || DATASETS[0]; }
+// Companion datasets share a parent source's checkbox + per-letter filter and load lazily.
+function companionsOf(srcId) { return DATASETS.filter((d) => d.parent === srcId); }
+function companionLetterSet() { return new Set(DATASETS.filter((d) => d.parent).flatMap((d) => d.letters || [])); }
+function checkedLetters() { return new Set([...document.querySelectorAll(".lf:checked")].map((c) => c.value)); }
+// Companions (of active sources) not yet loaded whose declared letters are currently enabled.
+function neededCompanions() {
+  const on = checkedLetters();
+  return activeSources().flatMap(companionsOf)
+    .filter((c) => !LOADED[c.id] && (c.letters || []).some((l) => on.has(l)))
+    .map((c) => c.id);
+}
 const COND_LABELS = { msa: "MSA", tbm: "TBM (template-based)", chemmap: "chemmap input (SHAPE-guided)", exp: "experimental (PDB)" };
 function condLabel(cond) { const t = cond || []; return t.length ? t.map((x) => COND_LABELS[x] || x).join(", ") : "sequence-only (unconditioned)"; }
 function prefix(ds) { return ds && ds.base ? ds.base + "/" : ""; }
@@ -100,10 +111,13 @@ async function boot() {
 }
 
 function buildSourcePanel() {
-  // The motif-bearing dataset (ribo2) gets the nested per-letter checkboxes (#letter_filter).
-  $("source-panel").innerHTML = DATASETS.map((d) => {
+  // Companion datasets (d.parent) don't get their own row — they ride the parent source.
+  // The first motif-bearing source gets the nested per-letter checkboxes (#letter_filter).
+  let letterAttached = false;
+  $("source-panel").innerHTML = DATASETS.filter((d) => !d.parent).map((d) => {
     const row = `<label class="srcrow"><input type="checkbox" class="src" value="${d.id}">${d.label}</label>`;
-    return d.motifs ? row + `<div id="letter_filter" class="letters srcsub"></div>` : row;
+    if (d.motifs && !letterAttached) { letterAttached = true; return row + `<div id="letter_filter" class="letters srcsub"></div>`; }
+    return row;
   }).join("");
 }
 
@@ -139,15 +153,21 @@ async function ensureLoaded(dsid) {
 
 async function loadSources() {
   const active = activeSources();
+  const comps = active.flatMap(companionsOf);                 // companions of active sources
+  // A companion loads once any of its declared letters is enabled (persisted lf, or current DOM).
+  const st = loadState() || {};
+  const onLetters = new Set([...(Array.isArray(st.lf) ? st.lf : []), ...checkedLetters()]);
+  const compLoad = comps.filter((c) => (c.letters || []).some((l) => onLetters.has(l))).map((c) => c.id);
+  const toLoad = [...active, ...compLoad];
   try {
-    for (const id of active) await ensureLoaded(id);
+    for (const id of toLoad) await ensureLoaded(id);
   } catch (e) {
     if (GATED && e.status === 403) { localStorage.removeItem("atlas_token"); return showGate("Incorrect passcode — try again."); }
     if (GATED) return showGate("Could not load data (" + (e.status || "network") + ").");
     throw e;
   }
   FOLDS = []; MOTIFS_BY_DS = {}; PAIRING_BY_DS = {}; FBYK = {};
-  for (const id of active) {
+  for (const id of toLoad) {
     const L = LOADED[id]; if (!L) continue;
     FOLDS = FOLDS.concat(L.folds);
     MOTIFS_BY_DS[id] = L.motifs; PAIRING_BY_DS[id] = L.pairing;
@@ -159,6 +179,8 @@ async function loadSources() {
     if (DSBYID[f._dsid] && DSBYID[f._dsid].motifs && f.letter) ls.add(f.letter);  // letters only from motif-bearing source
     if (f.length > maxLen) maxLen = f.length;
   }
+  // Show companion letters (e.g. I–Q) as checkboxes even before their data is loaded.
+  comps.forEach((c) => (c.letters || []).forEach((l) => ls.add(l)));
   MOTIF_SET = [...ms].sort();
   LETTERS = [...ls].sort();
   $("len_max").value = maxLen || 9999;
@@ -180,13 +202,29 @@ function buildMotifFilter() {
   ).join("");
 }
 function buildLetterFilter() {
+  // Companion letters (I–Q) start UNCHECKED so the default view stays A–H (fast); enabling one
+  // lazily loads that companion's data. A–H (loaded) start checked.
+  const comp = companionLetterSet();
+  const hasComp = LETTERS.some((l) => comp.has(l));
   $("letter_filter").innerHTML = LETTERS.map((l) =>
-    `<label><input type="checkbox" class="lf" value="${l}" checked>${l}</label>`).join("");
+    `<label${comp.has(l) ? ' class="lf-opt" title="curated I–Q · chemmap pseudolabel · loads on first use"' : ""}>` +
+    `<input type="checkbox" class="lf" value="${l}"${comp.has(l) ? "" : " checked"}>${l}</label>`).join("") +
+    (hasComp ? `<div class="lf-note">I–Q = curated novel folds (chemmap pseudolabel) · load on demand</div>` : "");
 }
 
 function wireDynamic() {
-  document.querySelectorAll(".mf,.lf").forEach((c) =>
+  document.querySelectorAll(".mf").forEach((c) =>
     c.addEventListener("change", () => { saveState(); render(); }));
+  document.querySelectorAll(".lf").forEach((c) => c.addEventListener("change", onLetterChange));
+}
+// A letter toggle: if it enables a not-yet-loaded companion (I–Q), lazily load it, else just render.
+async function onLetterChange() {
+  saveState();
+  if (neededCompanions().length) {
+    const note = document.querySelector(".lf-note");
+    if (note) { note.textContent = "loading I–Q folds…"; note.classList.add("loading"); }
+    await loadSources();   // rebuilds the letter filter (and note) when done
+  } else render();
 }
 
 function wireStatic() {
@@ -194,7 +232,8 @@ function wireStatic() {
     el.addEventListener("input", () => { syncLabels(); saveState(); render(); }));
   $("reset").addEventListener("click", () => {
     document.querySelectorAll(".mf").forEach((c) => c.checked = false);
-    document.querySelectorAll(".lf").forEach((c) => c.checked = true);
+    const comp = companionLetterSet();  // companion (I–Q) letters stay OFF on reset (opt-in)
+    document.querySelectorAll(".lf").forEach((c) => c.checked = !comp.has(c.value));
     document.querySelectorAll(".cf").forEach((c) => c.checked = false);
     ["plddt_min", "tm_max", "ov_max"].forEach((id) => $(id).value = $(id).max);
     $("agr_min").value = -1;

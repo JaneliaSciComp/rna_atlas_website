@@ -58,7 +58,10 @@ fieldset.collapsed > *:not(legend) { display: none; }
 select { width: 100%; margin: 4px 0; padding: 3px; }
 .letters { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .letters label { background: #eef2f5; border-radius: 4px; padding: 2px 7px; cursor: pointer; }
+.letters label.lf-opt { background: #e7eefc; border: 1px dashed #9cb6e8; }  /* opt-in companion (I–Q) */
 .letters input { margin-right: 3px; }
+.letters .lf-note { flex-basis: 100%; font-weight: 400; font-size: 10px; color: #6b7684; margin-top: 2px; }
+.letters .lf-note.loading { color: #2f6fd6; }
 #motif_filter { max-height: 150px; overflow-y: auto; margin-top: 4px; border-top: 1px solid #eee; padding-top: 4px; }
 #motif_filter label { display: block; font-size: 12px; cursor: pointer; }
 #reset { width: 100%; padding: 6px; background: #2e6f95; color: #fff; border: 0; border-radius: 5px; cursor: pointer; }

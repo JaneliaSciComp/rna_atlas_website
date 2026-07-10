@@ -52,7 +52,7 @@
     <fieldset>
       <legend>Length (nt)</legend>
       <div class="row"><label>min</label><input type="number" id="len_min" value="0" min="0"><span id="len_min_v"></span></div>
-      <div class="row"><label>max</label><input type="number" id="len_max" value="9999" min="0"><span id="len_max_v"></span></div>
+      <div class="row"><label>max</label><input type="number" id="len_max" value="2000" min="0"><span id="len_max_v"></span></div>
     </fieldset>
 
     <fieldset>
@@ -273,6 +273,15 @@
 <div id="deep" class="hidden mode-modal">
   <div class="deep-card">
     <div class="deep-tools">
+      <select id="deep_color_by" class="deep-cby" title="3D coloring">
+        <option value="a23">2A3 SHAPE reactivity</option>
+        <option value="dms">DMS reactivity</option>
+        <option value="plddt">pLDDT confidence</option>
+        <option value="pairing">base pairing (paired/unpaired)</option>
+        <option value="nuc">nucleotide (A/C/G/U)</option>
+        <option value="crossed">tertiary crossed-pairs (pinned residues)</option>
+        <option value="spectrum">spectrum (5&prime;&rarr;3&prime;)</option>
+      </select>
       <span class="vtoggle" id="deep-vtoggle" title="3D viewer engine">
         <button type="button" data-v="3dmol">3Dmol</button>
         <button type="button" data-v="molstar">Mol*</button>
@@ -285,6 +294,7 @@
       <div id="viewer3d"></div>
       <div id="tracks"></div>
       <div id="props"></div>
+      <div id="reactchart"></div>
     </div>
   </div>
 </div>

@@ -35,8 +35,8 @@ function motifColor(name) { return MOTIF_COLORS[name] || MOTIF_DEFAULT; }
 const SHAPE_STOPS = [[1, 1, 1], [255 / 255, 212 / 255, 194 / 255],
   [240 / 255, 138 / 255, 93 / 255], [184 / 255, 29 / 255, 36 / 255]];
 function lerp(a, b, t) { return a + (b - a) * t; }
-function shapeColor(v) {
-  if (v === null || v === undefined || Number.isNaN(v)) return "#dfe3e8"; // masked
+function shapeRGB(v) {
+  if (v === null || v === undefined || Number.isNaN(v)) return [223, 227, 232]; // masked
   v = Math.max(0, Math.min(1, v));
   const seg = v * (SHAPE_STOPS.length - 1);
   const i = Math.min(SHAPE_STOPS.length - 2, Math.floor(seg));
@@ -44,9 +44,13 @@ function shapeColor(v) {
   const r = Math.round(lerp(a[0], b[0], t) * 255);
   const g = Math.round(lerp(a[1], b[1], t) * 255);
   const bb = Math.round(lerp(a[2], b[2], t) * 255);
+  return [r, g, bb];
+}
+function shapeColor(v) {
+  const [r, g, bb] = shapeRGB(v);
+  if (v === null || v === undefined || Number.isNaN(v)) return "#dfe3e8"; // masked
   return `rgb(${r},${g},${bb})`;
 }
-
-// 3D B-factor protection ramp (blue protected -> white -> red reactive), domain [-0.3, 1.0].
-const PROT_STOPS = [[0x21 / 255, 0x66 / 255, 0xac / 255],
-  [0xf7 / 255, 0xf7 / 255, 0xf7 / 255], [0xb2 / 255, 0x18 / 255, 0x2b / 255]];
+function shapeColorHex(v) {
+  return "0x" + shapeRGB(v).map((c) => c.toString(16).padStart(2, "0").toUpperCase()).join("");
+}

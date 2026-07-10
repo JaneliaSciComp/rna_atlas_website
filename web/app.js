@@ -174,17 +174,15 @@ async function loadSources() {
     MOTIFS_BY_DS[id] = L.motifs; PAIRING_BY_DS[id] = L.pairing; TSPANS_BY_DS[id] = L.tspans || {};
   }
   const ms = new Set(), ls = new Set();
-  let maxLen = 0;
   for (const f of FOLDS) {
     (f.motifs || []).forEach((m) => ms.add(m));
     if (DSBYID[f._dsid] && DSBYID[f._dsid].motifs && f.letter) ls.add(f.letter);  // letters only from motif-bearing source
-    if (f.length > maxLen) maxLen = f.length;
   }
   // Show companion letters (e.g. I–Q) as checkboxes even before their data is loaded.
   comps.forEach((c) => (c.letters || []).forEach((l) => ls.add(l)));
   MOTIF_SET = [...ms].sort();
   LETTERS = [...ls].sort();
-  $("len_max").value = maxLen || 9999;
+  $("len_max").value = 2000;   // default length-max cap (raise the field to see longer folds)
   const maxCR = Math.max(1, ...FOLDS.map((f) => f.contact_ratio || 0));
   $("cr_min").max = Math.ceil(maxCR * 20) / 20;
   buildMotifFilter();
@@ -239,7 +237,7 @@ function wireStatic() {
     ["plddt_min", "tm_max", "ov_max"].forEach((id) => $(id).value = $(id).max);
     $("agr_min").value = -1;
     $("plddt_min").value = 0; $("clash_max").value = 9999; $("len_min").value = 0;
-    $("len_max").value = Math.max(...FOLDS.map((f) => f.length || 0));
+    $("len_max").value = 2000;
     ["shape_ok", "req_tert", "req_rare", "tm_has", "novel_only", "per_letter"].forEach((id) => $(id).checked = false);
     $("cr_min").value = 0; $("bp_min").value = 0; $("cf_min").value = 0;
     if ($("fold_min")) $("fold_min").value = 0; if ($("sclust_min")) $("sclust_min").value = 0;
@@ -252,7 +250,8 @@ function wireStatic() {
   });
   if ($("search")) $("search").addEventListener("input", () => { saveState(); render(); });
   if ($("alt_palette")) $("alt_palette").addEventListener("change", () => { if (currentDeep) { drawTracks(currentDeep.f, currentDeep.react); load3D(currentDeep.f, currentDeep.react); } });
-  if ($("color_by")) $("color_by").addEventListener("change", () => { if (currentDeep) load3D(currentDeep.f, currentDeep.react); });
+  if ($("color_by")) $("color_by").addEventListener("change", () => { if ($("deep_color_by")) $("deep_color_by").value = $("color_by").value; if (currentDeep) load3D(currentDeep.f, currentDeep.react); });
+  if ($("deep_color_by")) $("deep_color_by").addEventListener("change", () => { if ($("color_by")) $("color_by").value = $("deep_color_by").value; saveState(); if (currentDeep) load3D(currentDeep.f, currentDeep.react); });
   if ($("ss_view")) $("ss_view").addEventListener("change", () => { if (currentDeep) drawTracks(currentDeep.f, currentDeep.react); });
   // collapsible sections (click a legend) + collapse-all (click the panel heading)
   document.querySelectorAll("#config fieldset legend").forEach((lg) =>
@@ -475,9 +474,11 @@ async function openDeep(key) {
   }
   currentDeep = { f, react };
   drawTracks(f, react);
+  drawReactChart(f, react);
   load3D(f, react);
 }
 let currentDeep = null;
+let reactChartResizeBound = false;
 
 function drawProps(f) {
   const verdict = f.best_tm1 == null ? "n/a (not scored vs v341)"
@@ -494,9 +495,10 @@ function drawProps(f) {
     ["Conditioning", condLabel(f._cond)],
     ["Clashscore", num(f.clashscore, 2)],
     ["Novelty (best_tm1 vs v341)", f.best_tm1 == null ? "&mdash;" : `${num(f.best_tm1, 3)} &mdash; ${verdict}`],
-    ["Nearest known fold", `${f.near || "&mdash;"}${f.near_title ? ` &mdash; ${f.near_title}` : ""}`],
+    ["Closest known structure (PDB)", `${f.near || "&mdash;"}${f.near_title ? ` &mdash; ${f.near_title}` : ""}${f.best_tm1 != null ? ` &middot; TM₁ ${num(f.best_tm1, 3)}` : ""}`],
     ["Distinct vs A&ndash;E (overlap)", num(f.overlap_ae, 3)],
-    ["SHAPE-supported", `${f.shape_ok ? "yes" : "no"} (SHAPE–pairing agreement = ${num(f.shape_agr, 3)}, + = good; mean prot = ${num(f.mean_prot_2a3, 3)})`],
+    ["SHAPE agr (vs 2A3)", `${f.shape_ok ? "yes" : "no"} (SHAPE–pairing agreement = ${num(f.shape_agr, 3)}, + = good; mean prot = ${num(f.mean_prot_2a3, 3)})`],
+    (f.pred_pearson_2a3 != null || f.pred_pearson_dms != null) ? ["Prediction fidelity (pred vs pseudolabel)", `2A3 r=${num(f.pred_pearson_2a3, 2)} / DMS r=${num(f.pred_pearson_dms, 2)} · Spearman 2A3 ${num(f.pred_spearman_2a3, 2)} / DMS ${num(f.pred_spearman_dms, 2)}`] : null,
     ["OpenKnot score", num(f.openknot, 3)],
     ["Pseudoknot", f.pseudoknot ? "yes" : "no"],
     ["Secondary-structure class", f.ss_class],
@@ -608,7 +610,7 @@ function forna2D(id, dbn, seq, react, box) {
 }
 function drawTracks(f, react) {
   const seq = (react && react.seq) || "";
-  const ra = react && (react.a23 || react.dms);
+  const ra = react && (react.a23 || react.dms || react.pred_a23 || react.pred_dms);
   const n = seq.length || (ra ? ra.length : 0) || f.length || 0;
   if (!n) { $("tracks").innerHTML = '<p class="muted">No reactivity / sequence available for this fold.</p>'; return; }
   const cw = Math.max(6, Math.min(16, Math.floor(900 / n)));
@@ -623,7 +625,15 @@ function drawTracks(f, react) {
     lanes[li] = hi; m.lane = li;
   });
   const laneH = 9, mh = lanes.length * (laneH + 2);
-  const yMot = pad, ySeq = yMot + mh + 4, yDms = ySeq + 16, yA23 = yDms + 16, yPair = yA23 + 16, H = yPair + 18;
+  const yMot = pad, ySeq = yMot + mh + 4;
+  const reactRows = [
+    { arr: react && react.dms, label: "DMS" },
+    ...(react && react.pred_dms ? [{ arr: react.pred_dms, label: "DMS pred" }] : []),
+    { arr: react && react.a23, label: "2A3" },
+    ...(react && react.pred_a23 ? [{ arr: react.pred_a23, label: "2A3 pred" }] : []),
+  ];
+  const hasPred = !!(react && (react.pred_dms || react.pred_a23));
+  const yPair = ySeq + 16 + reactRows.length * 16, H = yPair + 18;
   let svg = `<svg width="${W + 40}" height="${H}" font-size="9">`;
   // motif bars
   motifs.forEach((m) => {
@@ -646,8 +656,8 @@ function drawTracks(f, react) {
     }
     return s;
   };
-  svg += rrow(react && react.dms, yDms, "DMS");
-  svg += rrow(react && react.a23, yA23, "2A3");
+  let yReact = ySeq + 16;
+  reactRows.forEach((row) => { svg += rrow(row.arr, yReact, row.label); yReact += 16; });
   // predicted pairing track: unpaired = light red, paired = white (eyeball SHAPE agreement)
   const dbn = (PAIRING_BY_DS[f._dsid] || {})[f.id] || "";
   let pr = `<text x="${W + 3}" y="${yPair + 11}" fill="#5b6670">pair</text>`;
@@ -662,7 +672,96 @@ function drawTracks(f, react) {
   const ss = (dbn && ssMode === "arc") ? arcDiagram(dbn, n, cw, W) : (dbn ? forna2D(f.id, dbn, seq, react, 340) : "");
   const ssLbl = ssMode === "arc" ? "arcs link base pairs" : "2D layout — nodes colored by base";
   const ssBlock = ss ? `<div style="font-size:11px;color:#5b6670;margin:10px 0 3px">predicted secondary structure (${ssLbl}; <span style="color:#c1440e">orange = pseudoknot</span>)</div>${ss}` : "";
-  $("tracks").innerHTML = `<div style="font-size:11px;color:#5b6670;margin-bottom:3px">motif lanes &middot; sequence &middot; DMS &middot; 2A3 reactivity (white=protected &rarr; red=reactive) &middot; pairing (white=paired, light red=unpaired)</div>` + svg + ssBlock;
+  const predNote = hasPred ? " &middot; *pred = RNAnix-predicted" : "";
+  $("tracks").innerHTML = `<div style="font-size:11px;color:#5b6670;margin-bottom:3px">motif lanes &middot; sequence &middot; DMS &middot; 2A3 reactivity (white=protected &rarr; red=reactive) &middot; pairing (white=paired, light red=unpaired)${predNote}</div>` + svg + ssBlock;
+}
+
+function drawReactChart(f, react) {
+  const el = $("reactchart");
+  if (!el) return;
+  if (!react || (!react.pred_dms && !react.pred_a23)) { el.innerHTML = ""; return; }
+  if (!reactChartResizeBound) {
+    window.addEventListener("resize", () => {
+      if (currentDeep) drawReactChart(currentDeep.f, currentDeep.react);
+    });
+    reactChartResizeBound = true;
+  }
+
+  el.innerHTML = `
+    <div class="reactchart-title">Predicted vs input reactivity</div>
+    <div class="reactchart-caption">DMS &mdash; Pearson ${num(f.pred_pearson_dms, 3)} &middot; Spearman ${num(f.pred_spearman_dms, 3)}</div>
+    <canvas id="rc_dms"></canvas>
+    <div class="reactchart-caption">2A3 &mdash; Pearson ${num(f.pred_pearson_2a3, 3)} &middot; Spearman ${num(f.pred_spearman_2a3, 3)}</div>
+    <canvas id="rc_2a3"></canvas>
+    <div class="reactchart-legend">
+      <span><span class="reactchart-swatch" style="background:#1f77b4"></span>predicted (model)</span>
+      <span><span class="reactchart-swatch" style="background:#f59e0b"></span>input pseudolabel</span>
+    </div>`;
+
+  const drawChart = (canvas, pred, exp) => {
+    if (!canvas) return;
+    const n = (pred && pred.length) || (exp && exp.length) || 0;
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    if (!n || !w || !h) return;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    const padL = 22, padR = 6, padT = 4, padB = 14;
+    const plotW = Math.max(1, w - padL - padR), plotH = Math.max(1, h - padT - padB);
+    const ymin = -0.5, ymax = 1.5;
+    const clip = (v) => Math.max(ymin, Math.min(ymax, v));
+    const x = (i) => padL + (n > 1 ? (i / (n - 1)) * plotW : plotW / 2);
+    const y = (v) => padT + ((ymax - clip(v)) / (ymax - ymin)) * plotH;
+
+    ctx.strokeStyle = "#9ca3af";
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(padL, y(0));
+    ctx.lineTo(padL + plotW, y(0));
+    [0, 1].forEach((v) => {
+      const yy = y(v);
+      ctx.moveTo(padL - 3, yy);
+      ctx.lineTo(padL, yy);
+    });
+    ctx.moveTo(padL, padT + plotH);
+    ctx.lineTo(padL + plotW, padT + plotH);
+    ctx.stroke();
+
+    ctx.fillStyle = "#6b7280";
+    ctx.font = "9px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    [0, 1].forEach((v) => ctx.fillText(String(v), padL - 5, y(v)));
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText("1", padL, padT + plotH + 2);
+    if (n > 1) ctx.fillText(String(n), padL + plotW, padT + plotH + 2);
+
+    const line = (arr, color, width) => {
+      if (!arr) return;
+      ctx.beginPath();
+      let drawing = false;
+      for (let i = 0; i < n; i++) {
+        const v = arr[i];
+        if (v === null || v === undefined || Number.isNaN(+v)) { drawing = false; continue; }
+        const xx = x(i), yy = y(+v);
+        if (!drawing) { ctx.moveTo(xx, yy); drawing = true; }
+        else ctx.lineTo(xx, yy);
+      }
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.stroke();
+    };
+    line(exp, "#f59e0b", 1.2);
+    line(pred, "#1f77b4", 1.4);
+  };
+
+  drawChart($("rc_dms"), react.pred_dms, react.dms);
+  drawChart($("rc_2a3"), react.pred_a23, react.a23);
 }
 
 let viewer = null, viewerModel = null, mstar = null, molstarLoading = null;
@@ -679,6 +778,7 @@ function loadMolstarLib() {                          // reuse the bundle already
 function markDeepEngine() {
   const t = $("deep-vtoggle"); if (t) t.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.v === deepEngine));
   if ($("color_by")) $("color_by").disabled = (deepEngine === "molstar");   // color-by is 3Dmol-only
+  if ($("deep_color_by")) $("deep_color_by").disabled = (deepEngine === "molstar");
 }
 function setDeepEngine(v) {
   if (v === deepEngine) return;
@@ -718,6 +818,7 @@ async function load3D(f, react) {
   catch (e) { el.innerHTML = '<p style="color:#fff;padding:8px">structure unavailable</p>'; return; }
   const fmt = data.startsWith("data_") || data.includes("_atom_site") ? "cif" : "pdb";
   if (currentDeep) { currentDeep.structText = data; currentDeep.structFmt = fmt; }
+  if ($("deep_color_by") && $("color_by")) $("deep_color_by").value = $("color_by").value;
   if (deepEngine === "molstar") { renderMolstar(el, data, fmt); return; }
   if (typeof $3Dmol === "undefined") { el.innerHTML = '<p style="color:#fff;padding:8px">3Dmol.js not loaded.</p>'; return; }
   viewer = $3Dmol.createViewer(el, { backgroundColor: "0x0d1117" });
@@ -738,9 +839,9 @@ async function load3D(f, react) {
     style = { cartoon: { colorfunc: (a) => cs.has(a.resi) ? "0xb5121b" : "0x9aa7b0", ringMode: 3 } };
   } else if (mode === "spectrum") {
     style = { cartoon: { color: "spectrum", ringMode: 3 } };
-  } else {                                       // a23 / dms reactivity (blue protected -> red reactive); spectrum if absent
+  } else {                                       // a23 / dms reactivity; spectrum if absent
     const arr = mode === "dms" ? dms : a23;
-    style = arr ? { cartoon: { colorfunc: (a) => reactCF(arr[a.resi - 1]), ringMode: 3 } }
+    style = arr ? { cartoon: { colorfunc: (a) => shapeColorHex(arr[a.resi - 1]), ringMode: 3 } }
                 : { cartoon: { color: "spectrum", ringMode: 3 } };
   }
   viewer.setStyle({}, style);
@@ -750,16 +851,6 @@ async function load3D(f, react) {
     viewer.addStyle({ resi }, { stick: { color: motifColor(m.type), radius: 0.28 } });
   });
   viewer.zoomTo(); viewer.render();
-}
-function shapeMix(a, b, t) {
-  return "0x" + [0, 1, 2].map((i) => Math.round((a[i] + (b[i] - a[i]) * t) * 255).toString(16).padStart(2, "0")).join("");
-}
-function hexCF(h) { return "0x" + h.replace("#", ""); }
-function reactCF(v) {                              // 2A3/DMS: blue protected -> white -> red reactive
-  if (v == null || Number.isNaN(v)) return "0xf7f7f7";
-  const t = Math.max(-0.3, Math.min(1, v)), f = (t + 0.3) / 1.3;
-  return f < 0.5 ? $3Dmol.CC.color(shapeMix(PROT_STOPS[0], PROT_STOPS[1], f * 2))
-                 : $3Dmol.CC.color(shapeMix(PROT_STOPS[1], PROT_STOPS[2], (f - 0.5) * 2));
 }
 function plddtCF(b) {                              // AlphaFold confidence palette
   if (b == null || Number.isNaN(b)) return "0xcccccc";

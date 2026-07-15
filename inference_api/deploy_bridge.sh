@@ -35,9 +35,9 @@ cat > /tmp/casp-web-policy.json <<JSON
  {"Sid":"lambdacfg","Effect":"Allow","Action":"lambda:GetFunctionConfiguration","Resource":"arn:aws:lambda:$REGION:$ACCOUNT:function:janelia-das-casp-daslab-*-prod"},
  {"Sid":"sfnexec","Effect":"Allow","Action":["states:DescribeExecution","states:StopExecution"],"Resource":"arn:aws:states:$REGION:$ACCOUNT:execution:janelia-das-casp-daslab-*-pipeline-prod:*"},
  {"Sid":"sfnsm","Effect":"Allow","Action":["states:StartExecution","states:ListExecutions"],"Resource":"arn:aws:states:$REGION:$ACCOUNT:stateMachine:janelia-das-casp-daslab-*-pipeline-prod"},
- {"Sid":"s3get","Effect":"Allow","Action":"s3:GetObject","Resource":["arn:aws:s3:::janelia-das-casp-artifacts-prod/submissions/*","arn:aws:s3:::janelia-das-casp-artifacts-prod/cache/*"]},
+ {"Sid":"s3get","Effect":"Allow","Action":"s3:GetObject","Resource":["arn:aws:s3:::janelia-das-casp-artifacts-prod/submissions/*","arn:aws:s3:::janelia-das-casp-artifacts-prod/cache/*","arn:aws:s3:::janelia-das-casp-artifacts-prod/predictions/*"]},
  {"Sid":"s3put","Effect":"Allow","Action":"s3:PutObject","Resource":"arn:aws:s3:::janelia-das-casp-artifacts-prod/requests/*"},
- {"Sid":"s3list","Effect":"Allow","Action":"s3:ListBucket","Resource":"arn:aws:s3:::janelia-das-casp-artifacts-prod","Condition":{"StringLike":{"s3:prefix":["submissions/*","cache/*","requests/*"]}}}
+ {"Sid":"s3list","Effect":"Allow","Action":"s3:ListBucket","Resource":"arn:aws:s3:::janelia-das-casp-artifacts-prod","Condition":{"StringLike":{"s3:prefix":["submissions/*","cache/*","requests/*","predictions/*"]}}}
 ]}
 JSON
 aws --profile "$PROFILE" iam put-role-policy --role-name "$ROLE" \

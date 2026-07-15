@@ -21,7 +21,10 @@
   let curMsa = false;                          // whether the current job uses MSA (drives the timeline)
   let results = { nomsa: null, msa: null };   // CIF text per stage
   let shown = null, dmol = null, mstar = null, activeV = null, lastText = null, molstarLoading = null, curJobId = null;
+  let openModels = [], _colorSeq = 0;          // session model registry (multi-model view — Feature 1)
   let vmode = (() => { try { return localStorage.getItem("infer_viewer") || "molstar"; } catch (e) { return "molstar"; } })();
+  let ssMode = (() => { try { return localStorage.getItem("infer_ss") || "forna"; } catch (e) { return "forna"; } })();
+  let curSS = null;                            // derived secondary structure of the shown model (Feature 2)
 
   // ---------- models ----------
   const MODELS_FALLBACK = [
@@ -85,7 +88,7 @@
     if (String(id).startsWith("demo-")) { setStatus("demo job — no real structure was produced. Submit a prediction to get one" + (API ? "." : " (backend not connected here).")); return; }
     if (!API) { setStatus("backend not connected — can't open stored results here."); return; }
     curMsa = ((loadJobs().find((x) => x.id === id) || {}).mode || "protenix-mt") !== "none";
-    results = { nomsa: null, msa: null }; shown = null; $("ibadges").innerHTML = "";
+    results = { nomsa: null, msa: null }; shown = null; $("ibadges").innerHTML = ""; updateSS();
     setStatus("opening job " + String(id).slice(0, 16) + "…"); poll(id);
   }
 
@@ -113,7 +116,15 @@
     }).join("");
   }
 
-  // ---------- 3D viewers: Mol* (default) or 3Dmol, user-selectable ----------
+  // ---------- 3D viewers + session model registry (Feature 1) ----------
+  // Opening a result ADDS a model; each can be shown/hidden/closed independently instead of
+  // reloading the page to clear. 3Dmol keeps a per-model GLModel handle (show/hide via setStyle,
+  // removeModel on close); Mol* clears + reloads the visible set on each change (the wrapper's
+  // loadStructureFromData returns no handle) — which also fixes the old missing-clear that let
+  // Mol* structures stack unintentionally.
+  const MODEL_COLORS = ["#2e6f95", "#e8862e", "#3a7d44", "#c1440e", "#6a4c93", "#16a0a0", "#d1495b", "#5b7c99"];
+  const modelUid = (k) => (curJobId || "job") + ":" + k;
+  const fmtOf = (text) => (text.startsWith("data_") || text.includes("_atom_site") ? "cif" : "pdb");
   function loadMolstarLib() {                       // lazy-load the vendored ~5MB bundle on first use
     if (window.molstar) return Promise.resolve();
     if (molstarLoading) return molstarLoading;
@@ -126,6 +137,7 @@
   function resetContainer() {
     try { if (mstar && mstar.dispose) mstar.dispose(); } catch (e) {}
     $("iviewer").innerHTML = ""; dmol = null; mstar = null; activeV = null;
+    openModels.forEach((m) => (m.dHandle = null));   // GLModel handles die with the viewer
   }
   function markViewerButtons() {
     const t = $("vtoggle"); if (!t) return;
@@ -135,45 +147,218 @@
     if (v === vmode) return;
     vmode = v; try { localStorage.setItem("infer_viewer", v); } catch (e) {}
     markViewerButtons();
-    if (lastText) showStructure(lastText);
+    if (openModels.length) renderModels(true);
   }
-  function showStructure(text) {
-    lastText = text;
-    $("iplaceholder").style.display = "none"; $("iview").classList.add("show");
-    if (vmode === "molstar") showMolstar(text); else showDmol(text);
+  function showResultArea() { $("iplaceholder").style.display = "none"; $("iview").classList.add("show"); }
+  // add (or re-show) a stage's structure in the registry, then render + focus it
+  function openModel(k) {
+    if (!results[k]) return;
+    const uid = modelUid(k);
+    let m = openModels.find((x) => x.uid === uid);
+    if (!m) {
+      const jb = loadJobs().find((x) => x.id === curJobId) || {};
+      const nm = jb.name || (curJobId ? String(curJobId).split(":")[1] : "") || "prediction";
+      const stageLbl = k === "msa" ? "MSA-refined" : "Draft (no-MSA)";
+      m = { uid, k, label: nm + " · " + stageLbl, text: results[k], visible: true,
+            dHandle: null, color: MODEL_COLORS[_colorSeq++ % MODEL_COLORS.length] };
+      openModels.push(m);
+    } else { m.visible = true; m.text = results[k]; }
+    shown = k; lastText = m.text;
+    showResultArea();
+    renderModels(true); renderBadges(); renderModelPanel(); updateSS();
   }
-  function showDmol(text) {
+  async function renderModels(fit) {
+    if (!openModels.length) return;
+    showResultArea();
+    if (vmode === "molstar") await renderModelsMolstar(fit);
+    else renderModels3Dmol(fit);
+  }
+  function renderModels3Dmol(fit) {
     if (activeV !== "3dmol") resetContainer();
     activeV = "3dmol";
     if (typeof $3Dmol === "undefined") { setStatus("3Dmol not loaded"); return; }
     if (!dmol) dmol = $3Dmol.createViewer($("iviewer"), { backgroundColor: "0x0d1117" });
-    dmol.removeAllModels();
-    const fmt = text.startsWith("data_") || text.includes("_atom_site") ? "cif" : "pdb";
-    dmol.addModel(text, fmt); dmol.setStyle({}, { cartoon: { color: "spectrum", ringMode: 3 } });
-    dmol.zoomTo(); dmol.render(); dmol.resize();
+    let added = false;
+    for (const m of openModels) {
+      if (!m.dHandle) { m.dHandle = dmol.addModel(m.text, fmtOf(m.text)); added = true; }
+      if (m.visible) m.dHandle.setStyle({}, { cartoon: { color: m.color, ringMode: 3 } });
+      else m.dHandle.setStyle({}, {});           // empty style => hidden
+    }
+    if (fit || added) dmol.zoomTo();
+    dmol.render(); dmol.resize();
   }
-  async function showMolstar(text) {
+  let _molstarSeq = 0;
+  async function renderModelsMolstar(fit) {
     if (activeV !== "molstar") resetContainer();
     activeV = "molstar";
     try { await loadMolstarLib(); }
-    catch (e) { vmode = "3dmol"; markViewerButtons(); return showDmol(text); }
+    catch (e) { vmode = "3dmol"; markViewerButtons(); return renderModels3Dmol(fit); }
     try {
       if (!mstar) mstar = await molstar.Viewer.create($("iviewer"), {
         layoutIsExpanded: false, layoutShowControls: true, layoutShowSequence: true,
         layoutShowLog: false, viewportShowExpand: true, viewportShowSelectionMode: false,
       });
-      await mstar.loadStructureFromData(text, "pdb");
+    } catch (e) { setStatus("Mol* init failed: " + e.message); return; }
+    const seq = ++_molstarSeq;
+    try {
+      await mstar.plugin.clear();                  // FIX: clear so visible models don't stack
+      for (const m of openModels) {
+        if (!m.visible) continue;
+        if (seq !== _molstarSeq) return;           // a newer render superseded this one
+        await mstar.loadStructureFromData(m.text, fmtOf(m.text) === "cif" ? "mmcif" : "pdb");
+      }
     } catch (e) { setStatus("Mol* render failed: " + e.message); }
+  }
+  function toggleModel(uid, visible) {
+    const m = openModels.find((x) => x.uid === uid); if (!m) return;
+    m.visible = visible; renderModels(false); renderModelPanel();
+  }
+  function closeModel(uid) {
+    const i = openModels.findIndex((x) => x.uid === uid); if (i < 0) return;
+    const m = openModels[i];
+    if (dmol && m.dHandle) { try { dmol.removeModel(m.dHandle); } catch (e) {} }
+    openModels.splice(i, 1);
+    if (shown && modelUid(shown) === uid) { shown = null; lastText = null; }
+    if (openModels.length) renderModels(false);
+    else {
+      if (dmol) dmol.render();
+      if (mstar) { try { mstar.plugin.clear(); } catch (e) {} }
+      $("iview").classList.remove("show"); $("iplaceholder").style.display = "";
+    }
+    renderModelPanel(); renderBadges(); updateSS();
+  }
+  function setAllModels(visible) {
+    if (!openModels.length) return;
+    openModels.forEach((m) => (m.visible = visible));
+    renderModels(visible); renderModelPanel();
+  }
+  function clearModels() {
+    if (dmol) openModels.forEach((m) => { if (m.dHandle) { try { dmol.removeModel(m.dHandle); } catch (e) {} } });
+    openModels = []; shown = null; lastText = null;
+    if (dmol) dmol.render();
+    if (mstar) { try { mstar.plugin.clear(); } catch (e) {} }
+    $("iview").classList.remove("show"); $("iplaceholder").style.display = "";
+    renderModelPanel(); renderBadges(); updateSS();
+  }
+  function renderModelPanel() {
+    const el = $("models"); if (!el) return;
+    if (!openModels.length) { el.innerHTML = ""; return; }
+    const anyVis = openModels.some((m) => m.visible);
+    el.innerHTML = '<div class="jobs-h">Models <span class="mh-actions">'
+      + `<button class="mh-btn" id="m-toggleall">${anyVis ? "hide all" : "show all"}</button>`
+      + `<button class="mh-btn" id="m-clearall">clear all</button></span></div>`
+      + openModels.map((m) =>
+        `<div class="model">`
+        + `<input type="checkbox" class="mvis" data-uid="${esc(m.uid)}"${m.visible ? " checked" : ""} title="show / hide">`
+        + `<span class="msw" style="background:${m.color}"></span>`
+        + `<span class="mn${shown && modelUid(shown) === m.uid ? " mn-cur" : ""}" title="${esc(m.label)}">${esc(m.label)}</span>`
+        + `<button class="mclose" data-uid="${esc(m.uid)}" title="close this model">&times;</button>`
+        + `</div>`).join("");
+    el.querySelectorAll(".mvis").forEach((c) => (c.onchange = () => toggleModel(c.dataset.uid, c.checked)));
+    el.querySelectorAll(".mclose").forEach((b) => (b.onclick = () => closeModel(b.dataset.uid)));
+    $("m-toggleall").onclick = () => setAllModels(!anyVis);
+    $("m-clearall").onclick = clearModels;
+  }
+
+  // ---------- secondary structure, derived client-side from the shown model's 3D (Feature 2) ----------
+  function deriveCurrentSS() {
+    if (!shown || !results[shown]) { curSS = null; return; }
+    const uid = modelUid(shown);
+    if (curSS && curSS.uid === uid) return;        // cached for the current model
+    try { curSS = Object.assign({ uid }, deriveSS(results[shown])); }
+    catch (e) { curSS = null; }
+  }
+  function updateSS() {
+    const blk = $("issblock"); if (!blk) return;
+    deriveCurrentSS();
+    if (!curSS || !curSS.n) { blk.setAttribute("hidden", ""); if ($("ss-svg")) $("ss-svg").innerHTML = ""; return; }
+    blk.removeAttribute("hidden"); renderSS();
+  }
+  function renderSS() {
+    if (!curSS) return;
+    const n = curSS.n;
+    let svg;
+    if (ssMode === "arc") {
+      const cw = Math.max(6, Math.min(16, Math.floor(900 / Math.max(1, n))));
+      svg = arcDiagram(curSS.dbn, n, cw, n * cw);
+    } else {
+      svg = forna2D("infer:" + curSS.uid, curSS.dbn, curSS.seq, null, 380, false);
+    }
+    $("ss-svg").innerHTML = svg || '<div class="muted" style="padding:6px 0">No canonical base pairs detected — the model looks single-stranded.</div>';
+    $("ss-info").textContent = `${curSS.cls} · ${(curSS.bpf * 100).toFixed(0)}% paired · ${n} nt`;
+    if ($("ss-mode")) $("ss-mode").querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.m === ssMode));
+  }
+  function setSSMode(m) {
+    if (m === ssMode) return;
+    ssMode = m; try { localStorage.setItem("infer_ss", m); } catch (e) {}
+    renderSS();
+  }
+  function exportDbn() {
+    deriveCurrentSS();
+    if (!curSS || !curSS.n) return;
+    const jb = loadJobs().find((x) => x.id === curJobId) || {};
+    const base = safeName(jb.name || (curJobId ? String(curJobId).split(":")[1] : "") || "prediction") || "prediction";
+    const hdr = `>${base}${shown ? " " + shown : ""} len=${curSS.n} class=${curSS.cls} bp_fraction=${curSS.bpf}`;
+    const body = `${hdr}\n${curSS.seq}\n${curSS.dbn}\n`;
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([body], { type: "text/plain" }));
+    a.download = base + ".dbn"; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+  function exportSSPng() {
+    const svgEl = $("ss-svg") && $("ss-svg").querySelector("svg"); if (!svgEl) return;
+    const w = parseFloat(svgEl.getAttribute("width")) || 380, h = parseFloat(svgEl.getAttribute("height")) || 380;
+    const xml = new XMLSerializer().serializeToString(svgEl);
+    const url = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(xml)));
+    const img = new Image();
+    img.onload = () => {
+      const scale = 2, c = document.createElement("canvas");
+      c.width = Math.ceil(w * scale); c.height = Math.ceil(h * scale);
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, c.width, c.height);
+      ctx.setTransform(scale, 0, 0, scale, 0, 0); ctx.drawImage(img, 0, 0);
+      const jb = loadJobs().find((x) => x.id === curJobId) || {};
+      const base = safeName(jb.name || (curJobId ? String(curJobId).split(":")[1] : "") || "prediction") || "prediction";
+      const a = document.createElement("a"); a.href = c.toDataURL("image/png");
+      a.download = base + "_ss.png"; document.body.appendChild(a); a.click(); a.remove();
+    };
+    img.src = url;
   }
   function renderBadges() {
     const order = [["msa", "MSA-refined"], ["nomsa", "Draft (no MSA)"]];
+    // the full sample pool lives at predictions/<target>/<model>/ — available for any
+    // real API job (parts[1] = target_id), including cached ones.
+    const canPool = !!(API && curJobId && curJobId.split(":")[1] && !String(curJobId).startsWith("demo-"));
+    const dl = Object.values(results).some(Boolean)
+      ? `<span class="dlwrap">`
+        + `<button class="rbadge dl" id="rdl">&#10515; export zip</button>`
+        + (canPool ? `<button class="rbadge dlcaret" id="rdlmenu" title="More downloads" aria-haspopup="true" aria-expanded="false">&#9662;</button>`
+          + `<div class="dlmenu" id="dlmenu" hidden>`
+          + `<button class="dlmi" id="dlpool">&#10515; Download all predictions</button>`
+          + `<div class="dlmi-sub">the entire model sample pool (all seeds &amp; samples)</div>`
+          + `</div>` : "")
+        + `</span>`
+      : "";
     $("ibadges").innerHTML = order.filter(([k]) => results[k]).map(([k, lbl]) =>
-      `<button class="rbadge ${shown === k ? "active" : ""}" data-k="${k}">${lbl}</button>`).join("")
-      + (Object.values(results).some(Boolean) ? `<button class="rbadge dl" id="rdl">&#10515; export zip</button>` : "");
+      `<button class="rbadge ${shown === k ? "active" : ""}" data-k="${k}">${lbl}</button>`).join("") + dl;
     $("ibadges").querySelectorAll(".rbadge[data-k]").forEach((b) => b.onclick = () => view(b.dataset.k));
     if ($("rdl")) $("rdl").onclick = exportZip;
+    const menuBtn = $("rdlmenu"), menu = $("dlmenu");
+    if (menuBtn && menu) {
+      menuBtn.onclick = (e) => {
+        e.stopPropagation();
+        const open = menu.hasAttribute("hidden");
+        if (open) menu.removeAttribute("hidden"); else menu.setAttribute("hidden", "");
+        menuBtn.setAttribute("aria-expanded", open ? "true" : "false");
+      };
+      if ($("dlpool")) $("dlpool").onclick = () => { menu.setAttribute("hidden", ""); menuBtn.setAttribute("aria-expanded", "false"); exportPool(); };
+      if (!renderBadges._docClose) {   // close on outside click, wired once
+        renderBadges._docClose = true;
+        document.addEventListener("click", () => { const m = $("dlmenu"), b = $("rdlmenu"); if (m) m.setAttribute("hidden", ""); if (b) b.setAttribute("aria-expanded", "false"); });
+      }
+    }
   }
-  function view(k) { if (!results[k]) return; shown = k; showStructure(results[k]); renderBadges(); }
+  function view(k) { openModel(k); }   // a stage badge opens that stage into the model registry
   function gotResult(k, text) { results[k] = text; if (k === "msa" || !results.msa) view(k); else renderBadges(); }
 
   // ---------- export bundle (pdb + cif + png + txt -> zip; same store-zip as the main atlas) ----------
@@ -241,6 +426,9 @@
       { name: base + ".cif", data: _enc(pdbToCif(lastText, base)) },
     ];
     const png = viewerPNG(); if (png) files.push({ name: base + ".png", data: png });
+    // client-derived secondary structure of the shown model (dot-bracket)
+    deriveCurrentSS();
+    if (curSS && curSS.n) files.push({ name: base + ".dbn", data: _enc(`>${base} class=${curSS.cls} bp_fraction=${curSS.bpf}\n${curSS.seq}\n${curSS.dbn}\n`) });
     // include the MSA/rMSA alignment files when the job used them
     if (API && jb.mode && jb.mode !== "none" && curJobId) {
       setStatus("bundling alignments…");
@@ -254,6 +442,51 @@
     a.href = URL.createObjectURL(zipStore(files)); a.download = base + ".zip";
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+
+  // ---------- download the ENTIRE prediction pool (every seed/sample, not just the top-5) ----------
+  // The pipeline persists the raw model output at predictions/<target>/<model>/<branch>/…/
+  // seed_<N>/predictions/<target>_sample_<i>.cif (+ per-sample confidence json). We list it
+  // via /pool then stream each file through /poolfile and store-zip client-side, so the whole
+  // pool ships even when it exceeds the API's single-response size limit.
+  async function exportPool() {
+    if (!API || !curJobId) return;
+    const jb = loadJobs().find((x) => x.id === curJobId) || {};
+    const base = safeName(jb.name || curJobId.split(":")[1] || "prediction") || "prediction";
+    setStatus("listing prediction pool…");
+    let list;
+    try { list = await (await fetch(`${API}/pool?job=${encodeURIComponent(curJobId)}${tok() ? "&t=" + encodeURIComponent(tok()) : ""}`)).json(); }
+    catch (e) { setStatus("pool list failed: " + e.message); return; }
+    const items = (list && list.files) || [];
+    if (!items.length) { setStatus("no prediction pool found for this job"); return; }
+    const files = [];
+    let done = 0;
+    const q = items.slice();
+    async function worker() {
+      while (q.length) {
+        const it = q.shift();
+        try {
+          const r = await fetch(`${API}/poolfile?job=${encodeURIComponent(curJobId)}&key=${encodeURIComponent(it.key)}${tok() ? "&t=" + encodeURIComponent(tok()) : ""}`);
+          if (r.ok) files.push({ name: it.name, data: _enc(await r.text()) });  // keep the pool's folder structure in the zip
+        } catch (e) {}
+        setStatus(`downloading pool ${++done}/${items.length}…`);
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(8, items.length) }, worker));
+    if (!files.length) { setStatus("pool download failed"); return; }
+    // a small manifest so the zip is self-describing
+    const meta = [
+      "name: " + (jb.name || ""), "model: " + (jb.model || "default"), "alignment: " + (jb.mode || ""),
+      "job_id: " + curJobId, "pool_members: " + files.length + " of " + items.length,
+      "length: " + ((jb.seq || "").length || "") + " nt",
+    ];
+    if (jb.seq) meta.push("sequence:\n" + jb.seq);
+    files.unshift({ name: "README.txt", data: _enc(meta.join("\n") + "\n") });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(zipStore(files)); a.download = base + "_pool.zip";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    setStatus("done — " + files.length + " pool files");
   }
 
   // ---------- backend adapter ----------
@@ -310,7 +543,7 @@
     const seq = seqLen();
     if (seq.length < 5) { $("predict-note").textContent = "Enter a sequence of at least 5 nt."; return; }
     if (/[^ACGUN]/.test(seq)) { $("predict-note").textContent = "Sequence has non-RNA characters (allowed: A C G U N)."; return; }
-    results = { nomsa: null, msa: null }; shown = null; $("ibadges").innerHTML = ""; $("predict-note").textContent = "";
+    results = { nomsa: null, msa: null }; shown = null; $("ibadges").innerHTML = ""; $("predict-note").textContent = ""; updateSS();
     try { if (window.Notification && Notification.permission === "default") Notification.requestPermission(); } catch (e) {}
     const mode = $("msa_mode").value || "protenix-mt";
     const opts = { mode };
@@ -382,7 +615,10 @@
     if (!API) $("predict-note").innerHTML = "Backend not connected yet — Predict runs a demo of the flow.";
     markViewerButtons();
     $("vtoggle").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => setViewer(b.dataset.v)));
-    loadModels(); renderJobs(); refreshJobs(); syncServerJobs();
+    if ($("ss-mode")) $("ss-mode").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => setSSMode(b.dataset.m)));
+    if ($("ss-dbn")) $("ss-dbn").addEventListener("click", exportDbn);
+    if ($("ss-png")) $("ss-png").addEventListener("click", exportSSPng);
+    loadModels(); renderJobs(); refreshJobs(); syncServerJobs(); renderModelPanel();
     seqLen();
   }
   if (GATED && !tok()) showGate(); else (document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", init) : init());

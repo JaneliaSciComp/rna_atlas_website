@@ -8,3 +8,5 @@ dist/
 .lavish/
 cryo_tmp/
 .infer_api
+graphify-out/
+.claude/settings.local.json

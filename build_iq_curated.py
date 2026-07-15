@@ -63,10 +63,19 @@ def letter_of(sid):
 
 
 def npz_path(sid, letter):
+    """Predicted-reactivity npz. The union set draws folds from BOTH the padded run
+    (<letter>_snr1_out) and the de-padded run (<letter>_depadded_out); return whichever
+    tree actually has the file (de-padded preferred). Falls back to the padded path."""
     lo = letter.lower()
-    return (f"{SNR_ROOT}/{lo}_snr1_out/{lo}_snr1__rna_ribonanza2__shard0000of0001/"
-            f"predictions/rna_ribonanza2/step_0_rna_ribonanza2_{sid}/seed_0/predictions/"
-            f"step_0_rna_ribonanza2_{sid}_seed_0_sample_0.profiles.npz")
+    def _p(run):  # run = "snr1" | "depadded"
+        return (f"{SNR_ROOT}/{lo}_{run}_out/{lo}_{run}__rna_ribonanza2__shard0000of0001/"
+                f"predictions/rna_ribonanza2/step_0_rna_ribonanza2_{sid}/seed_0/predictions/"
+                f"step_0_rna_ribonanza2_{sid}_seed_0_sample_0.profiles.npz")
+    for run in ("depadded", "snr1"):
+        p = _p(run)
+        if os.path.exists(p):
+            return p
+    return _p("snr1")
 
 
 def contact_ratio_from_text(text):
@@ -90,9 +99,9 @@ def contact_ratio_from_text(text):
 
 
 def load_react(sid, letter, seqlen):
-    """(dms[], a23[]) design-aligned floats (NaN->None), or (None, None) if no npz."""
-    if letter not in NOPQ:
-        return None, None
+    """(dms[], a23[]) design-aligned floats (NaN->None), or (None, None) if no npz.
+    No letter gate: the union run has predicted-reactivity npz for all I-Q letters
+    (the old I-M flag-drop is fixed on the de-padded run); npz_path finds the right tree."""
     p = npz_path(sid, letter)
     if not os.path.exists(p):
         return None, None
@@ -217,13 +226,16 @@ def load_cluster_sizes(path, ids):
 
 
 def main():
+    global SRC
     ap = argparse.ArgumentParser()
     ap.add_argument("--name", default="ribo2-iq-curated")
     ap.add_argument("--label", default="Ribonanza-2 curated I–Q · chemmap pseudolabel")
+    ap.add_argument("--src", default=SRC, help="curation tree (curated.list, 02_fasta, 10_bfactor_restore/pdb, ...)")
     ap.add_argument("--workers", type=int, default=32)
     ap.add_argument("--limit", type=int, default=0, help="build only first N ids (smoke test)")
     ap.add_argument("--out", default=os.path.join(ROOT, "dist", "datasets"))
     args = ap.parse_args()
+    SRC = args.src   # set before Pool fork so workers (process/npz_path) inherit it
 
     od = os.path.join(args.out, args.name)
     os.makedirs(f"{od}/data", exist_ok=True)

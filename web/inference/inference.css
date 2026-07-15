@@ -42,7 +42,16 @@
 .rbadge.active { background: #2e6f95; color: #fff; border-color: #2e6f95; }
 .rbadge:hover { background: #eaf3f8; }
 .rbadge.active:hover { background: #245a7a; }
-.rbadge.dl { color: #5b6670; margin-left: auto; }
+.rbadge.dl { color: #5b6670; }
+/* download split-button + dropdown menu (export zip | ▾ → download all predictions) */
+.dlwrap { position: relative; display: inline-flex; margin-left: auto; }
+.dlwrap .rbadge.dl { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.rbadge.dlcaret { color: #5b6670; padding: 4px 7px; margin-left: -1px; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.dlmenu { position: absolute; top: calc(100% + 4px); right: 0; z-index: 20; background: #fff; border: 1px solid #cdd6dd; border-radius: 8px; box-shadow: 0 6px 20px rgba(20,40,60,.16); padding: 4px; min-width: 210px; }
+.dlmenu[hidden] { display: none; }
+.dlmi { display: block; width: 100%; text-align: left; font-size: 12px; border: 0; background: transparent; color: #2e6f95; border-radius: 5px; padding: 6px 9px; cursor: pointer; }
+.dlmi:hover { background: #eaf3f8; }
+.dlmi-sub { font-size: 10px; color: #8a94a0; padding: 0 9px 4px; line-height: 1.35; }
 #iplaceholder { color: #8a96a0; font-size: 13px; max-width: 520px; line-height: 1.5; margin-top: 20px; }
 
 /* model selector + jobs monitor (added for submit/model/monitor/cancel) */
@@ -65,3 +74,36 @@
 .js-cancelled { background: #f3e9e4; color: #c1440e; }
 .jkill { flex: 0 0 auto; border: 1px solid #e0b3a2; background: #fbeee7; color: #c1440e; border-radius: 4px; font-size: 11px; padding: 1px 8px; cursor: pointer; }
 .jkill:hover { background: #c1440e; color: #fff; border-color: #c1440e; }
+
+/* session model registry — visibility checkboxes + close (Feature 1) */
+.mpanel { margin-top: 10px; }
+.mpanel:empty { display: none; }
+.mpanel .jobs-h { display: flex; align-items: center; justify-content: space-between; }
+.mh-actions { display: inline-flex; gap: 6px; }
+.mh-btn { border: 1px solid #cdd6dd; background: #fff; color: #2e6f95; border-radius: 4px; font-size: 10px; text-transform: none; letter-spacing: 0; padding: 1px 7px; cursor: pointer; font-weight: 500; }
+.mh-btn:hover { background: #eaf3f8; }
+.model { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 5px 0; border-top: 1px solid #eef2f5; }
+.model .mvis { flex: 0 0 auto; cursor: pointer; margin: 0; }
+.model .msw { flex: 0 0 auto; width: 11px; height: 11px; border-radius: 3px; border: 1px solid rgba(0,0,0,.15); }
+.model .mn { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #1f324d; }
+.model .mn-cur { font-weight: 700; }
+.model .mclose { flex: 0 0 auto; border: 1px solid #d3dae0; background: #f6f8fa; color: #8a96a0; border-radius: 4px; font-size: 13px; line-height: 1; padding: 0 6px; cursor: pointer; }
+.model .mclose:hover { background: #c1440e; color: #fff; border-color: #c1440e; }
+
+/* secondary structure view + export (Feature 2) */
+.ssblock { margin-top: 14px; border-top: 1px solid #e6ebef; padding-top: 10px; }
+.ssblock[hidden] { display: none; }
+.ss-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.ss-title { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #5b6670; font-weight: 600; }
+.ss-info { font-size: 11px; color: #8a96a0; }
+.ss-mode { display: inline-flex; margin-left: auto; }
+.ss-mode button { font-size: 11px; border: 1px solid #cdd6dd; background: #fff; color: #5b6670; padding: 2px 9px; cursor: pointer; }
+.ss-mode button:first-child { border-radius: 5px 0 0 5px; }
+.ss-mode button:last-child { border-radius: 0 5px 5px 0; border-left: 0; }
+.ss-mode button.active { background: #2e6f95; color: #fff; border-color: #2e6f95; }
+.ss-dl { display: inline-flex; gap: 5px; }
+.ss-dl button { font-size: 11px; border: 1px solid #cdd6dd; background: #fff; color: #2e6f95; border-radius: 5px; padding: 2px 9px; cursor: pointer; }
+.ss-dl button:hover { background: #eaf3f8; }
+.ss-svg { background: #fff; border: 1px solid #e6ebef; border-radius: 8px; padding: 8px; overflow: auto; }
+.ss-svg svg { display: block; max-width: 100%; height: auto; }
+.ss-note { font-size: 10px; color: #8a94a0; margin-top: 5px; line-height: 1.4; }

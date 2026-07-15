@@ -62,6 +62,23 @@
       </div>
       <div id="iviewer"></div>
       <div id="ibadges"></div>
+      <div id="models" class="models mpanel"></div>
+    </div>
+    <div id="issblock" class="ssblock" hidden>
+      <div class="ss-head">
+        <span class="ss-title">Secondary structure</span>
+        <span class="ss-info" id="ss-info"></span>
+        <span class="ss-mode" id="ss-mode">
+          <button type="button" data-m="forna">2D</button>
+          <button type="button" data-m="arc">Arc</button>
+        </span>
+        <span class="ss-dl">
+          <button type="button" id="ss-dbn" title="download dot-bracket (.dbn)">&#10515; .dbn</button>
+          <button type="button" id="ss-png" title="download the 2D as PNG">&#10515; PNG</button>
+        </span>
+      </div>
+      <div id="ss-svg" class="ss-svg"></div>
+      <div class="ss-note">Derived client-side from the predicted 3D (canonical WC/wobble pairs only). <span style="color:#c1440e">orange = pseudoknot</span>.</div>
     </div>
     <div id="iplaceholder">Submit a sequence to predict its 3D structure. Runs single-sequence by default (fast); tick “compute MSA” for a slower, usually more accurate model.</div>
   </main>
@@ -69,6 +86,8 @@
 
 <script src="../lib/3Dmol-min.js"></script>
 <script src="../config.js"></script>
+<script src="../viz_style.js"></script>
+<script src="../ss.js"></script>
 <script src="inference.js"></script>
 </body>
 </html>

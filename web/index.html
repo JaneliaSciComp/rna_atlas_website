@@ -30,6 +30,13 @@
     <button id="source-btn" title="Choose data sources">Source &#9662;</button>
     <div id="source-panel" class="hidden"></div>
   </span>
+  <span id="sublibwrap">
+    <button id="sublib-btn" title="Filter by sublibrary (all selected by default)">Sublibraries &#9662;</button>
+    <div id="sublib-panel" class="hidden">
+      <div class="srcsub-h">Sublibraries <button id="sublib-all" class="linkish" type="button">all</button> · <button id="sublib-none" class="linkish" type="button">none</button></div>
+      <div id="sublib_filter" class="letters"></div>
+    </div>
+  </span>
   <input id="search" type="search" placeholder="search id · name · sublibrary…" autocomplete="off">
   <span id="viewctl" title="view">
     <button data-view="table" class="active">Table</button>
@@ -100,6 +107,7 @@
       <legend>Topology</legend>
       <select id="pk"><option value="any">pseudoknot: any</option><option value="1">pseudoknot only</option><option value="0">exclude pseudoknots</option></select>
     </fieldset>
+
 
     <fieldset>
       <legend>Termini &amp; scaffolding</legend>
@@ -272,24 +280,26 @@
 
 <div id="deep" class="hidden mode-modal">
   <div class="deep-card">
-    <div class="deep-tools">
-      <select id="deep_color_by" class="deep-cby" title="3D coloring">
-        <option value="a23">2A3 SHAPE reactivity</option>
-        <option value="dms">DMS reactivity</option>
-        <option value="plddt">pLDDT confidence</option>
-        <option value="pairing">base pairing (paired/unpaired)</option>
-        <option value="nuc">nucleotide (A/C/G/U)</option>
-        <option value="crossed">tertiary crossed-pairs (pinned residues)</option>
-        <option value="spectrum">spectrum (5&prime;&rarr;3&prime;)</option>
-      </select>
-      <span class="vtoggle" id="deep-vtoggle" title="3D viewer engine">
-        <button type="button" data-v="3dmol">3Dmol</button>
-        <button type="button" data-v="molstar">Mol*</button>
-      </span>
-      <button id="deep-export" title="Download cif + pdb + png + txt as a zip">⤓ Export</button>
-      <button id="deep-close" title="Close">&times;</button>
+    <div class="deep-head">
+      <h2 id="deep-title"></h2>
+      <div class="deep-tools">
+        <select id="deep_color_by" class="deep-cby" title="3D coloring">
+          <option value="a23">2A3 SHAPE reactivity</option>
+          <option value="dms">DMS reactivity</option>
+          <option value="plddt">pLDDT confidence</option>
+          <option value="pairing">base pairing (paired/unpaired)</option>
+          <option value="nuc">nucleotide (A/C/G/U)</option>
+          <option value="crossed">tertiary crossed-pairs (pinned residues)</option>
+          <option value="spectrum">spectrum (5&prime;&rarr;3&prime;)</option>
+        </select>
+        <span class="vtoggle" id="deep-vtoggle" title="3D viewer engine">
+          <button type="button" data-v="3dmol">3Dmol</button>
+          <button type="button" data-v="molstar">Mol*</button>
+        </span>
+        <button id="deep-export" title="Download cif + pdb + png + txt as a zip">⤓ Export</button>
+        <button id="deep-close" title="Close">&times;</button>
+      </div>
     </div>
-    <h2 id="deep-title"></h2>
     <div class="deep-body">
       <div id="viewer3d"></div>
       <div id="tracks"></div>
@@ -310,6 +320,7 @@
 <script src="config.js"></script>
 <script src="datasets.js"></script>
 <script src="viz_style.js"></script>
+<script src="ss.js"></script>
 <script src="app.js"></script>
 <script src="agent.js"></script>
 </body>

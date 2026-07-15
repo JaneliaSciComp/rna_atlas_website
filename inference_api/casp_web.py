@@ -5,6 +5,10 @@ prediction pipeline (us-east-2). Exposes a clean JSON API the front-end already 
   POST /predict  {sequence,model,options,token}
                                      -> {job_id, target_id, model, status}
   GET  /status?job=<job_id>&t=<tok> -> {state, stages:{msa:{status,cif?}}}
+  GET  /msa?job=<job_id>&t=<tok>    -> {files:[{name,content}]}   (alignment files)
+  GET  /template?job=<job_id>&t=<tok> -> {files:[{name,content}]} (JohnTBM template CSVs)
+  GET  /pool?job=<job_id>&t=<tok>   -> {files:[{key,name,size}],count,bytes}  (full sample pool)
+  GET  /poolfile?job=<job_id>&key=<k>&t=<tok> -> raw file content (one pool member)
   GET  /jobs?t=<tok>                -> {jobs:[{job_id,model,state,name}]}
   POST /cancel   {job_id,token}     -> {ok}
 
@@ -105,6 +109,12 @@ def lambda_handler(event, context):
         return _status(qs)
     if path.endswith("/msa"):
         return _msa(qs)
+    if path.endswith("/template") or path.endswith("/templates"):
+        return _templates(qs)
+    if path.endswith("/poolfile"):
+        return _poolfile(qs)
+    if path.endswith("/pool"):
+        return _pool(qs)
     if path.endswith("/jobs"):
         return _jobs()
     if path.endswith("/cancel") and method == "POST":
@@ -262,6 +272,98 @@ def _msa(qs):
             except Exception:
                 continue
     return _resp(200, {"files": files})
+
+
+def _templates(qs):
+    """Return the JohnTBM per-chain template files for a job so the web export can
+    bundle them. The pipeline's Templates step caches them at
+    cache/templates/{templates_tool_version}/{fasta_sha256}/ (same scheme as the MSA
+    step; see cache_check.py kind="templates"). These are the structural templates the
+    model was conditioned on (per-chain .templates.csv + any JTBM structures)."""
+    job = qs.get("job") or ""
+    parts = job.split(":")
+    model = parts[0] if parts else "daslab-ptnx1"
+    ename = parts[2] if len(parts) > 2 else ""
+    if not ename:
+        return _resp(200, {"files": []})           # cached/single-seq jobs: no execution to read
+    try:
+        inp = json.loads(sfn.describe_execution(executionArn=_exec_arn(model, ename))["input"])
+    except Exception as e:
+        return _resp(200, {"files": [], "error": str(e)})
+    sha = inp.get("fasta_sha256", "")
+    tv = inp.get("templates_tool_version", "")
+    if not sha or not tv:
+        return _resp(200, {"files": []})
+    files, total, CAP = [], 0, 4_500_000           # keep the JSON response under the API limit
+    try:
+        r = s3.list_objects_v2(Bucket=ARTIFACTS_BUCKET, Prefix=f"cache/templates/{tv}/{sha}/")
+    except Exception as e:
+        return _resp(200, {"files": [], "error": str(e)})
+    for o in r.get("Contents", []):
+        key = o["Key"]
+        leaf = key.rsplit("/", 1)[-1]
+        if not leaf.lower().endswith((".csv", ".pdb", ".cif")):
+            continue                                # skip the 'done'/'pending' sentinels
+        fn = "templates/" + leaf
+        if o["Size"] > CAP or total + o["Size"] > CAP:
+            files.append({"name": fn, "truncated": True})
+            continue
+        try:
+            files.append({"name": fn, "content": s3.get_object(Bucket=ARTIFACTS_BUCKET, Key=key)["Body"].read().decode("utf-8", "replace")})
+            total += o["Size"]
+        except Exception:
+            continue
+    return _resp(200, {"files": files})
+
+
+def _pool_prefix(job):
+    """predictions/<target_id>/<model>/ — the SageMaker predict step writes the full
+    sample pool here (one <branch>-<ts>/<target>/seed_<N>/predictions/ tree per MSA
+    branch, each with <target>_sample_<i>.cif + summary_confidence_sample_<i>.json).
+    Derivable from the job_id alone, so it also works for CACHED jobs (empty exec)."""
+    parts = job.split(":")
+    model = parts[0] if parts else ""
+    target_id = parts[1] if len(parts) > 1 else ""
+    if not model or model not in MODEL_IDS or not target_id:
+        return None, None
+    return f"predictions/{target_id}/{model}/", model
+
+
+def _pool(qs):
+    """List the entire prediction pool for a job (metadata only — keys + sizes, always
+    small) so the web export can fetch each file via /poolfile and zip it client-side.
+    This avoids the API's response-size limit that a single inline bundle would hit."""
+    prefix, _ = _pool_prefix(qs.get("job") or "")
+    if not prefix:
+        return _resp(200, {"files": []})
+    files = []
+    try:
+        paginator = s3.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=ARTIFACTS_BUCKET, Prefix=prefix):
+            for o in page.get("Contents", []):
+                key = o["Key"]
+                if key.lower().endswith((".cif", ".pdb", ".json")):
+                    files.append({"key": key, "name": key[len(prefix):], "size": o["Size"]})
+    except Exception as e:
+        return _resp(200, {"files": [], "error": str(e)})
+    return _resp(200, {"files": files, "count": len(files),
+                       "bytes": sum(f["size"] for f in files)})
+
+
+def _poolfile(qs):
+    """Proxy a single pool file's content. The key MUST live under this job's own
+    predictions/<target>/<model>/ prefix (prevents reading arbitrary bucket objects)."""
+    prefix, _ = _pool_prefix(qs.get("job") or "")
+    key = qs.get("key") or ""
+    if not prefix or not key.startswith(prefix) or ".." in key:
+        return _resp(403, {"error": "invalid key"})
+    try:
+        body = s3.get_object(Bucket=ARTIFACTS_BUCKET, Key=key)["Body"].read()
+    except Exception as e:
+        return _resp(404, {"error": str(e)})
+    return {"statusCode": 200,
+            "headers": {"Content-Type": "text/plain; charset=utf-8", **_CORS},
+            "body": body.decode("utf-8", "replace")}
 
 
 def _jobs():

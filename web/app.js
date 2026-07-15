@@ -37,7 +37,9 @@ function durl(path) {
   return t ? `${base}${base.includes("?") ? "&" : "?"}t=${encodeURIComponent(t)}` : base;
 }
 async function getJSON(path) {
-  const r = await fetch(durl(path));
+  // no-cache: always revalidate with the origin (conditional request) so a data update after a
+  // deploy is picked up without a manual hard-refresh (data files carry no cache-control header).
+  const r = await fetch(durl(path), { cache: "no-cache" });
   if (!r.ok) { const e = new Error("http " + r.status); e.status = r.status; throw e; }
   return r.json();
 }
@@ -52,12 +54,16 @@ const FKEY = "atlas_filters";
 const FIELD_IDS = ["search", "len_min", "len_max", "plddt_min", "clash_max", "tm_max", "tm_has", "novel_only",
   "ov_max", "shape_ok", "agr_min", "cr_min", "bp_min", "cf_min", "fold_min", "sclust_min", "req_tert", "req_rare", "motif_mode", "pk", "termini", "overhang_max", "uucg", "rank_key", "topn", "per_letter", "alt_palette", "color_by", "ss_view"];
 const altPalette = () => !!($("alt_palette") && $("alt_palette").checked);
+// Sublibraries menu: all present sublibraries are ON by default; we persist only the ones the
+// user has explicitly turned OFF, so newly-appearing sublibraries (from a new source) start ON.
+let SUBLIB_OFF = new Set();
 function snapshot() {
   const s = {};
   FIELD_IDS.forEach((id) => { const el = $(id); if (el) s[id] = el.type === "checkbox" ? el.checked : el.value; });
   s.mf = [...document.querySelectorAll(".mf:checked")].map((c) => c.value);
   s.lf = [...document.querySelectorAll(".lf:checked")].map((c) => c.value);
   s.cf = [...document.querySelectorAll(".cf:checked")].map((c) => c.value);
+  s.sfx = [...SUBLIB_OFF];
   s.src = activeSources();
   s.sort = sortOverride;
   s.collapsed = [...document.querySelectorAll("#config fieldset")].map((fs, i) => fs.classList.contains("collapsed") ? i : -1).filter((i) => i >= 0);
@@ -70,6 +76,7 @@ function applyState(s) {
   if (s.mf) document.querySelectorAll(".mf").forEach((c) => { c.checked = s.mf.includes(c.value); });
   if (s.lf) document.querySelectorAll(".lf").forEach((c) => { c.checked = s.lf.includes(c.value); });
   if (s.cf) document.querySelectorAll(".cf").forEach((c) => { c.checked = s.cf.includes(c.value); });
+  if (s.sfx) { SUBLIB_OFF = new Set(s.sfx); document.querySelectorAll(".sf").forEach((c) => { c.checked = !SUBLIB_OFF.has(c.value); }); updateSublibBtn(); }
   sortOverride = s.sort || null;
   if (s.collapsed) { const fs = document.querySelectorAll("#config fieldset"); s.collapsed.forEach((i) => fs[i] && fs[i].classList.add("collapsed")); }
   if (s.allcollapsed) $("config").classList.add("allcollapsed");
@@ -126,6 +133,24 @@ function wireSourceUI() {
   document.addEventListener("click", (e) => { if (!$("sourcewrap").contains(e.target)) $("source-panel").classList.add("hidden"); });
   document.querySelectorAll(".src").forEach((c) =>
     c.addEventListener("change", () => { toggleLetterVisibility(); updateSourceBtn(); saveState(); loadSources(); }));
+  // Sublibraries menu (sibling of Source): toggle + close on outside click + all/none shortcuts.
+  $("sublib-btn").addEventListener("click", (e) => { e.stopPropagation(); $("sublib-panel").classList.toggle("hidden"); });
+  document.addEventListener("click", (e) => { if (!$("sublibwrap").contains(e.target)) $("sublib-panel").classList.add("hidden"); });
+  $("sublib-all").addEventListener("click", () => {
+    SUBLIB_OFF.clear();
+    document.querySelectorAll(".sf").forEach((c) => c.checked = true);
+    updateSublibBtn(); saveState(); render();
+  });
+  $("sublib-none").addEventListener("click", () => {
+    document.querySelectorAll(".sf").forEach((c) => { c.checked = false; SUBLIB_OFF.add(c.value); });
+    updateSublibBtn(); saveState(); render();
+  });
+  // Delegated so it survives buildSublibFilter() rebuilds (the checkboxes are re-created each time).
+  $("sublib_filter").addEventListener("change", (e) => {
+    const c = e.target; if (!c.classList || !c.classList.contains("sf")) return;
+    if (c.checked) SUBLIB_OFF.delete(c.value); else SUBLIB_OFF.add(c.value);
+    updateSublibBtn(); saveState(); render();
+  });
 }
 
 function toggleLetterVisibility() {
@@ -189,6 +214,7 @@ async function loadSources() {
   buildLetterFilter();
   wireDynamic();
   applyState(loadState());
+  buildSublibFilter();   // after applyState so it scopes to the restored letter + SUBLIB_OFF state
   toggleLetterVisibility();
   syncLabels();
   render();
@@ -211,6 +237,33 @@ function buildLetterFilter() {
     (hasComp ? `<div class="lf-note">I–Q = curated novel folds (chemmap pseudolabel) · load on demand</div>` : "");
 }
 
+// Sublibraries menu — repopulated from the distinct `sublibrary` values in the currently-loaded
+// sources (tracks the source selection). All present sublibraries default ON; only user-turned-OFF
+// ones (SUBLIB_OFF) start unchecked, so a newly-appearing sublibrary starts ON. The whole menu
+// button hides when the active sources have no sublibraries.
+function buildSublibFilter() {
+  const el = $("sublib_filter"); if (!el) return;
+  // Prefer the sublibraries of the CURRENTLY-CHECKED letters (enabling one I–Q letter loads the whole
+  // I–Q dataset, so scoping keeps the list to the selected letters). Fall back to ALL loaded
+  // sublibraries if that scope is momentarily empty, so the menu never vanishes when data has them.
+  const all = [...new Set(FOLDS.map((f) => f.sublibrary).filter(Boolean))];
+  const letters = new Set([...document.querySelectorAll(".lf:checked")].map((c) => c.value));
+  const inScope = (f) => !(DSBYID[f._dsid] && DSBYID[f._dsid].motifs && f.letter && !letters.has(f.letter));
+  let subs = [...new Set(FOLDS.filter(inScope).map((f) => f.sublibrary).filter(Boolean))];
+  if (!subs.length) subs = all;
+  subs.sort();
+  el.innerHTML = subs.map((s) =>
+    `<label><input type="checkbox" class="sf" value="${esc(s)}"${SUBLIB_OFF.has(s) ? "" : " checked"}>${esc(s)}</label>`).join("");
+  const wrap = $("sublibwrap"); if (wrap) wrap.style.display = all.length ? "" : "none";
+  updateSublibBtn();
+}
+function updateSublibBtn() {
+  const btn = $("sublib-btn"); if (!btn) return;
+  const boxes = [...document.querySelectorAll(".sf")];
+  const on = boxes.filter((c) => c.checked).length;
+  btn.innerHTML = `Sublibraries${boxes.length && on < boxes.length ? ` (${on}/${boxes.length})` : ""} &#9662;`;
+}
+
 function wireDynamic() {
   document.querySelectorAll(".mf").forEach((c) =>
     c.addEventListener("change", () => { saveState(); render(); }));
@@ -223,16 +276,16 @@ async function onLetterChange() {
     const note = document.querySelector(".lf-note");
     if (note) { note.textContent = "loading I–Q folds…"; note.classList.add("loading"); }
     await loadSources();   // rebuilds the letter filter (and note) when done
-  } else render();
+  } else { buildSublibFilter(); render(); }
 }
 
 function wireStatic() {
   document.querySelectorAll("#config input:not(.mf):not(.lf), #config select").forEach((el) =>
     el.addEventListener("input", () => { syncLabels(); saveState(); render(); }));
   $("reset").addEventListener("click", () => {
+    // Reset argument filters only — leave the source/letter selection and the Sublibrary
+    // checkboxes intact (those are "what data is shown", not a filter argument).
     document.querySelectorAll(".mf").forEach((c) => c.checked = false);
-    const comp = companionLetterSet();  // companion (I–Q) letters stay OFF on reset (opt-in)
-    document.querySelectorAll(".lf").forEach((c) => c.checked = !comp.has(c.value));
     document.querySelectorAll(".cf").forEach((c) => c.checked = false);
     ["plddt_min", "tm_max", "ov_max"].forEach((id) => $(id).value = $(id).max);
     $("agr_min").value = -1;
@@ -241,12 +294,13 @@ function wireStatic() {
     ["shape_ok", "req_tert", "req_rare", "tm_has", "novel_only", "per_letter"].forEach((id) => $(id).checked = false);
     $("cr_min").value = 0; $("bp_min").value = 0; $("cf_min").value = 0;
     if ($("fold_min")) $("fold_min").value = 0; if ($("sclust_min")) $("sclust_min").value = 0;
-    $("pk").value = "any"; $("rank_key").value = "best_tm1:asc"; $("topn").value = 200;
+    $("pk").value = "any";
+    $("rank_key").value = "best_tm1:asc"; $("topn").value = 200;
     if ($("color_by")) $("color_by").value = "a23";
     if ($("motif_mode")) $("motif_mode").value = "any";
     if ($("ss_view")) $("ss_view").value = "forna";
     if ($("search")) $("search").value = "";
-    sortOverride = null; localStorage.removeItem(FKEY); syncLabels(); render();
+    sortOverride = null; saveState(); syncLabels(); render();
   });
   if ($("search")) $("search").addEventListener("input", () => { saveState(); render(); });
   if ($("alt_palette")) $("alt_palette").addEventListener("change", () => { if (currentDeep) { drawTracks(currentDeep.f, currentDeep.react); load3D(currentDeep.f, currentDeep.react); } });
@@ -297,7 +351,8 @@ function filters() {
     foldMin: +($("fold_min") ? $("fold_min").value : 0), sclustMin: +($("sclust_min") ? $("sclust_min").value : 0),
     tert: $("req_tert").checked, rare: $("req_rare").checked, motifs: mf,
     motifMode: ($("motif_mode") ? $("motif_mode").value : "any"),
-    pk: $("pk").value, letters: new Set(lf), cond: new Set(cf),
+    pk: $("pk").value, sublibOff: SUBLIB_OFF,
+    letters: new Set(lf), cond: new Set(cf),
     termini: ($("termini") ? $("termini").value : "any"),
     ohmax: ($("overhang_max") && $("overhang_max").value !== "") ? +$("overhang_max").value : Infinity,
     uucg: $("uucg") ? $("uucg").checked : false,
@@ -328,6 +383,7 @@ function pass(f, c) {
   if (c.rare && f.n_rare < 1) return false;
   if (c.motifs.length) { const has = (m) => (f.motifs || []).includes(m); if (c.motifMode === "all" ? !c.motifs.every(has) : !c.motifs.some(has)) return false; }
   if (c.pk !== "any" && String(f.pseudoknot) !== c.pk) return false;
+  if (f.sublibrary && c.sublibOff.has(f.sublibrary)) return false;
   if (c.termini === "bp" && f.termini_bp !== 1) return false;
   if (c.termini === "trim" && (f.termini_trim !== 1 || Math.max(f.overhang5 || 0, f.overhang3 || 0) > c.ohmax)) return false;
   if (c.uucg && f.uucg_tetraloop !== 1) return false;
@@ -387,7 +443,7 @@ function showMore(all) { pageLimit = all ? Infinity : pageLimit + (+$("topn").va
 let viewMode = "table", lastRows = [];
 
 const COLS = [
-  ["id", "seq_id"], ["name", "name"], ["letter", "L"], ["length", "len"], ["plddt", "pLDDT"],
+  ["id", "seq_id"], ["name", "name"], ["source_group", "source"], ["letter", "L"], ["length", "len"], ["plddt", "pLDDT"],
   ["best_tm1", "best_tm1"], ["near", "nearest"], ["overlap_ae", "ovlp_AE"],
   ["shape_ok", "SHAPE"], ["shape_agr", "SHAPE agr"], ["contact_ratio", "compact"], ["bp_fraction", "paired"],
   ["crossed_frac", "crossed"], ["fold_size", "cluster"], ["n_tert", "tert"], ["n_rare", "rare"], ["pseudoknot", "PK"], ["motifs", "motifs"],
@@ -415,7 +471,7 @@ function drawTable(rows) {
       : (hasShape ? `<span class="muted" title="has SHAPE data but motif residues not protected">no</span>`
                   : `<span class="muted" title="no usable SHAPE data for this fold">n/d</span>`);
     return `<tr data-id="${esc(f.id)}" data-uid="${esc(f._uid)}">
-      <td>${esc(f.id)}</td><td>${esc(f.name || "")}</td><td>${f.letter}</td>
+      <td>${esc(f.id)}</td><td>${esc(f.name || "")}</td><td>${esc(f.source_group || "")}</td><td>${f.letter}</td>
       <td class="num">${f.length ?? ""}</td><td class="num">${plbar}</td>
       <td class="num">${num(f.best_tm1, 3)}</td><td title="${(f.near_title || "").replace(/"/g, "&quot;")}">${f.near || ""}</td>
       <td class="num">${num(f.overlap_ae, 2)}</td><td>${shape}</td>
@@ -470,7 +526,7 @@ async function openDeep(key) {
   drawProps(f);
   let react = null;
   if (ds.react) {
-    try { react = await (await fetch(durl(prefix(ds) + "react/" + (f.key || id) + ".json"))).json(); } catch (e) { react = null; }
+    try { react = await (await fetch(durl(prefix(ds) + "react/" + (f.key || id) + ".json"), { cache: "no-cache" })).json(); } catch (e) { react = null; }
   }
   currentDeep = { f, react };
   drawTracks(f, react);
@@ -485,12 +541,15 @@ function drawProps(f) {
     : f.best_tm1 < 0.40 ? "novel" : f.best_tm1 < 0.45 ? "borderline" : "matches known fold";
   const rowsHtml = [
     ["Source", `${f.source} (lib ${f.letter})`],
+    f.source_group ? ["Biological source", esc(f.source_group)] : null,
     ["Sublibrary", f.sublibrary],
     f.rnacentral_id ? ["RNAcentral", `<a href="https://rnacentral.org/rna/${esc(f.rnacentral_id)}" target="_blank" rel="noopener">${esc(f.rnacentral_id)}</a>${f.rnacentral_name ? ` &mdash; ${esc(f.rnacentral_name)}` : ""}`] : null,
     f.rna_type ? ["RNA type", esc(f.rna_type)] : null,
     (f.member_dbs && f.member_dbs.length) ? ["Member databases", f.member_dbs.map(esc).join(", ")] : null,
     f.rfam_id ? ["Rfam family", `<a href="https://rfam.org/family/${esc(f.rfam_id)}" target="_blank" rel="noopener">${esc(f.rfam_id)}</a>${f.rfam_name ? ` &mdash; ${esc(f.rfam_name)}` : ""}`] : null,
     ["Length", `${f.length} nt`],
+    (f.true_design_length != null && f.true_design_length !== f.length)
+      ? ["True design region", `${f.true_design_length} nt (positions ${f.design_start}–${f.design_end} of the 177-nt construct; the folded model is 5′-padded to ${f.length} nt)`] : null,
     ["pLDDT / gpde", `${num(f.plddt)} / ${num(f.gpde, 3)}`],
     ["Conditioning", condLabel(f._cond)],
     ["Clashscore", num(f.clashscore, 2)],
@@ -540,74 +599,8 @@ function spansFor(f) {
   });
 }
 
-function ssPairs(dbn) {   // dot-bracket (multi-level) -> [{i,j,pk}] (pk = crossing/pseudoknot bracket)
-  const OPENB = "([{<", CLOSEB = ")]}>", st = [[], [], [], []], pairs = [];
-  for (let i = 0; i < dbn.length; i++) {
-    const o = OPENB.indexOf(dbn[i]);
-    if (o >= 0) { st[o].push(i); continue; }
-    const c = CLOSEB.indexOf(dbn[i]);
-    if (c >= 0 && st[c].length) pairs.push({ i: st[c].pop(), j: i, pk: c > 0 });
-  }
-  return pairs;
-}
-function arcDiagram(dbn, n, cw, W) {   // SVG arc plot of the predicted secondary structure
-  const pairs = ssPairs((dbn || "").slice(0, n));
-  if (!pairs.length) return "";
-  const cap = 120; let maxH = 12;
-  const segs = pairs.map((p) => { const h = Math.min(cap, 6 + (p.j - p.i) * cw * 0.55); maxH = Math.max(maxH, h); return { p, h }; });
-  const aH = maxH + 8, base = aH - 2;
-  let s = `<svg width="${W + 40}" height="${aH}" font-size="9"><line x1="0" y1="${base}" x2="${W}" y2="${base}" stroke="#dfe3e8"/>`;
-  segs.forEach(({ p, h }) => {
-    const xi = p.i * cw + cw / 2, xj = p.j * cw + cw / 2, mx = (xi + xj) / 2;
-    s += `<path d="M${xi.toFixed(1)} ${base} Q ${mx.toFixed(1)} ${(base - h).toFixed(1)} ${xj.toFixed(1)} ${base}" fill="none" stroke="${p.pk ? "#c1440e" : "#2e6f95"}" stroke-width="1.2" opacity="0.55"><title>${p.i + 1}–${p.j + 1}${p.pk ? " (pseudoknot)" : ""}</title></path>`;
-  });
-  return s + "</svg>";
-}
-// forna-style 2D layout: spring-embed the nucleotide graph (backbone + base pairs), draw nodes.
-let _ssCache = {};
-function ssLayout(n, pairs) {
-  const L = 16, pos = new Array(n);
-  for (let i = 0; i < n; i++) { const a = i / n * 6.2832; pos[i] = { x: Math.cos(a) * L * n / 6.2832, y: Math.sin(a) * L * n / 6.2832 }; }
-  const iters = n > 400 ? 260 : 420;
-  const fx = new Float64Array(n), fy = new Float64Array(n);
-  for (let it = 0; it < iters; it++) {
-    const cool = 1 - it / iters * 0.8;
-    fx.fill(0); fy.fill(0);
-    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
-      const dx = pos[i].x - pos[j].x, dy = pos[i].y - pos[j].y, d2 = dx * dx + dy * dy || 0.01;
-      if (d2 < 9000) { const r = 150 / d2; fx[i] += dx * r; fy[i] += dy * r; fx[j] -= dx * r; fy[j] -= dy * r; }
-    }
-    const sp = (a, b, str) => { const dx = pos[b].x - pos[a].x, dy = pos[b].y - pos[a].y, d = Math.sqrt(dx * dx + dy * dy) || 0.01, f = (d - L) * str, ux = dx / d * f, uy = dy / d * f; fx[a] += ux; fy[a] += uy; fx[b] -= ux; fy[b] -= uy; };
-    for (let i = 0; i < n - 1; i++) sp(i, i + 1, 0.22);
-    for (const p of pairs) sp(p.i, p.j, 0.28);
-    for (let i = 0; i < n; i++) { pos[i].x += Math.max(-8, Math.min(8, fx[i])) * cool; pos[i].y += Math.max(-8, Math.min(8, fy[i])) * cool; }
-  }
-  return pos;
-}
-function forna2D(id, dbn, seq, react, box) {
-  const n = (seq && seq.length) || (dbn || "").length || 0;
-  if (n < 2) return "";
-  if (n > 900) return arcDiagram(dbn, n, Math.max(6, Math.min(16, Math.floor(900 / n))), n * Math.max(6, Math.min(16, Math.floor(900 / n))));
-  const pairs = ssPairs((dbn || "").slice(0, n));
-  let pos = _ssCache[id];
-  if (!pos || pos.length !== n) { pos = ssLayout(n, pairs); _ssCache[id] = pos; }
-  const xs = pos.map((p) => p.x), ys = pos.map((p) => p.y);
-  const minx = Math.min(...xs), maxx = Math.max(...xs), miny = Math.min(...ys), maxy = Math.max(...ys);
-  const pad = 12, sc = Math.min((box - 2 * pad) / ((maxx - minx) || 1), (box - 2 * pad) / ((maxy - miny) || 1));
-  const X = (v) => (pad + (v - minx) * sc).toFixed(1), Y = (v) => (pad + (v - miny) * sc).toFixed(1);
-  const r = Math.max(2.4, Math.min(7, sc * 7)), alt = altPalette();
-  let s = `<svg width="${box}" height="${box}" font-size="7">`;
-  let path = "M";
-  for (let i = 0; i < n; i++) path += `${X(pos[i].x)} ${Y(pos[i].y)}${i < n - 1 ? " L" : ""} `;
-  s += `<path d="${path}" fill="none" stroke="#cdd6dd" stroke-width="1.4"/>`;
-  for (const p of pairs) s += `<line x1="${X(pos[p.i].x)}" y1="${Y(pos[p.i].y)}" x2="${X(pos[p.j].x)}" y2="${Y(pos[p.j].y)}" stroke="${p.pk ? "#c1440e" : "#9aa7b0"}" stroke-width="1"/>`;
-  for (let i = 0; i < n; i++) {
-    const ch = (seq && seq[i]) || "N";
-    s += `<circle cx="${X(pos[i].x)}" cy="${Y(pos[i].y)}" r="${r.toFixed(1)}" fill="${nucColor(ch, alt)}" stroke="#fff" stroke-width="0.5"><title>${i + 1} ${ch}</title></circle>`;
-    if (r >= 6 && seq) s += `<text x="${X(pos[i].x)}" y="${(+Y(pos[i].y) + 2.3).toFixed(1)}" text-anchor="middle" fill="#fff">${ch}</text>`;
-  }
-  return s + "</svg>";
-}
+// ssPairs / arcDiagram / ssLayout / forna2D (+ deriveSS) now live in the shared web/ss.js
+// module (loaded before app.js), so app.js and the /inference page share one implementation.
 function drawTracks(f, react) {
   const seq = (react && react.seq) || "";
   const ra = react && (react.a23 || react.dms || react.pred_a23 || react.pred_dms);
@@ -669,7 +662,7 @@ function drawTracks(f, react) {
   }
   svg += pr + "</svg>";
   const ssMode = ($("ss_view") ? $("ss_view").value : "forna");
-  const ss = (dbn && ssMode === "arc") ? arcDiagram(dbn, n, cw, W) : (dbn ? forna2D(f.id, dbn, seq, react, 340) : "");
+  const ss = (dbn && ssMode === "arc") ? arcDiagram(dbn, n, cw, W) : (dbn ? forna2D(f.id, dbn, seq, react, 340, altPalette()) : "");
   const ssLbl = ssMode === "arc" ? "arcs link base pairs" : "2D layout — nodes colored by base";
   const ssBlock = ss ? `<div style="font-size:11px;color:#5b6670;margin:10px 0 3px">predicted secondary structure (${ssLbl}; <span style="color:#c1440e">orange = pseudoknot</span>)</div>${ss}` : "";
   const predNote = hasPred ? " &middot; *pred = RNAnix-predicted" : "";

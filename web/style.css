@@ -11,8 +11,19 @@ header h1 { font-size: 17px; margin: 0; font-weight: 600; }
 #source-panel.hidden { display: none; }
 #source-panel .srcrow { display: block; font-weight: 600; margin: 6px 0 2px; cursor: pointer; }
 #source-panel .srcrow input { margin-right: 6px; }
+#source-panel { max-height: 74vh; overflow-y: auto; }
 #source-panel .srcsub { margin: 2px 0 8px 20px; }
 #source-panel .srcsub label { font-weight: 400; }
+.srcsub-h { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: #5b6670; font-weight: 700; margin: 2px 0 6px; }
+/* Sublibraries menu — sibling of the Source menu */
+#sublibwrap { position: relative; }
+#sublib-btn { font-size: 13px; border: 1px solid #3a4a63; background: #2a3b54; color: #fff; cursor: pointer; border-radius: 5px; padding: 5px 11px; }
+#sublib-btn:hover { background: #2e6f95; }
+#sublib-panel { position: absolute; top: 30px; left: 0; z-index: 60; background: #fff; color: #1f324d; border: 1px solid #cdd6dd; border-radius: 7px; box-shadow: 0 8px 28px rgba(0,0,0,.25); padding: 8px 12px; min-width: 230px; max-height: 74vh; overflow-y: auto; }
+#sublib-panel.hidden { display: none; }
+#sublib-panel #sublib_filter label { font-weight: 400; font-size: 11px; }
+.linkish { background: none; border: 0; color: #2e6f95; cursor: pointer; font-size: 10px; padding: 0 2px; }
+.linkish:hover { text-decoration: underline; }
 #search { margin-left: 18px; width: 260px; padding: 5px 9px; border: 0; border-radius: 5px; font-size: 13px; }
 #layoutctl { margin-left: 12px; display: inline-flex; gap: 2px; }
 #layoutctl button { font-size: 14px; line-height: 1; border: 1px solid #3a4a63; background: #2a3b54; color: #cdd6dd; cursor: pointer; border-radius: 4px; padding: 3px 7px; }
@@ -92,7 +103,8 @@ tbody tr:hover { background: #eaf3f8; }
 #deep.mode-right .deep-body, #deep.mode-bottom .deep-body { grid-template-columns: 1fr; }
 #deep.mode-right #viewer3d, #deep.mode-bottom #viewer3d { grid-row: auto; height: 300px; }
 .deep-card { background: #fff; padding: 14px 18px; position: relative; overflow: auto; }
-.deep-tools { position: absolute; top: 8px; right: 10px; display: flex; gap: 2px; z-index: 2; }
+.deep-head { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+.deep-tools { flex: 0 0 auto; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 2px; z-index: 2; }
 .deep-tools button { font-size: 16px; line-height: 1; border: 1px solid #dde3e8; background: #f4f6f8; cursor: pointer; color: #5b6670; border-radius: 4px; padding: 3px 7px; }
 .deep-tools button:hover { background: #eaf3f8; }
 .deep-tools button[data-mode="bottom"] { transform: rotate(90deg); }
@@ -105,7 +117,7 @@ tbody tr:hover { background: #eaf3f8; }
 #deep-close { font-size: 18px; }
 #deep-export { font-size: 12px; padding: 4px 10px; font-weight: 600; color: #2e6f95; }
 #deep-export:hover { background: #2e6f95; color: #fff; border-color: #2e6f95; }
-#deep-title { margin: 0 0 8px; font-size: 16px; }
+#deep-title { margin: 0; font-size: 16px; line-height: 1.3; flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .deep-body { display: grid; grid-template-columns: 1.1fr 1fr; grid-template-rows: auto auto; gap: 12px; }
 #viewer3d { position: relative; width: 100%; height: 420px; min-height: 240px; background: #0d1117; border-radius: 6px; grid-row: span 2; resize: vertical; overflow: hidden; }
 #tracks { width: 100%; overflow-x: auto; }

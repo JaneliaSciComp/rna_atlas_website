@@ -41,10 +41,17 @@ def letter_of(sid):
 
 
 def npz_path(sid, letter):
+    # union folds come from both the padded (_snr1_out) and de-padded (_depadded_out) runs
     lo = letter.lower()
-    return (f"{SNR_ROOT}/{lo}_snr1_out/{lo}_snr1__rna_ribonanza2__shard0000of0001/"
-            f"predictions/rna_ribonanza2/step_0_rna_ribonanza2_{sid}/seed_0/predictions/"
-            f"step_0_rna_ribonanza2_{sid}_seed_0_sample_0.profiles.npz")
+    def _p(run):
+        return (f"{SNR_ROOT}/{lo}_{run}_out/{lo}_{run}__rna_ribonanza2__shard0000of0001/"
+                f"predictions/rna_ribonanza2/step_0_rna_ribonanza2_{sid}/seed_0/predictions/"
+                f"step_0_rna_ribonanza2_{sid}_seed_0_sample_0.profiles.npz")
+    for run in ("depadded", "snr1"):
+        p = _p(run)
+        if os.path.exists(p):
+            return p
+    return _p("snr1")
 
 
 def pearson(x, y):
@@ -116,9 +123,7 @@ def process(rec):
     rj_path = f"{_CTX['od']}/react/{key}.json"
     enr = {"r2a3": None, "shape_agr": None, "shape_ok": 0}
 
-    if letter not in NOPQ:
-        return sid, enr
-
+    # No NOPQ gate for the union: predicted-reactivity npz now exists for all I-Q letters.
     try:
         rj = json.load(open(rj_path))
     except Exception:
@@ -181,10 +186,13 @@ def load_chemmap(path):
 
 
 def main():
+    global SRC
     ap = argparse.ArgumentParser()
     ap.add_argument("--name", default="ribo2-iq-curated")
+    ap.add_argument("--src", default=SRC, help="curation tree (11_chemmap/chemmap_correlations.tsv)")
     ap.add_argument("--workers", type=int, default=32)
     args = ap.parse_args()
+    SRC = args.src
     od = os.path.join(ROOT, "dist", "datasets", args.name)
     fp = f"{od}/data/folds.json"
     pp = f"{od}/data/pairing.json"

@@ -153,6 +153,9 @@ tbody tr:hover { background: #eaf3f8; }
 #viewctl button.active { background: #2e6f95; color: #fff; border-color: #2e6f95; }
 #agent-btn { margin-left: 12px; font-size: 12px; font-weight: 600; border: 1px solid #3a4a63; background: #2a3b54; color: #fff; cursor: pointer; border-radius: 5px; padding: 4px 10px; }
 #agent-btn:hover { background: #2e6f95; }
+#share-btn { margin-left: 12px; font-size: 12px; font-weight: 600; border: 1px solid #3a4a63; background: #2a3b54; color: #fff; cursor: pointer; border-radius: 5px; padding: 4px 10px; }
+#share-btn:hover { background: #2e6f95; }
+#share-btn.copied { background: #3a7d44; border-color: #3a7d44; }
 
 /* ---------- scatter map ---------- */
 #tbl.hidden, #mapwrap.hidden, #agent.hidden { display: none !important; }

@@ -53,6 +53,10 @@ MAX_ENTITIES = 16
 MAX_COUNT = 8
 MIN_POLY = 5
 MAX_TOTAL_RESIDUES = 5000
+# per-request fleet knobs (RNAnix fleet models read SEEDS + N_SAMPLE env; defaults 3 seeds, 5 samples)
+SEED_POOL = ["101", "202", "303", "404", "505"]
+MAX_SEEDS = 5
+MAX_SAMPLES = 5
 _ALPHA = {"rna": set("ACGUN"), "dna": set("ACGTN"),
           "protein": set("ACDEFGHIKLMNPQRSTVWYX")}
 # Protenix/AF3 sequences[] key per polymer type.
@@ -217,10 +221,25 @@ def _predict(body):
     if mode not in ("protenix-mt", "rmsa", "both", "none"):
         mode = "protenix-mt"
     tag = "nomsa" if mode == "none" else "msa"
-    # target key covers the full ORDERED entity list (type|seq-or-ligand|count) + model + mode, so
-    # distinct complexes never collide (e.g. a homodimer count:2 vs the monomer of the same chain).
+    # per-request fleet knobs: N seeds x N samples/seed (RNAnix fleet models). Defaults match the
+    # image (3 seeds, 5 samples). Non-fleet models (protenix ptnx1) ignore these env vars.
+    opt = body.get("options") or {}
+    try:
+        n_seeds = int(opt.get("seeds") or 3)
+    except (TypeError, ValueError):
+        n_seeds = 3
+    try:
+        n_sample = int(opt.get("samples") or 5)
+    except (TypeError, ValueError):
+        n_sample = 5
+    n_seeds = max(1, min(MAX_SEEDS, n_seeds))
+    n_sample = max(1, min(MAX_SAMPLES, n_sample))
+    seeds_str = ",".join(SEED_POOL[:n_seeds])
+    # target key covers the full ORDERED entity list (type|seq-or-ligand|count) + model + mode +
+    # fleet knobs, so distinct complexes/settings never collide (homodimer count:2 vs monomer; 1 vs 5 seeds).
     parts = [f"{e['type']}:{e.get('seq', e.get('value', ''))}:{e['count']}" for e in entities]
-    target_id = "web" + hashlib.sha256((model + "|" + mode + "|" + "|".join(parts)).encode()).hexdigest()[:12]
+    key = f"{model}|{mode}|s{n_seeds}|n{n_sample}|" + "|".join(parts)
+    target_id = "web" + hashlib.sha256(key.encode()).hexdigest()[:12]
 
     # cache: a finalized structure already exists
     if _latest_pdb(target_id, model):
@@ -235,6 +254,9 @@ def _predict(body):
         sc = json.loads(env.get("SERVER_CONFIG_JSON", "{}"))
     except Exception as e:
         return _resp(502, {"error": f"config read failed: {e}"})
+    # thread the fleet knobs into the server config passed to the SageMaker env; step_functions.tf
+    # injects them via "SEEDS.$" = "$.server.seeds" / "N_SAMPLE.$" = "$.server.n_sample".
+    sc = {**sc, "seeds": seeds_str, "n_sample": str(n_sample)}
     total = sum(len(e["seq"]) * e["count"] for e in entities if e["type"] != "ligand")
     has_rna = any(e["type"] == "rna" for e in entities)
     thr = int(sc.get("large_residue_threshold", 2000))

@@ -1,0 +1,13 @@
+{
+  "id": "my-rna-model-v1",
+  "display_name": "My RNA model v1",
+  "description": "RNAnix Px1 variant, 48-block pairformer, trained on ABCDE (step 49999).",
+  "model_name": "px1_myvariant_step49999",
+  "use_msa": true,
+  "use_template": true,
+  "rnaonly": true,
+  "config_overrides": {
+    "model.pairformer.n_blocks": 48,
+    "sample_diffusion.N_step": 200
+  }
+}

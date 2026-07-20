@@ -73,6 +73,9 @@
 /* model selector + jobs monitor (added for submit/model/monitor/cancel) */
 #model, #msa_mode { width: 100%; padding: 6px 8px; border: 1px solid #cdd6dd; border-radius: 5px; font-size: 13px; margin: 2px 0 6px; background: #fff; }
 .ihint { font-size: 11px; color: #7a848c; line-height: 1.4; margin: 2px 0 2px; }
+.optrow { display: flex; gap: 10px; margin-top: 4px; }
+.optrow span { flex: 1 1 0; min-width: 0; }
+.numopt { width: 100%; padding: 6px 8px; border: 1px solid #cdd6dd; border-radius: 5px; font-size: 13px; margin: 2px 0 2px; background: #fff; }
 .jobs { margin-top: 14px; }
 .jobs-h { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #5b6670; font-weight: 600; margin-bottom: 4px; }
 .job { display: flex; align-items: center; gap: 7px; font-size: 12px; padding: 5px 0; border-top: 1px solid #eef2f5; }

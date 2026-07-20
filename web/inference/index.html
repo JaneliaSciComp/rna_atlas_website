@@ -48,6 +48,11 @@
         <option value="both">Use MSA + rMSA (slower, thorough)</option>
       </select>
       <div class="ihint" id="msa_hint">None = single-sequence (fastest). MSA / rMSA condition on alignments (slower, usually more accurate).</div>
+      <div class="optrow">
+        <span><label class="ilbl" for="opt_seeds">Seeds</label><input id="opt_seeds" class="numopt" type="number" min="1" max="5" step="1" value="3"></span>
+        <span><label class="ilbl" for="opt_samples">Samples / seed</label><input id="opt_samples" class="numopt" type="number" min="1" max="5" step="1" value="5"></span>
+      </div>
+      <div class="ihint" id="fleet_hint"></div>
     </fieldset>
     <button id="predict-btn">Predict</button>
     <p id="predict-note" class="muted"></p>

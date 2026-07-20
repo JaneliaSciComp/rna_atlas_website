@@ -7,6 +7,36 @@ does the work and how long it takes.
 
 ---
 
+## 0. Upstream inference gap (not fixable in this repo) — reactivity for I/J/K/L/M
+
+- [ ] **`ribo2-iq-curated-v2` letters I/J/K/L/M (13,993 records): no real DMS/2A3 reactivity
+  at all**, and `r2a3`/`shape_agr`/`pred_pearson_*`/`pred_spearman_*` are all null as a
+  consequence. This is the single biggest missing-data item in the whole atlas by record
+  count — bigger than everything in sections A-D combined.
+  - **Root cause (confirmed at the raw model-output level):** spot-checked via
+    `21258723-ribonanza2k` (tRNA-Pro, human mitochondrial, 69nt). Its `profiles.npz`
+    prediction file exists on disk and has a real, varying `profile_1D` array (69×10,
+    values 0.0009-0.9995) — inference genuinely ran — but `exp_reactivity_DMS` and
+    `exp_reactivity_2A3` are **all zero**, and the model's own `pearson_dms`/`pearson_2a3`/
+    `spearman_dms`/`spearman_2a3` are **NaN**. Checked all 13,993 I/J/K/L/M records the same
+    way: 100% show either a missing npz or an all-zero reactivity channel — none have a
+    real signal.
+  - **This is the documented 2026-07-02 incident**, not a new bug: the production submit
+    scripts for these letters were generated without `--atlas_save_extra_outputs true`
+    (dropped from `_template_submit_array.sh`), so reactivity/profile output was never
+    computed for 33.4% of the atlas, while N/O/P/Q (which had the flag) got it.
+  - **Correction to a code comment:** `build_iq_curated.py`'s `load_react()` docstring
+    claims *"the old I-M flag-drop is fixed on the de-padded run"* — the data contradicts
+    this. The de-padded npz for the spot-checked record still has all-zero reactivity, so
+    whatever fix was intended doesn't appear to have actually landed in what's deployed.
+    Worth correcting the comment or re-checking whether the de-padded rerun that was
+    supposed to fix this actually happened.
+  - **Fix:** requires re-running RNAnix inference for I/J/K/L/M with reactivity output
+    enabled — an expensive re-inference job, not an atlas_explorer code change. Track as the
+    known "permanent coverage gap on I-M" cost noted in project memory, not a quick patch.
+
+---
+
 ## A. Data already exists — just needs to be joined/wired in (real bugs, cheap fixes)
 
 - [ ] **`ribo2` letters G + H: zero RNAcentral/Rfam annotation** (`rnacentral_id`,
@@ -158,6 +188,10 @@ etc.). Full per-field rationale is in `summary_by_field.csv`.
 
 ## Priority if picking one thing to fix first
 
-**A (RNAcentral/Rfam G/H offset bug)** — highest impact (971 records × 6 fields, a one-line
-offset fix in `enrich_fgh_metadata.py`) and it's an unambiguous, proven bug rather than a
-judgment call.
+**Biggest record count by far is section 0 (I/J/K/L/M reactivity, 13,993 records)**, but it
+needs an expensive re-inference run, not a code fix — track it separately as infrastructure
+work, not a quick patch.
+
+**Of the fixes actually doable in this repo, A (RNAcentral/Rfam G/H offset bug)** is highest
+priority — 971 records × 6 fields, a one-line offset fix in `enrich_fgh_metadata.py`, and
+it's an unambiguous, proven bug rather than a judgment call.

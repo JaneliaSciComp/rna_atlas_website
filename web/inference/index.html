@@ -30,9 +30,10 @@
 <div id="ilayout">
   <aside id="ipanel">
     <h2>Input</h2>
-    <label class="ilbl" for="seq">RNA sequence</label>
-    <textarea id="seq" rows="6" placeholder="Paste an RNA sequence (A C G U). FASTA header optional."></textarea>
-    <div class="seqinfo"><span id="seqlen">0 nt</span><button id="example-btn" class="linkbtn" type="button">load example</button></div>
+    <label class="ilbl">Entities <span class="lbl-sub">RNA · protein · DNA · ligand</span></label>
+    <div id="entities"></div>
+    <div class="ent-actions"><button id="add-entity" class="linkbtn" type="button">+ Add entity</button></div>
+    <div class="seqinfo"><span id="seqlen">0 residues</span><button id="example-btn" class="linkbtn" type="button">load example</button></div>
     <label class="ilbl" for="jobname">Name (optional)</label>
     <input id="jobname" type="text" placeholder="my RNA">
     <label class="ilbl" for="model">Model</label>

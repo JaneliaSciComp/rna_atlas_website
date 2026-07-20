@@ -3,7 +3,8 @@
 # Needs ADMIN creds (default profile / SSO AdministratorAccess) — the scoped
 # atlas-inference user cannot create IAM/Lambda/API-Gateway.
 #
-#   ./deploy_bridge.sh            # create-or-update everything, print INFER_API url
+#   ./deploy_bridge.sh              # -> shared CASP prod stack (FN casp-web),   print INFER_API url
+#   STAGE=atlas ./deploy_bridge.sh  # -> isolated atlas fork (FN casp-web-atlas), print INFER_API url
 #
 # WEB_TOKEN (the gate passcode) is read from DEPLOYED.local.md (gitignored) —
 # it must equal the atlas passcode so the front-end's ?t=/token matches.
@@ -13,11 +14,18 @@ cd "$(dirname "$0")"
 PROFILE="${PROFILE:-default}"
 REGION="us-east-2"
 ACCOUNT="481088927481"
-FN="casp-web"
-ROLE="casp-web-role"
-API="casp-web-api"
+# STAGE picks which CASP pipeline stack the bridge drives: "prod" = the shared CASP production
+# pipeline; "atlas" (or any non-prod) = the isolated atlas fork. Non-prod stages get a "-<stage>"
+# suffix on the bridge Lambda/role/API so they never collide with the prod bridge.
+STAGE="${STAGE:-prod}"
+SUF=""; [ "$STAGE" = "prod" ] || SUF="-$STAGE"
+FN="casp-web$SUF"
+ROLE="casp-web-role$SUF"
+API="casp-web-api$SUF"
+ARTIFACTS_BUCKET="janelia-das-casp-artifacts-$STAGE"
 AWS="aws --profile $PROFILE --region $REGION"
 LAMBDA_ARN="arn:aws:lambda:$REGION:$ACCOUNT:function:$FN"
+echo "STAGE=$STAGE  ->  FN=$FN  ARTIFACTS_BUCKET=$ARTIFACTS_BUCKET"
 
 WEB_TOKEN="$(grep -ioE 'atlas-[a-f0-9]{12}' ../DEPLOYED.local.md | head -1)"
 [ -n "$WEB_TOKEN" ] || { echo "ERROR: could not read passcode from ../DEPLOYED.local.md"; exit 1; }
@@ -32,12 +40,12 @@ $AWS iam get-role --role-name "$ROLE" >/dev/null 2>&1 || \
 cat > /tmp/casp-web-policy.json <<JSON
 {"Version":"2012-10-17","Statement":[
  {"Sid":"logs","Effect":"Allow","Action":["logs:CreateLogGroup","logs:CreateLogStream","logs:PutLogEvents"],"Resource":"*"},
- {"Sid":"lambdacfg","Effect":"Allow","Action":"lambda:GetFunctionConfiguration","Resource":"arn:aws:lambda:$REGION:$ACCOUNT:function:janelia-das-casp-daslab-*-prod"},
- {"Sid":"sfnexec","Effect":"Allow","Action":["states:DescribeExecution","states:StopExecution"],"Resource":"arn:aws:states:$REGION:$ACCOUNT:execution:janelia-das-casp-daslab-*-pipeline-prod:*"},
- {"Sid":"sfnsm","Effect":"Allow","Action":["states:StartExecution","states:ListExecutions"],"Resource":"arn:aws:states:$REGION:$ACCOUNT:stateMachine:janelia-das-casp-daslab-*-pipeline-prod"},
- {"Sid":"s3get","Effect":"Allow","Action":"s3:GetObject","Resource":["arn:aws:s3:::janelia-das-casp-artifacts-prod/submissions/*","arn:aws:s3:::janelia-das-casp-artifacts-prod/cache/*","arn:aws:s3:::janelia-das-casp-artifacts-prod/predictions/*"]},
- {"Sid":"s3put","Effect":"Allow","Action":"s3:PutObject","Resource":"arn:aws:s3:::janelia-das-casp-artifacts-prod/requests/*"},
- {"Sid":"s3list","Effect":"Allow","Action":"s3:ListBucket","Resource":"arn:aws:s3:::janelia-das-casp-artifacts-prod","Condition":{"StringLike":{"s3:prefix":["submissions/*","cache/*","requests/*","predictions/*"]}}}
+ {"Sid":"lambdacfg","Effect":"Allow","Action":"lambda:GetFunctionConfiguration","Resource":"arn:aws:lambda:$REGION:$ACCOUNT:function:janelia-das-casp-daslab-*-$STAGE"},
+ {"Sid":"sfnexec","Effect":"Allow","Action":["states:DescribeExecution","states:StopExecution"],"Resource":"arn:aws:states:$REGION:$ACCOUNT:execution:janelia-das-casp-daslab-*-pipeline-$STAGE:*"},
+ {"Sid":"sfnsm","Effect":"Allow","Action":["states:StartExecution","states:ListExecutions"],"Resource":"arn:aws:states:$REGION:$ACCOUNT:stateMachine:janelia-das-casp-daslab-*-pipeline-$STAGE"},
+ {"Sid":"s3get","Effect":"Allow","Action":"s3:GetObject","Resource":["arn:aws:s3:::$ARTIFACTS_BUCKET/submissions/*","arn:aws:s3:::$ARTIFACTS_BUCKET/cache/*","arn:aws:s3:::$ARTIFACTS_BUCKET/predictions/*"]},
+ {"Sid":"s3put","Effect":"Allow","Action":"s3:PutObject","Resource":"arn:aws:s3:::$ARTIFACTS_BUCKET/requests/*"},
+ {"Sid":"s3list","Effect":"Allow","Action":"s3:ListBucket","Resource":"arn:aws:s3:::$ARTIFACTS_BUCKET","Condition":{"StringLike":{"s3:prefix":["submissions/*","cache/*","requests/*","predictions/*"]}}}
 ]}
 JSON
 aws --profile "$PROFILE" iam put-role-policy --role-name "$ROLE" \
@@ -50,7 +58,7 @@ rm -f /tmp/casp-web.zip
 ( cd "$(dirname casp_web.py)" && zip -q /tmp/casp-web.zip casp_web.py )
 
 echo "== 3/5 Lambda =="
-ENV="Variables={WEB_TOKEN=$WEB_TOKEN,ARTIFACTS_BUCKET=janelia-das-casp-artifacts-prod,ACCOUNT=$ACCOUNT,REGION=$REGION,STAGE=prod}"
+ENV="Variables={WEB_TOKEN=$WEB_TOKEN,ARTIFACTS_BUCKET=$ARTIFACTS_BUCKET,ACCOUNT=$ACCOUNT,REGION=$REGION,STAGE=$STAGE}"
 if $AWS lambda get-function --function-name "$FN" >/dev/null 2>&1; then
   $AWS lambda update-function-code --function-name "$FN" --zip-file fileb:///tmp/casp-web.zip >/dev/null
   sleep 3

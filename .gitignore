@@ -10,3 +10,5 @@ cryo_tmp/
 .infer_api
 graphify-out/
 .claude/settings.local.json
+.anthropic_key
+.claude_proxy

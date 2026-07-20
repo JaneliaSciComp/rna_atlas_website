@@ -24,13 +24,15 @@ deploy_shell() {
     [ -f "web/$f" ] && aws --profile $P s3 cp "web/$f" "$B/${pfx}$f" --only-show-errors && echo "  ${pfx}$f"
   done
   # config.js is generated per-target (web/config.js is the local-dev one and is never uploaded).
-  # Shared Claude key (optional) comes from the gitignored .claude_key file so it's never committed.
+  # The assistant's Anthropic key is NEVER shipped to the client — the browser calls the
+  # claude-proxy Lambda (window.CLAUDE_PROXY, from gitignored .claude_proxy) which holds the key
+  # server-side. (The old window.CLAUDE_KEY shared-client-key path was removed after it leaked.)
   CFG=$(printf 'window.DATA_BASE = "%s";\nwindow.GATED = true;\n' "$db")
-  [ -f .claude_key ] && CFG="$CFG"$'\n'"window.CLAUDE_KEY = \"$(tr -d '\n' < .claude_key)\";"
+  [ -f .claude_proxy ] && CFG="$CFG"$'\n'"window.CLAUDE_PROXY = \"$(tr -d '\n' < .claude_proxy)\";"
   [ -f .infer_api ] && CFG="$CFG"$'\n'"window.INFER_API = \"$(tr -d '\n' < .infer_api)\";"
   printf '%s\n' "$CFG" \
     | aws --profile $P s3 cp - "$B/${pfx}config.js" --content-type application/javascript --only-show-errors \
-    && echo "  ${pfx}config.js  (DATA_BASE=\"$db\"$([ -f .claude_key ] && echo ' +CLAUDE_KEY')$([ -f .infer_api ] && echo ' +INFER_API'))"
+    && echo "  ${pfx}config.js  (DATA_BASE=\"$db\"$([ -f .claude_proxy ] && echo ' +CLAUDE_PROXY')$([ -f .infer_api ] && echo ' +INFER_API'))"
   for lf in web/lib/*.js; do bn=$(basename "$lf"); aws --profile $P s3 cp "$lf" "$B/${pfx}lib/$bn" --only-show-errors && echo "  ${pfx}lib/$bn"; done
   # /inference subpage
   for f in web/inference/*; do [ -f "$f" ] && aws --profile $P s3 cp "$f" "$B/${pfx}inference/$(basename "$f")" --only-show-errors && echo "  ${pfx}inference/$(basename "$f")"; done
@@ -94,11 +96,11 @@ case "${1:-prod}" in
       aws --profile $P s3 cp "$B/dev/$f" "$B/$f" --only-show-errors && echo "  $f"
     done
     CFG=$(printf 'window.DATA_BASE = "";\nwindow.GATED = true;\n')
-    [ -f .claude_key ] && CFG="$CFG"$'\n'"window.CLAUDE_KEY = \"$(tr -d '\n' < .claude_key)\";"
+    [ -f .claude_proxy ] && CFG="$CFG"$'\n'"window.CLAUDE_PROXY = \"$(tr -d '\n' < .claude_proxy)\";"
     [ -f .infer_api ] && CFG="$CFG"$'\n'"window.INFER_API = \"$(tr -d '\n' < .infer_api)\";"
     printf '%s\n' "$CFG" \
       | aws --profile $P s3 cp - "$B/config.js" --content-type application/javascript --only-show-errors \
-      && echo "  config.js  (prod$([ -f .claude_key ] && echo ' +CLAUDE_KEY')$([ -f .infer_api ] && echo ' +INFER_API'))"
+      && echo "  config.js  (prod$([ -f .claude_proxy ] && echo ' +CLAUDE_PROXY')$([ -f .infer_api ] && echo ' +INFER_API'))"
     echo "invalidating /* ..."; invalidate "/*"
     echo "done — promoted to https://rna-atlas.org/"
     ;;

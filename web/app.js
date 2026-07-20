@@ -81,8 +81,60 @@ function applyState(s) {
   if (s.collapsed) { const fs = document.querySelectorAll("#config fieldset"); s.collapsed.forEach((i) => fs[i] && fs[i].classList.add("collapsed")); }
   if (s.allcollapsed) $("config").classList.add("allcollapsed");
 }
-function saveState() { try { localStorage.setItem(FKEY, JSON.stringify(snapshot())); } catch (e) {} }
+function saveState() { try { localStorage.setItem(FKEY, JSON.stringify(snapshot())); } catch (e) {} updateShareUI(); }
 function loadState() { try { return JSON.parse(localStorage.getItem(FKEY) || "null"); } catch (e) { return null; } }
+
+// --- shareable view-state links (Neuroglancer-style): the full view state is JSON-encoded into
+// the URL hash fragment. The fragment is never sent in an HTTP request, so this needs zero backend
+// support on this static site, and there's no server-side URL-length limit to worry about.
+const HKEY = "state";
+let PENDING_STATE = null;   // a decoded #state=/localStorage snapshot waiting to be applied by the first loadSources()
+function fullSnapshot() {
+  // snapshot() covers filters/sources/sort/collapsed; add the bits it doesn't track.
+  const s = snapshot();
+  s.view = viewMode;
+  if ($("map_color")) s.map_color = $("map_color").value;
+  s.mapT = mapT;
+  if (currentDeep && currentDeep.f) s.deep = currentDeep.f._uid;
+  return s;
+}
+function decodeHashState() {
+  const h = location.hash.slice(1);
+  if (!h.startsWith(HKEY + "=")) return null;
+  try { return JSON.parse(decodeURIComponent(h.slice(HKEY.length + 1))); } catch (e) { return null; }
+}
+function updateShareUI() {
+  try { history.replaceState(null, "", "#" + HKEY + "=" + encodeURIComponent(JSON.stringify(fullSnapshot()))); } catch (e) {}
+}
+let _shareTimer = null;
+// debounced variant for high-frequency changes (map drag/zoom) so we're not rewriting the address
+// bar on every mousemove — the eventual state is identical either way, just less thrashy.
+function scheduleShareUpdate() { clearTimeout(_shareTimer); _shareTimer = setTimeout(updateShareUI, 300); }
+
+function copyShareLink() {
+  clearTimeout(_shareTimer);
+  updateShareUI();   // flush any pending debounced change so the copied link is exactly current
+  const url = location.href;
+  const flash = () => {
+    const b = $("share-btn"); if (!b) return;
+    const prev = b.innerHTML;
+    b.innerHTML = "&#10003; Copied!"; b.classList.add("copied");
+    setTimeout(() => { b.innerHTML = prev; b.classList.remove("copied"); }, 1500);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(flash).catch(() => legacyCopy(url, flash));
+  } else {
+    legacyCopy(url, flash);
+  }
+}
+function legacyCopy(text, done) {
+  const ta = document.createElement("textarea");
+  ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  try { document.execCommand("copy"); } catch (e) {}
+  document.body.removeChild(ta);
+  if (done) done();
+}
 
 function showGate(msg) {
   const g = $("gate");
@@ -107,14 +159,40 @@ async function boot() {
   buildSourcePanel();
   wireSourceUI();
   wireStatic();
-  // initial source selection: persisted set, else just the first dataset (ribo2)
-  const st = loadState();
-  const saved = st && st.src;
+  // Pasting a link that only differs in the hash (same path) into an ALREADY-OPEN tab does not
+  // reload the page — the browser just fires hashchange. Without this listener that link would
+  // silently do nothing there, even though opening it in a fresh tab works fine.
+  window.addEventListener("hashchange", onHashChange);
+  // initial state: a shared #state= link (if present) wins over the locally-persisted one —
+  // opening someone else's link should show THEIR view, not silently fall back to your last session.
+  await enterState(decodeHashState() || loadState());
+}
+let _applyingHash = false;
+async function onHashChange() {
+  if (_applyingHash) return;                // our own updateShareUI() uses replaceState, which never
+  const s = decodeHashState();               // fires hashchange, so this only runs for genuine external
+  if (!s) return;                            // navigations (pasted link, edited address bar, etc.)
+  _applyingHash = true;
+  try { await enterState(s); } finally { _applyingHash = false; }
+}
+// Drives the app to a given snapshot: source/letter selection (re-fetching any newly-needed
+// dataset), all filters, and the parts snapshot()/applyState() don't cover (view mode, map
+// color-by + pan/zoom, the open deep-view fold). Shared by boot() and onHashChange() so a pasted
+// link is applied identically whether it's the first load or a live navigation.
+async function enterState(initial) {
+  PENDING_STATE = initial;
+  const saved = initial && initial.src;
   document.querySelectorAll(".src").forEach((c) => {
     c.checked = (saved && saved.length) ? saved.includes(c.value) : (c.value === DATASETS[0].id);
   });
   toggleLetterVisibility(); updateSourceBtn();
   await loadSources();
+  if (initial && initial.map_color && $("map_color")) $("map_color").value = initial.map_color;
+  if (initial && initial.mapT) mapT = initial.mapT;
+  setView((initial && initial.view) || "table");
+  if (initial && initial.deep) await openDeep(initial.deep);
+  else if (currentDeep) closeDeep();
+  updateShareUI();   // normalize the address bar to whatever we actually ended up showing
 }
 
 function buildSourcePanel() {
@@ -181,7 +259,7 @@ async function loadSources() {
   const active = activeSources();
   const comps = active.flatMap(companionsOf);                 // companions of active sources
   // A companion loads once any of its declared letters is enabled (persisted lf, or current DOM).
-  const st = loadState() || {};
+  const st = PENDING_STATE || loadState() || {};
   const onLetters = new Set([...(Array.isArray(st.lf) ? st.lf : []), ...checkedLetters()]);
   const compLoad = comps.filter((c) => (c.letters || []).some((l) => onLetters.has(l))).map((c) => c.id);
   const toLoad = [...active, ...compLoad];
@@ -213,11 +291,14 @@ async function loadSources() {
   buildMotifFilter();
   buildLetterFilter();
   wireDynamic();
-  applyState(loadState());
+  applyState(PENDING_STATE || loadState());
   buildSublibFilter();   // after applyState so it scopes to the restored letter + SUBLIB_OFF state
   toggleLetterVisibility();
   syncLabels();
   render();
+  // Only the very first load (boot, possibly from a shared link) replays a pending snapshot;
+  // later reloads (user toggling a source checkbox) should reflect live state, not repeat it.
+  PENDING_STATE = null;
 }
 
 function buildMotifFilter() {
@@ -320,6 +401,7 @@ function wireStatic() {
     b.addEventListener("click", () => setDeepMode(b.dataset.mode)));
   document.querySelectorAll('#viewctl button[data-view]').forEach((b) =>
     b.addEventListener("click", () => setView(b.dataset.view)));
+  if ($("share-btn")) $("share-btn").addEventListener("click", copyShareLink);
   if ($("help-btn")) $("help-btn").addEventListener("click", () => $("help").classList.remove("hidden"));
   if ($("help-close")) $("help-close").addEventListener("click", () => $("help").classList.add("hidden"));
   $("help").addEventListener("click", (e) => { if (e.target.id === "help") $("help").classList.add("hidden"); });
@@ -513,6 +595,8 @@ function closeDeep() {
   $("deep").classList.add("hidden");
   updateLayout();
   if (viewer) { try { viewer.resize(); } catch (e) {} }
+  currentDeep = null;
+  saveState();
 }
 
 async function openDeep(key) {
@@ -529,6 +613,7 @@ async function openDeep(key) {
     try { react = await (await fetch(durl(prefix(ds) + "react/" + (f.key || id) + ".json"), { cache: "no-cache" })).json(); } catch (e) { react = null; }
   }
   currentDeep = { f, react };
+  saveState();
   drawTracks(f, react);
   drawReactChart(f, react);
   load3D(f, react);
@@ -960,6 +1045,7 @@ function setView(mode) {
   document.querySelectorAll('#viewctl button[data-view]').forEach((b) => b.classList.toggle("active", b.dataset.view === viewMode));
   if (viewMode === "map") setupMap();
   render();
+  saveState();
 }
 function grad4(t) {
   const s = [[33, 102, 172], [14, 154, 166], [237, 174, 73], [211, 74, 69]];
@@ -1023,13 +1109,13 @@ function setupMap() {
   const cv = $("map");
   cv.addEventListener("wheel", (e) => { e.preventDefault(); const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top, f = e.deltaY < 0 ? 1.15 : 1 / 1.15;
     const nk = Math.max(0.75, Math.min(40, mapT.k * f)), af = nk / mapT.k;   // clamp zoom-out (fit ~panel) and zoom-in
-    mapT.x = mx - (mx - mapT.x) * af; mapT.y = my - (my - mapT.y) * af; mapT.k = nk; renderMap(lastRows); }, { passive: false });
-  cv.addEventListener("dblclick", () => { mapT = { k: 1, x: 0, y: 0 }; renderMap(lastRows); });   // double-click resets to fit
+    mapT.x = mx - (mx - mapT.x) * af; mapT.y = my - (my - mapT.y) * af; mapT.k = nk; renderMap(lastRows); scheduleShareUpdate(); }, { passive: false });
+  cv.addEventListener("dblclick", () => { mapT = { k: 1, x: 0, y: 0 }; renderMap(lastRows); scheduleShareUpdate(); });   // double-click resets to fit
   cv.addEventListener("mousedown", (e) => { mapDrag = { x: e.clientX, y: e.clientY, ox: mapT.x, oy: mapT.y, moved: false }; });
   window.addEventListener("mousemove", (e) => {
     const cv2 = $("map"), r = cv2.getBoundingClientRect();
     if (mapDrag) { mapDrag.moved = mapDrag.moved || Math.abs(e.clientX - mapDrag.x) + Math.abs(e.clientY - mapDrag.y) > 3;
-      mapT.x = mapDrag.ox + (e.clientX - mapDrag.x); mapT.y = mapDrag.oy + (e.clientY - mapDrag.y); renderMap(lastRows); return; }
+      mapT.x = mapDrag.ox + (e.clientX - mapDrag.x); mapT.y = mapDrag.oy + (e.clientY - mapDrag.y); renderMap(lastRows); scheduleShareUpdate(); return; }
     if (viewMode !== "map") return;
     const tip = $("maptip");
     if (e.target !== cv2) { tip.classList.add("hidden"); return; }
@@ -1037,8 +1123,12 @@ function setupMap() {
     if (p) { tip.classList.remove("hidden"); tip.style.left = (e.clientX - r.left + 14) + "px"; tip.style.top = (e.clientY - r.top + 14) + "px";
       tip.innerHTML = `<b>${esc(p.f.id)}</b>${p.f.name ? "<br>" + esc(p.f.name) : ""}`; } else tip.classList.add("hidden");
   });
-  window.addEventListener("mouseup", (e) => { if (mapDrag && !mapDrag.moved && e.target === $("map")) { const r = $("map").getBoundingClientRect(); const p = mapPick(e.clientX - r.left, e.clientY - r.top, 9); if (p) openDeep(p.f._uid); } mapDrag = null; });
-  $("map_color").addEventListener("change", () => renderMap(lastRows));
+  window.addEventListener("mouseup", (e) => {
+    if (mapDrag && !mapDrag.moved && e.target === $("map")) { const r = $("map").getBoundingClientRect(); const p = mapPick(e.clientX - r.left, e.clientY - r.top, 9); if (p) openDeep(p.f._uid); }
+    if (mapDrag && mapDrag.moved) updateShareUI();   // flush the debounced pan/zoom update right when the drag ends
+    mapDrag = null;
+  });
+  $("map_color").addEventListener("change", () => { renderMap(lastRows); saveState(); });
 }
 
 // ---------------- AtlasAPI: programmatic surface the assistant drives ----------------
@@ -1076,10 +1166,13 @@ function fieldStats(field, over) {
 }
 window.AtlasAPI = {
   setView,
-  setColorBy: (f) => { if ($("map_color")) { $("map_color").value = f; if (viewMode === "map") renderMap(lastRows); } },
+  setColorBy: (f) => { if ($("map_color")) { $("map_color").value = f; if (viewMode === "map") renderMap(lastRows); saveState(); } },
   applyFilters,
   resetFilters: () => { $("reset").click(); return lastRows.length; },
   selectFold: (id) => { const f = foldById(id); if (!f) return false; openDeep(f._uid); return true; },
+  // Current address bar already IS the shareable link (kept live via updateShareUI()); this just
+  // hands it back as a value so the assistant can quote it in a reply.
+  getShareLink: () => { updateShareUI(); return location.href; },
   getResults: (limit, fields) => {
     const def = ["id", "name", "letter", "length", "plddt", "best_tm1", "near", "rna_type", "rfam_id", "rfam_name",
       "fold_size", "global_fold_id", "seq_cluster_size", "contact_ratio", "bp_fraction", "pseudoknot", "n_tert", "n_rare",

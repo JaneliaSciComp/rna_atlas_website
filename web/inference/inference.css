@@ -5,9 +5,25 @@
 #ipanel { width: 340px; overflow-y: auto; padding: 14px 16px; background: #fff; border-right: 1px solid #dde3e8; }
 #ipanel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: #5b6670; margin: 2px 0 12px; }
 .ilbl { display: block; font-size: 12px; color: #5b6670; margin: 10px 0 3px; font-weight: 600; }
-#seq { width: 100%; resize: vertical; font: 12px ui-monospace, Menlo, monospace; border: 1px solid #cdd6dd; border-radius: 6px; padding: 8px; letter-spacing: .5px; }
+#seq, .ent-seq { width: 100%; resize: vertical; font: 12px ui-monospace, Menlo, monospace; border: 1px solid #cdd6dd; border-radius: 6px; padding: 8px; letter-spacing: .5px; }
 #jobname { width: 100%; border: 1px solid #cdd6dd; border-radius: 6px; padding: 6px 8px; font: 13px sans-serif; }
 .seqinfo { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #8a96a0; margin-top: 3px; }
+.lbl-sub { font-weight: 400; text-transform: none; letter-spacing: 0; color: #99a3ab; }
+
+/* AF3-style multi-entity input (RNA / protein / DNA / ligand + copy counts) */
+#entities { display: flex; flex-direction: column; gap: 8px; }
+.entity { border: 1px solid #dde3e8; border-radius: 8px; padding: 8px; background: #fafcfe; }
+.entity.invalid { border-color: #e0b3a2; background: #fdf3ef; }
+.ent-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.ent-type { flex: 1 1 auto; padding: 4px 6px; border: 1px solid #cdd6dd; border-radius: 5px; font-size: 12px; background: #fff; }
+.ent-count { width: 46px; padding: 4px; border: 1px solid #cdd6dd; border-radius: 5px; font-size: 12px; text-align: center; }
+.ent-head button { border: 1px solid #d3dae0; background: #f6f8fa; color: #5b6670; border-radius: 4px; font-size: 11px; line-height: 1.4; padding: 1px 6px; cursor: pointer; }
+.ent-head button:disabled { opacity: .35; cursor: default; }
+.ent-head .ent-del:hover:enabled { background: #c1440e; color: #fff; border-color: #c1440e; }
+.ent-info { display: flex; align-items: center; gap: 8px; font-size: 10px; color: #8a96a0; margin-top: 3px; }
+.ent-caveat { color: #b9770e; }
+.ent-len { margin-left: auto; }
+.ent-actions { margin-top: 6px; }
 .linkbtn { background: none; border: 0; color: #2e6f95; cursor: pointer; font-size: 11px; }
 .linkbtn:hover { text-decoration: underline; }
 #predict-btn { width: 100%; margin-top: 12px; padding: 9px; background: #2e6f95; color: #fff; border: 0; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px; }

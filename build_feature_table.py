@@ -13,6 +13,7 @@ Run in the `base` (or any) python env -- only needs csv/json.
 """
 import argparse
 import csv
+import hashlib
 import json
 import os
 import re
@@ -37,6 +38,12 @@ except Exception:
     CROSSED_TSV = ""
 
 PAIR_CHARS = set("()[]{}<>") | set(string.ascii_letters)
+
+
+def key_of(sid):
+    """Sanitized filename id (matches build_dataset.py / build_iq_curated.py / build_openknot_long.py)."""
+    k = re.sub(r"[^A-Za-z0-9_-]+", "_", sid).strip("_")[:70]
+    return f"{k}_{hashlib.md5(sid.encode()).hexdigest()[:6]}"
 
 
 def struct_path(sid):
@@ -87,31 +94,36 @@ def load_contact_ratios(sel):
 
 def load_manifest(sel):
     """From the annotation manifest: base-paired fraction + the fold-rep dbn (via global_fold_id),
-    and fold-level novelty (best_tm1_v341 / best_v341) for every fold."""
+    fold-level novelty (best_tm1_v341 / best_v341), and each fold's own is_fold_rep flag
+    (struct_rep -- whether this seq_id is itself the representative structure for its fold)."""
     if not ANNOT or not os.path.exists(ANNOT):
         print("  manifest annotations skipped (no annotation_manifest)")
-        return {}, {}, {}, {}
+        return {}, {}, {}, {}, {}
     import pyarrow.parquet as pq
     t = pq.read_table(ANNOT, columns=["seq_id", "global_fold_id", "is_fold_rep", "dbn",
                                        "best_tm1_v341", "best_v341"]).to_pydict()
-    rep_dbn, mem_gf = {}, {}
+    rep_dbn, mem_gf, rep_flag = {}, {}, {}
     tm, near = {}, {}
     for i, sid in enumerate(t["seq_id"]):
         gf, isrep, dbn = t["global_fold_id"][i], t["is_fold_rep"][i], t["dbn"][i]
-        if str(isrep) in ("1", "True", "true") and dbn:
+        is_rep = str(isrep) in ("1", "True", "true")
+        if is_rep and dbn:
             rep_dbn[gf] = dbn
         mem_gf[sid] = gf
+        rep_flag[sid] = 1 if is_rep else 0
         v = fl(t["best_tm1_v341"][i]); nr = t["best_v341"][i] or ""
         # TM1 == 0 with no nearest chain = USalign couldn't align (too short), not "novel" — leave unscored
         if v is not None and v > 0 and nr:
             tm[sid], near[sid] = v, nr
-    bp, dbns = {}, {}
+    bp, dbns, structrep = {}, {}, {}
     for sid in sel:
         dbn = rep_dbn.get(mem_gf.get(sid))
         if dbn:
             bp[sid] = round(sum(c in PAIR_CHARS for c in dbn) / len(dbn), 4)
             dbns[sid] = dbn
-    return bp, tm, near, dbns
+        if sid in rep_flag:
+            structrep[sid] = rep_flag[sid]
+    return bp, tm, near, dbns, structrep
 
 
 def load_pdb_titles(near_ids):
@@ -337,7 +349,7 @@ def main():
     # structuredness metrics + manifest novelty (best_tm1 for all folds)
     contact = load_contact_ratios(sel)
     crossed = load_crossed(CROSSED_TSV)
-    bpfrac, tm_manifest, near_manifest, dbns = load_manifest(sel)
+    bpfrac, tm_manifest, near_manifest, dbns, structrep = load_manifest(sel)
     for sid in sel:
         if sid not in novelty and sid in tm_manifest:
             novelty[sid] = {"best_tm1": tm_manifest[sid], "near": near_manifest.get(sid, "")}
@@ -359,6 +371,7 @@ def main():
         length = md.get("length") or len(s.get("design_sequence", ""))
         rec = {
             "id": sid,
+            "key": key_of(sid),
             "name": names.get(sid) or human_name(s.get("sublibrary", ""), src_ids.get(sid, "")),
             "letter": s.get("letter", md.get("letter", "")),
             "source": md.get("source", ""),
@@ -389,6 +402,7 @@ def main():
             "near_title": titles.get((nv.get("near", "") or "").split("_")[0].upper(), ""),
             "score": fl(sh.get("score")),
             "in_shortlist": 1 if sid in short else 0,
+            "struct_rep": structrep.get(sid, 0),
         }
         folds.append(rec)
 

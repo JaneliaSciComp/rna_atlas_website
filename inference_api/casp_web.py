@@ -2,7 +2,8 @@
 prediction pipeline (us-east-2). Exposes a clean JSON API the front-end already speaks:
 
   GET  /models                      -> {models:[{id,label}]}
-  POST /predict  {sequence,model,options,token}
+  POST /predict  {entities:[{type,sequence|ligand,count}], model, options, token}
+                 (legacy: {sequence,...} single RNA is still accepted)
                                      -> {job_id, target_id, model, status}
   GET  /status?job=<job_id>&t=<tok> -> {state, stages:{msa:{status,cif?}}}
   GET  /msa?job=<job_id>&t=<tok>    -> {files:[{name,content}]}   (alignment files)
@@ -46,6 +47,80 @@ MODELS = [
     {"id": "daslab-v0", "label": "daslab v0"},
 ]
 MODEL_IDS = {m["id"] for m in MODELS}
+
+# ---- multi-entity (AF3-style) input: RNA / protein / DNA / ligand, each with a copy count ----
+MAX_ENTITIES = 16
+MAX_COUNT = 8
+MIN_POLY = 5
+MAX_TOTAL_RESIDUES = 5000
+_ALPHA = {"rna": set("ACGUN"), "dna": set("ACGTN"),
+          "protein": set("ACDEFGHIKLMNPQRSTVWYX")}
+# Protenix/AF3 sequences[] key per polymer type.
+# MUST-VERIFY against the pinned Protenix schema before the atlas bridge goes live: the protein key
+# may be "proteinChain" (ByteDance Protenix) rather than "proteinSequence"; likewise the ligand inner
+# key and CCD_ prefix convention. RNA is confirmed ("rnaSequence").
+_PTX_KEY = {"rna": "rnaSequence", "dna": "dnaSequence", "protein": "proteinChain"}
+_CCD_RE = re.compile(r"^[A-Za-z0-9]{1,5}$")
+_SMILES_RE = re.compile(r"^[A-Za-z0-9@+\-\[\]()=#$%.\\/:*]+$")
+_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+
+
+def _clean_poly(kind, s):
+    s = "".join(str(s or "").split()).upper()
+    if kind == "rna":
+        s = s.replace("T", "U")
+    elif kind == "dna":
+        s = s.replace("U", "T")
+    elif kind == "protein":
+        s = "".join(c if c in _ALPHA["protein"] else "X" for c in s)  # coerce unknown residues -> X
+    return s
+
+
+def _parse_entities(body):
+    """Return (entities, error). entities = [{type, seq|value, count}] in submission order.
+    Backward compatible: with no `entities`, fall back to the legacy single-RNA `sequence` field."""
+    raw = body.get("entities")
+    if not isinstance(raw, list) or not raw:
+        seq = "".join(c for c in (body.get("sequence") or "").upper().replace("T", "U") if c in "ACGUN")
+        if len(seq) < MIN_POLY:
+            return None, "sequence must be >= 5 nt (A/C/G/U/N)"
+        return [{"type": "rna", "seq": seq, "count": 1}], None
+    if len(raw) > MAX_ENTITIES:
+        return None, f"too many entities (max {MAX_ENTITIES})"
+    out, has_poly = [], False
+    for i, e in enumerate(raw, 1):
+        t = str((e or {}).get("type") or "rna").lower()
+        if t not in ("rna", "dna", "protein", "ligand"):
+            return None, f"entity {i}: unknown type '{t}'"
+        try:
+            count = int((e or {}).get("count") or 1)
+        except (TypeError, ValueError):
+            count = 1
+        count = max(1, min(MAX_COUNT, count))
+        val = (e or {}).get("sequence")
+        if val is None:
+            val = (e or {}).get("ligand")
+        if t == "ligand":
+            v = str(val or "").strip()
+            if not v or not (_CCD_RE.match(v) or _SMILES_RE.match(v)):
+                return None, f"entity {i} (ligand): not a valid CCD code or SMILES"
+            out.append({"type": t, "value": v, "is_ccd": bool(_CCD_RE.match(v)), "count": count})
+            continue
+        s = _clean_poly(t, val)
+        if len(s) < MIN_POLY:
+            return None, f"entity {i} ({t}) must be >= {MIN_POLY} residues"
+        if set(s) - _ALPHA[t]:
+            return None, f"entity {i} ({t}) has invalid characters"
+        has_poly = True
+        out.append({"type": t, "seq": s, "count": count})
+    if not has_poly:
+        return None, "need at least one polymer entity (rna/dna/protein)"
+    total = sum(len(e["seq"]) * e["count"] for e in out if e["type"] != "ligand")
+    if total > MAX_TOTAL_RESIDUES:
+        return None, f"total {total} residues exceeds the {MAX_TOTAL_RESIDUES} limit"
+    return out, None
+
+
 _STATE = {"RUNNING": "running", "SUCCEEDED": "done", "FAILED": "error",
           "ABORTED": "error", "TIMED_OUT": "error"}
 _CORS = {"Access-Control-Allow-Origin": "*",
@@ -132,10 +207,9 @@ def _handler_env(model):
 
 
 def _predict(body):
-    seq = (body.get("sequence") or "").upper().replace("T", "U")
-    seq = "".join(c for c in seq if c in "ACGUN")
-    if len(seq) < 5:
-        return _resp(400, {"error": "sequence must be >= 5 nt (A/C/G/U/N)"})
+    entities, err = _parse_entities(body)
+    if err:
+        return _resp(400, {"error": err})
     model = body.get("model") or "daslab-ptnx1"
     if model not in MODEL_IDS:
         model = "daslab-ptnx1"
@@ -143,8 +217,10 @@ def _predict(body):
     if mode not in ("protenix-mt", "rmsa", "both", "none"):
         mode = "protenix-mt"
     tag = "nomsa" if mode == "none" else "msa"
-    # target key separates alignment modes for the same sequence+model
-    target_id = "web" + hashlib.sha256((model + "|" + mode + "|" + seq).encode()).hexdigest()[:12]
+    # target key covers the full ORDERED entity list (type|seq-or-ligand|count) + model + mode, so
+    # distinct complexes never collide (e.g. a homodimer count:2 vs the monomer of the same chain).
+    parts = [f"{e['type']}:{e.get('seq', e.get('value', ''))}:{e['count']}" for e in entities]
+    target_id = "web" + hashlib.sha256((model + "|" + mode + "|" + "|".join(parts)).encode()).hexdigest()[:12]
 
     # cache: a finalized structure already exists
     if _latest_pdb(target_id, model):
@@ -159,7 +235,8 @@ def _predict(body):
         sc = json.loads(env.get("SERVER_CONFIG_JSON", "{}"))
     except Exception as e:
         return _resp(502, {"error": f"config read failed: {e}"})
-    total = len(seq)
+    total = sum(len(e["seq"]) * e["count"] for e in entities if e["type"] != "ligand")
+    has_rna = any(e["type"] == "rna" for e in entities)
     thr = int(sc.get("large_residue_threshold", 2000))
     tbm = int(sc.get("tbm_fallback_nt", 1000))
     if thr < total <= tbm:
@@ -167,17 +244,51 @@ def _predict(body):
     eff = mode
     if eff != "none" and total > tbm and eff in ("rmsa", "both"):
         eff = "protenix-mt"
-    fasta = f">{target_id}\n{seq}\n"
+    if eff in ("rmsa", "both") and not has_rna:
+        eff = "protenix-mt"   # rMSA is RNA-specific — no RNA chain means nothing for it to align
+
+    # Protenix/AF3 input: one sequences[] entry per entity (count expands to physical chains).
+    # Ligand encoding matches the pipeline exactly: a CCD code -> {"ccdCodes": ["MG"]}; a SMILES
+    # string -> {"ligand": "<smiles>"} (see handler.py extra_sequences + the rna-ligand fixture).
+    sequences, smiles_ligand = [], ""
+    for e in entities:
+        if e["type"] == "ligand":
+            if e.get("is_ccd"):
+                sequences.append({"ligand": {"ccdCodes": [e["value"].upper()], "count": e["count"]}})
+            else:
+                sequences.append({"ligand": {"ligand": e["value"], "count": e["count"]}})
+                if not smiles_ligand:
+                    smiles_ligand = e["value"]
+        else:
+            sequences.append({_PTX_KEY[e["type"]]: {"count": e["count"], "sequence": e["seq"]}})
+    protenix = json.dumps([{"name": target_id, "sequences": sequences}])
+    # multi-record FASTA: one record per PHYSICAL polymer chain (A, B, C, …); ligands carry no MSA.
+    recs, ci = [], 0
+    for e in entities:
+        for _ in range(e["count"]):
+            cid = _LETTERS[ci] if ci < len(_LETTERS) else f"z{ci}"
+            ci += 1
+            if e["type"] != "ligand":
+                recs.append(f">{target_id}_{cid}\n{e['seq']}\n")
+    fasta = "".join(recs)
     # Every task (MSA / rMSA Fargate containers AND the MSAStubBuild Lambda) reads
     # protenix_input.json from request_input_prefix — the handler stores it for all
-    # requests, so the bridge must too (RNA-only: no ligand.json needed).
+    # requests, so the bridge must too. Ligands are inline in sequences[] (verified against the
+    # rna-ligand fixture + handler.py).
     req_prefix = f"requests/{env['SERVER_KEY']}/web-{target_id}"
-    protenix = json.dumps([{"name": target_id,
-                            "sequences": [{"rnaSequence": {"count": 1, "sequence": seq}}]}])
     try:
         s3.put_object(Bucket=env.get("ARTIFACTS_BUCKET", ""),
                       Key=f"{req_prefix}/protenix_input.json",
                       Body=protenix.encode(), ContentType="application/json")
+        # A SMILES ligand also needs a companion ligand.json (the MSA container reads it to build
+        # the ligand template SDF). CCD-code ligands are self-contained and need none.
+        if smiles_ligand:
+            s3.put_object(Bucket=env.get("ARTIFACTS_BUCKET", ""),
+                          Key=f"{req_prefix}/ligand.json",
+                          Body=json.dumps({"ligand_id": "", "ligand_name": "",
+                                           "ligand_smiles": smiles_ligand, "ligand_task": "",
+                                           "fileloc": ""}).encode(),
+                          ContentType="application/json")
     except Exception as e:
         return _resp(502, {"error": f"input upload failed: {e}"})
     ename = f"{env['SERVER_KEY']}-{re.sub(r'[^a-zA-Z0-9-]', '-', target_id)}-{uuid.uuid4().hex[:8]}"

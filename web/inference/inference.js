@@ -16,6 +16,7 @@
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
   const EXAMPLE = "GGGAACGACUCGAGUAGAGUCGAAAAGAGUGCUCCGAGAUGCGGUGAGAUUCCGCACCUGUGGUCAAAGCCCACAAACCAGCGCAAGCUGGCCUGGCAGGUGAAAUUCCUGCGCAG";
+  const EXAMPLE_ENTITIES = [{ type: "rna", seq: EXAMPLE, count: 2 }];   // homodimer — showcases the copy-count field
   const STAGES_MSA = [["queued", "Queued"], ["msa", "MSA build"], ["refined", "Predict & refine"]];
   const STAGES_NOMSA = [["queued", "Queued"], ["nomsa", "Predicting"], ["refined", "Done"]];
   let curMsa = false;                          // whether the current job uses MSA (drives the timeline)
@@ -25,6 +26,17 @@
   let vmode = (() => { try { return localStorage.getItem("infer_viewer") || "molstar"; } catch (e) { return "molstar"; } })();
   let ssMode = (() => { try { return localStorage.getItem("infer_ss") || "forna"; } catch (e) { return "forna"; } })();
   let curSS = null;                            // derived secondary structure of the shown model (Feature 2)
+
+  // ---------- input entities (AF3-style: RNA / protein / DNA / ligand, each with a copy count) ----------
+  const ENT_TYPES = {
+    rna:     { label: "RNA",     unit: "nt", ph: "RNA sequence (A C G U). FASTA header optional.", msa: true },
+    protein: { label: "Protein", unit: "aa", ph: "Protein sequence (20 aa). FASTA header optional.", msa: false },
+    dna:     { label: "DNA",     unit: "bp", ph: "DNA sequence (A C G T). FASTA header optional.", msa: false },
+    ligand:  { label: "Ligand",  unit: "",   ph: "CCD code (e.g. ATP, MG) or SMILES string", msa: false },
+  };
+  const ENT_ALPHA = { rna: /[^ACGUN]/, dna: /[^ACGTN]/, protein: /[^ACDEFGHIKLMNPQRSTVWYX]/ };
+  const MAX_ENTITIES = 16, MAX_COUNT = 8, MIN_POLY = 5, MAX_RESIDUES = 5000;
+  let entities = [{ type: "rna", seq: "", count: 1 }];   // ordered list of input entities
 
   // ---------- models ----------
   const MODELS_FALLBACK = [
@@ -100,11 +112,93 @@
     $("gate-go").onclick = go; inp.onkeydown = (e) => { if (e.key === "Enter") go(); };
   }
 
-  // ---------- sequence ----------
-  function cleanSeq(raw) {
-    return raw.split("\n").filter((l) => !l.startsWith(">")).join("").replace(/\s/g, "").toUpperCase().replace(/T/g, "U");
+  // ---------- entities: clean / measure / render / validate ----------
+  function cleanEntity(type, raw) {
+    if (type === "ligand") return String(raw || "").trim();                 // SMILES is case-sensitive
+    let s = String(raw || "").split("\n").filter((l) => !l.startsWith(">")).join("").replace(/\s/g, "").toUpperCase();
+    if (type === "rna") s = s.replace(/T/g, "U");
+    if (type === "dna") s = s.replace(/U/g, "T");
+    return s;
   }
-  function seqLen() { const s = cleanSeq($("seq").value); $("seqlen").textContent = s.length + " nt"; return s; }
+  function polyLen(e) { return e.type === "ligand" ? 0 : cleanEntity(e.type, e.seq).length; }
+  function totalResidues() { return entities.reduce((t, e) => t + polyLen(e) * (e.count || 1), 0); }
+  function clampCount(v) { let n = parseInt(v, 10); if (!isFinite(n) || n < 1) n = 1; if (n > MAX_COUNT) n = MAX_COUNT; return n; }
+  function entSummary(list) {
+    return (list || []).map((e) => {
+      if (e.type === "ligand") return "ligand(" + (cleanEntity("ligand", e.seq) || "?") + ")";
+      const lbl = (ENT_TYPES[e.type] || {}).label || e.type;
+      return ((e.count || 1) > 1 ? (e.count + "×") : "") + lbl;
+    }).join(" + ");
+  }
+  function updateTotals() { $("seqlen").textContent = totalResidues() + " residues"; }
+  function updateEntLen(i) {
+    const el = $("entities") && $("entities").querySelector('.ent-len[data-i="' + i + '"]'); if (!el) return;
+    const e = entities[i], t = ENT_TYPES[e.type] || ENT_TYPES.rna;
+    el.textContent = e.type === "ligand" ? (cleanEntity("ligand", e.seq) ? "ligand" : "") : (cleanEntity(e.type, e.seq).length + " " + t.unit);
+  }
+  function renderEntities() {
+    const wrap = $("entities"); if (!wrap) return;
+    wrap.innerHTML = entities.map((e, i) => {
+      const t = ENT_TYPES[e.type] || ENT_TYPES.rna;
+      const opts = Object.keys(ENT_TYPES).map((k) => `<option value="${k}"${k === e.type ? " selected" : ""}>${ENT_TYPES[k].label}</option>`).join("");
+      const caveat = (e.type === "protein" || e.type === "dna") ? `<span class="ent-caveat">single-sequence — no MSA yet</span>` : "";
+      const del = entities.length > 1 ? `<button class="ent-del" data-i="${i}" type="button" title="remove entity">&times;</button>` : "";
+      return `<div class="entity" data-i="${i}">`
+        + `<div class="ent-head">`
+        + `<select class="ent-type" data-i="${i}">${opts}</select>`
+        + `<input class="ent-count" data-i="${i}" type="number" min="1" max="${MAX_COUNT}" step="1" value="${e.count || 1}" title="copies">`
+        + `<button class="ent-up" data-i="${i}" type="button" title="move up"${i === 0 ? " disabled" : ""}>&#9650;</button>`
+        + `<button class="ent-down" data-i="${i}" type="button" title="move down"${i === entities.length - 1 ? " disabled" : ""}>&#9660;</button>`
+        + del
+        + `</div>`
+        + `<textarea class="ent-seq" data-i="${i}" rows="${e.type === "ligand" ? 2 : 4}" placeholder="${esc(t.ph)}">${esc(e.seq)}</textarea>`
+        + `<div class="ent-info">${caveat}<span class="ent-len" data-i="${i}"></span></div>`
+        + `</div>`;
+    }).join("");
+    wrap.querySelectorAll(".ent-type").forEach((s) => (s.onchange = () => { entities[+s.dataset.i].type = s.value; renderEntities(); }));
+    wrap.querySelectorAll(".ent-count").forEach((inp) => (inp.oninput = () => { entities[+inp.dataset.i].count = clampCount(inp.value); updateTotals(); }));
+    wrap.querySelectorAll(".ent-seq").forEach((ta) => (ta.oninput = () => { const i = +ta.dataset.i; entities[i].seq = ta.value; updateEntLen(i); updateTotals(); }));
+    wrap.querySelectorAll(".ent-del").forEach((b) => (b.onclick = () => removeEntity(+b.dataset.i)));
+    wrap.querySelectorAll(".ent-up").forEach((b) => (b.onclick = () => moveEntity(+b.dataset.i, -1)));
+    wrap.querySelectorAll(".ent-down").forEach((b) => (b.onclick = () => moveEntity(+b.dataset.i, 1)));
+    entities.forEach((_, i) => updateEntLen(i));
+    updateTotals();
+  }
+  function addEntity(type) { if (entities.length >= MAX_ENTITIES) return; entities.push({ type: type || "rna", seq: "", count: 1 }); renderEntities(); }
+  function removeEntity(i) { if (entities.length > 1) { entities.splice(i, 1); renderEntities(); } }
+  function moveEntity(i, d) { const j = i + d; if (j < 0 || j >= entities.length) return; const t = entities[i]; entities[i] = entities[j]; entities[j] = t; renderEntities(); }
+  function loadExample() { entities = EXAMPLE_ENTITIES.map((e) => ({ ...e })); renderEntities(); }
+  function validateEntities() {
+    if (!entities.length) return { ok: false, msg: "Add at least one entity." };
+    let hasPoly = false;
+    for (let i = 0; i < entities.length; i++) {
+      const e = entities[i], n = i + 1, t = ENT_TYPES[e.type];
+      if (!t) return { ok: false, i, msg: `Entity ${n}: unknown type.` };
+      const s = cleanEntity(e.type, e.seq);
+      if (e.type === "ligand") {
+        if (!s) return { ok: false, i, msg: `Entity ${n} (ligand): enter a CCD code or SMILES.` };
+        const ccd = /^[A-Za-z0-9]{1,5}$/.test(s), smiles = /^[A-Za-z0-9@+\-\[\]()=#$%.\/\\:*]+$/.test(s);
+        if (!ccd && !smiles) return { ok: false, i, msg: `Entity ${n} (ligand): not a valid CCD code or SMILES.` };
+        continue;
+      }
+      hasPoly = true;
+      if (s.length < MIN_POLY) return { ok: false, i, msg: `Entity ${n} (${t.label}) must be ≥ ${MIN_POLY} ${t.unit}.` };
+      if (ENT_ALPHA[e.type].test(s)) return { ok: false, i, msg: `Entity ${n} (${t.label}) has invalid characters (allowed: ${e.type === "rna" ? "A C G U N" : e.type === "dna" ? "A C G T N" : "20 aa + X"}).` };
+    }
+    if (!hasPoly) return { ok: false, msg: "Add at least one polymer (RNA / protein / DNA) — a ligand alone can't be folded." };
+    if (totalResidues() > MAX_RESIDUES) return { ok: false, msg: `Total ${totalResidues()} residues exceeds the ${MAX_RESIDUES} limit for the web submitter.` };
+    return { ok: true };
+  }
+  function markInvalid(i) {
+    const rows = $("entities") ? $("entities").querySelectorAll(".entity") : [];
+    rows.forEach((r, k) => r.classList.toggle("invalid", k === i));
+  }
+  function isSingleChainJob() {
+    const jb = loadJobs().find((x) => x.id === curJobId);
+    if (!jb || !jb.entities) return true;                 // legacy / server-recovered jobs: keep old single-chain behavior
+    const poly = jb.entities.filter((e) => e.type !== "ligand");
+    return poly.length === 1 && (poly[0].count || 1) === 1;
+  }
 
   // ---------- stage timeline ----------
   function renderStages(state) {
@@ -270,6 +364,9 @@
   }
   function updateSS() {
     const blk = $("issblock"); if (!blk) return;
+    // the client SS derivation reads only the first chain, so hide it for multi-chain complexes
+    // (misleading otherwise); single-RNA and legacy/server jobs behave exactly as before.
+    if (!isSingleChainJob()) { blk.setAttribute("hidden", ""); if ($("ss-svg")) $("ss-svg").innerHTML = ""; return; }
     deriveCurrentSS();
     if (!curSS || !curSS.n) { blk.setAttribute("hidden", ""); if ($("ss-svg")) $("ss-svg").innerHTML = ""; return; }
     blk.removeAttribute("hidden"); renderSS();
@@ -417,9 +514,13 @@
     const meta = [
       "name: " + (jb.name || ""), "model: " + (jb.model || "default"), "alignment: " + (jb.mode || ""),
       "stage: " + (shown || ""), "job_id: " + (curJobId || ""),
-      "length: " + ((jb.seq || "").length || "") + " nt",
     ];
-    if (jb.seq) meta.push("sequence:\n" + jb.seq);
+    if (jb.entities && jb.entities.length) {
+      meta.push("entities: " + (jb.summary || ""));
+      jb.entities.forEach((e, i) => meta.push(`  [${i + 1}] ${e.type} x${e.count || 1}: ${e.sequence}`));
+    } else if (jb.seq) {
+      meta.push("length: " + jb.seq.length + " nt"); meta.push("sequence:\n" + jb.seq);
+    }
     const files = [
       { name: base + ".txt", data: _enc(meta.join("\n") + "\n") },
       { name: base + ".pdb", data: _enc(lastText) },
@@ -478,9 +579,13 @@
     const meta = [
       "name: " + (jb.name || ""), "model: " + (jb.model || "default"), "alignment: " + (jb.mode || ""),
       "job_id: " + curJobId, "pool_members: " + files.length + " of " + items.length,
-      "length: " + ((jb.seq || "").length || "") + " nt",
     ];
-    if (jb.seq) meta.push("sequence:\n" + jb.seq);
+    if (jb.entities && jb.entities.length) {
+      meta.push("entities: " + (jb.summary || ""));
+      jb.entities.forEach((e, i) => meta.push(`  [${i + 1}] ${e.type} x${e.count || 1}: ${e.sequence}`));
+    } else if (jb.seq) {
+      meta.push("length: " + jb.seq.length + " nt"); meta.push("sequence:\n" + jb.seq);
+    }
     files.unshift({ name: "README.txt", data: _enc(meta.join("\n") + "\n") });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(zipStore(files)); a.download = base + "_pool.zip";
@@ -540,9 +645,14 @@
   }
 
   async function predict() {
-    const seq = seqLen();
-    if (seq.length < 5) { $("predict-note").textContent = "Enter a sequence of at least 5 nt."; return; }
-    if (/[^ACGUN]/.test(seq)) { $("predict-note").textContent = "Sequence has non-RNA characters (allowed: A C G U N)."; return; }
+    const v = validateEntities();
+    if (!v.ok) { markInvalid(v.i == null ? -1 : v.i); $("predict-note").textContent = v.msg; return; }
+    markInvalid(-1);
+    const ents = entities.map((e) => ({ type: e.type, sequence: cleanEntity(e.type, e.seq), count: clampCount(e.count) }));
+    const summary = entSummary(entities);
+    // backward-compat: still send a single `sequence` (the first RNA) so an un-upgraded bridge works
+    const firstRna = ents.find((e) => e.type === "rna");
+    const legacySeq = firstRna ? firstRna.sequence : "";
     results = { nomsa: null, msa: null }; shown = null; $("ibadges").innerHTML = ""; $("predict-note").textContent = ""; updateSS();
     try { if (window.Notification && Notification.permission === "default") Notification.requestPermission(); } catch (e) {}
     const mode = $("msa_mode").value || "protenix-mt";
@@ -553,11 +663,11 @@
     if (!API) { return demo(model, jobName); }
     let jobId, j0;
     try {
-      const r = await fetch(`${API}/predict`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sequence: seq, name: jobName, model, options: opts, token: tok() }) });
+      const r = await fetch(`${API}/predict`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sequence: legacySeq, entities: ents, name: jobName, model, options: opts, token: tok() }) });
       if (!r.ok) throw new Error("HTTP " + r.status); j0 = await r.json(); jobId = j0.job_id;
     } catch (e) { setStatus("submit failed: " + e.message); $("predict-note").textContent = "Could not reach the inference backend."; return; }
-    upsertJob({ id: jobId, name: jobName || jobId.slice(0, 10), model, mode, seq, state: (j0.status || "submitted").toLowerCase(), ts: Date.now() });
-    if (String(j0.status).toUpperCase() === "CACHED") { $("predict-note").innerHTML = "<b>Cached</b> — this sequence + model was already predicted; showing the stored result."; }
+    upsertJob({ id: jobId, name: jobName || jobId.slice(0, 10), model, mode, seq: legacySeq, entities: ents, summary, state: (j0.status || "submitted").toLowerCase(), ts: Date.now() });
+    if (String(j0.status).toUpperCase() === "CACHED") { $("predict-note").innerHTML = "<b>Cached</b> — this input + model was already predicted; showing the stored result."; }
     setStatus("running — job " + jobId); poll(jobId);
   }
 
@@ -565,7 +675,7 @@
   function demo(model, jobName) {
     const id = "demo-" + Date.now().toString(36);
     curMsa = ($("msa_mode").value || "") !== "none";
-    upsertJob({ id, name: jobName || "demo", model: model || "default", mode: $("msa_mode").value, state: "running", ts: Date.now() });
+    upsertJob({ id, name: jobName || "demo", model: model || "default", mode: $("msa_mode").value, entities: entities.map((e) => ({ type: e.type, sequence: cleanEntity(e.type, e.seq), count: clampCount(e.count) })), summary: entSummary(entities), state: "running", ts: Date.now() });
     $("predict-note").innerHTML = "<b>Demo mode</b> — inference backend not connected yet. Showing the staged flow (incl. model choice, monitoring &amp; kill); real predictions appear once <code>INFER_API</code> is wired to the AWS pipeline.";
     renderStages({ queued: "done", nomsa: "running" });
     setStatus("running (demo)…");
@@ -609,8 +719,9 @@
     if (added) { saveJobs(local); renderJobs(); }
   }
   function init() {
-    $("seq").addEventListener("input", seqLen);
-    $("example-btn").addEventListener("click", () => { $("seq").value = EXAMPLE; seqLen(); });
+    renderEntities();
+    $("add-entity").addEventListener("click", () => addEntity("rna"));
+    $("example-btn").addEventListener("click", loadExample);
     $("predict-btn").addEventListener("click", predict);
     if (!API) $("predict-note").innerHTML = "Backend not connected yet — Predict runs a demo of the flow.";
     markViewerButtons();
@@ -619,7 +730,6 @@
     if ($("ss-dbn")) $("ss-dbn").addEventListener("click", exportDbn);
     if ($("ss-png")) $("ss-png").addEventListener("click", exportSSPng);
     loadModels(); renderJobs(); refreshJobs(); syncServerJobs(); renderModelPanel();
-    seqLen();
   }
   if (GATED && !tok()) showGate(); else (document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", init) : init());
 })();

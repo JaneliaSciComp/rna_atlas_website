@@ -1,0 +1,691 @@
+dataset,dataset_label,field,n_total,n_present,n_missing,pct_missing,category,note
+ribo2,Ribonanza-2 curated A-H (base),best_sample,7757,0,7757,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 7757 records)
+ribo2,Ribonanza-2 curated A-H (base),best_tm1,7757,7751,6,0.08,EXPLAINABLE_PARTIAL,"6 missing total (6 explainable, 0 suspicious)"
+ribo2,Ribonanza-2 curated A-H (base),bp_fraction,7757,7757,0,0.0,ALWAYS_PRESENT,
+ribo2,Ribonanza-2 curated A-H (base),clashscore,7757,7757,0,0.0,ALWAYS_PRESENT,
+ribo2,Ribonanza-2 curated A-H (base),contact_ratio,7757,7757,0,0.0,ALWAYS_PRESENT,
+ribo2,Ribonanza-2 curated A-H (base),crossed_frac,7757,7757,0,0.0,ALWAYS_PRESENT,
+ribo2,Ribonanza-2 curated A-H (base),description,7757,0,7757,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 7757 records)
+ribo2,Ribonanza-2 curated A-H (base),design_end,7757,0,7757,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 7757 records)
+ribo2,Ribonanza-2 curated A-H (base),design_start,7757,0,7757,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 7757 records)
+ribo2,Ribonanza-2 curated A-H (base),designer,7757,0,7757,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 7757 records)
+ribo2,Ribonanza-2 curated A-H (base),eterna_id,7757,0,7757,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 7757 records)
+ribo2,Ribonanza-2 curated A-H (base),ex,7757,7757,0,0.0,ALWAYS_PRESENT,
+ribo2,Ribonanza-2 curated A-H (base),ey,7757,7757,0,0.0,ALWAYS_PRESENT,
+ribo2,Ribonanza-2 curated A-H (base),fold_size,7757,7757,0,0.0,ALWAYS_PRESENT,
+ribo2,Ribonanza-2 curated A-H (base),global_fold_id,7757,7757,0,0.0,ALWAYS_PRESENT,
+ribo2,Ribonanza-2 curated A-H (base),global_seq_cluster_id,7757,7757,0,0.0,ALWAYS_PRESENT,
+ribo2,Ribonanza-2 curated A-H (base),gpde,7757,7757,0,0.0,ALWAYS_PRESENT,
+ribo2,Ribonanza-2 curated A-H (base),id,7757,7757,0,0.0,ALWAYS_PRESENT,
+ribo2,Ribonanza-2 curated A-H (base),in_shortlist,7757,7757,0,0.0,ALWAYS_PRESENT,
+ribo2,Ribonanza-2 curated A-H (base),iptm,7757,0,7757,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 7757 records)
+ribo2,Ribonanza-2 curated A-H (base),is_novel_v341,7757,7757,0,0.0,ALWAYS_PRESENT,
+ribo2,Ribonanza-2 curated A-H (base),key,7757,0,7757,100.0,SUSPICIOUS_DATASET_GAP,"`key` (the sanitized filename id used for structs/react/motifs) is present in every other dataset's schema, including the newer ribo2-iq-curated-v2, but is absent from all 7,757 ribo2 A-H records. Looks like the base A-H folds.json predates the `key` convention -- i.e. a stale build vs. the current build_dataset.py."
+ribo2,Ribonanza-2 curated A-H (base),length,7757,7757,0,0.0,ALWAYS_PRESENT,
+ribo2,Ribonanza-2 curated A-H (base),letter,7757,7757,0,0.0,ALWAYS_PRESENT,
+ribo2,Ribonanza-2 curated A-H (base),mean_prot_2a3,7757,3065,4692,60.49,EXPLAINABLE_PARTIAL,"4692 missing total (4692 explainable, 0 suspicious)"
+ribo2,Ribonanza-2 curated A-H (base),member_dbs,7757,1777,5980,77.09,SUSPICIOUS_PARTIAL,"5980 missing total (5009 explainable, 971 suspicious)"
+ribo2,Ribonanza-2 curated A-H (base),mohca_regime_frac,7757,7757,0,0.0,ALWAYS_PRESENT,
+ribo2,Ribonanza-2 curated A-H (base),motifs,7757,7757,0,0.0,ALWAYS_PRESENT,
+ribo2,Ribonanza-2 curated A-H (base),msa_depth,7757,0,7757,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 7757 records)
+ribo2,Ribonanza-2 curated A-H (base),n_crossed_pairs,7757,7757,0,0.0,ALWAYS_PRESENT,
+ribo2,Ribonanza-2 curated A-H (base),n_rare,7757,7757,0,0.0,ALWAYS_PRESENT,
+ribo2,Ribonanza-2 curated A-H (base),n_tert,7757,7757,0,0.0,ALWAYS_PRESENT,
+ribo2,Ribonanza-2 curated A-H (base),name,7757,7757,0,0.0,ALWAYS_PRESENT,
+ribo2,Ribonanza-2 curated A-H (base),near,7757,7751,6,0.08,EXPLAINABLE_PARTIAL,"6 missing total (6 explainable, 0 suspicious)"
+ribo2,Ribonanza-2 curated A-H (base),near_title,7757,7751,6,0.08,EXPLAINABLE_PARTIAL,"6 missing total (6 explainable, 0 suspicious)"
+ribo2,Ribonanza-2 curated A-H (base),notes,7757,0,7757,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 7757 records)
+ribo2,Ribonanza-2 curated A-H (base),openknot,7757,2783,4974,64.12,EXPLAINABLE_PARTIAL,"4974 missing total (4974 explainable, 0 suspicious)"
+ribo2,Ribonanza-2 curated A-H (base),overhang3,7757,5589,2168,27.95,EXPLAINABLE_PARTIAL,"2168 missing total (2168 explainable, 0 suspicious)"
+ribo2,Ribonanza-2 curated A-H (base),overhang5,7757,5589,2168,27.95,EXPLAINABLE_PARTIAL,"2168 missing total (2168 explainable, 0 suspicious)"
+ribo2,Ribonanza-2 curated A-H (base),overlap_ae,7757,2783,4974,64.12,EXPLAINABLE_PARTIAL,"4974 missing total (4974 explainable, 0 suspicious)"
+ribo2,Ribonanza-2 curated A-H (base),overlap_global_fold_id,7757,2772,4985,64.26,EXPLAINABLE_PARTIAL,"4985 missing total (4985 explainable, 0 suspicious)"
+ribo2,Ribonanza-2 curated A-H (base),plddt,7757,7757,0,0.0,ALWAYS_PRESENT,
+ribo2,Ribonanza-2 curated A-H (base),pred_pearson_2a3,7757,0,7757,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 7757 records)
+ribo2,Ribonanza-2 curated A-H (base),pred_pearson_dms,7757,0,7757,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 7757 records)
+ribo2,Ribonanza-2 curated A-H (base),pred_spearman_2a3,7757,0,7757,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 7757 records)
+ribo2,Ribonanza-2 curated A-H (base),pred_spearman_dms,7757,0,7757,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 7757 records)
+ribo2,Ribonanza-2 curated A-H (base),pseudoknot,7757,7757,0,0.0,ALWAYS_PRESENT,
+ribo2,Ribonanza-2 curated A-H (base),ptm,7757,0,7757,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 7757 records)
+ribo2,Ribonanza-2 curated A-H (base),r2a3,7757,6153,1604,20.68,SUSPICIOUS_PARTIAL,"1604 missing total (1602 explainable, 2 suspicious)"
+ribo2,Ribonanza-2 curated A-H (base),rfam_id,7757,43,7714,99.45,SUSPICIOUS_PARTIAL,"7714 missing total (6743 explainable, 971 suspicious)"
+ribo2,Ribonanza-2 curated A-H (base),rfam_name,7757,43,7714,99.45,SUSPICIOUS_PARTIAL,"7714 missing total (6743 explainable, 971 suspicious)"
+ribo2,Ribonanza-2 curated A-H (base),rna_type,7757,1777,5980,77.09,SUSPICIOUS_PARTIAL,"5980 missing total (5009 explainable, 971 suspicious)"
+ribo2,Ribonanza-2 curated A-H (base),rnacentral_id,7757,1811,5946,76.65,SUSPICIOUS_PARTIAL,"5946 missing total (4975 explainable, 971 suspicious)"
+ribo2,Ribonanza-2 curated A-H (base),rnacentral_name,7757,1811,5946,76.65,SUSPICIOUS_PARTIAL,"5946 missing total (4975 explainable, 971 suspicious)"
+ribo2,Ribonanza-2 curated A-H (base),score,7757,3506,4251,54.8,EXPLAINABLE_PARTIAL,"4251 missing total (4251 explainable, 0 suspicious)"
+ribo2,Ribonanza-2 curated A-H (base),seq_cluster_size,7757,7757,0,0.0,ALWAYS_PRESENT,
+ribo2,Ribonanza-2 curated A-H (base),shape_agr,7757,6153,1604,20.68,SUSPICIOUS_PARTIAL,"1604 missing total (1602 explainable, 2 suspicious)"
+ribo2,Ribonanza-2 curated A-H (base),shape_ok,7757,7757,0,0.0,ALWAYS_PRESENT,
+ribo2,Ribonanza-2 curated A-H (base),source,7757,7757,0,0.0,ALWAYS_PRESENT,
+ribo2,Ribonanza-2 curated A-H (base),source_group,7757,0,7757,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 7757 records)
+ribo2,Ribonanza-2 curated A-H (base),ss_class,7757,7757,0,0.0,ALWAYS_PRESENT,
+ribo2,Ribonanza-2 curated A-H (base),struct_rep,7757,0,7757,100.0,SUSPICIOUS_DATASET_GAP,"`struct_rep` (structural-representative flag) is present in every other dataset's schema but absent from all 7,757 ribo2 A-H records -- same likely stale-build cause as `key`."
+ribo2,Ribonanza-2 curated A-H (base),sublibrary,7757,7757,0,0.0,ALWAYS_PRESENT,
+ribo2,Ribonanza-2 curated A-H (base),target_dbn,7757,0,7757,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 7757 records)
+ribo2,Ribonanza-2 curated A-H (base),termini_bp,7757,7757,0,0.0,ALWAYS_PRESENT,
+ribo2,Ribonanza-2 curated A-H (base),termini_trim,7757,7757,0,0.0,ALWAYS_PRESENT,
+ribo2,Ribonanza-2 curated A-H (base),trrosetta_url,7757,0,7757,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 7757 records)
+ribo2,Ribonanza-2 curated A-H (base),true_design_length,7757,0,7757,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 7757 records)
+ribo2,Ribonanza-2 curated A-H (base),uucg_tetraloop,7757,7757,0,0.0,ALWAYS_PRESENT,
+pseudolabels,Ribo-1 pseudolabel,best_sample,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,best_tm1,19759,19750,9,0.05,EXPLAINABLE_PARTIAL,"9 missing total (9 explainable, 0 suspicious)"
+pseudolabels,Ribo-1 pseudolabel,bp_fraction,19759,19759,0,0.0,ALWAYS_PRESENT,
+pseudolabels,Ribo-1 pseudolabel,clashscore,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,contact_ratio,19759,19759,0,0.0,ALWAYS_PRESENT,
+pseudolabels,Ribo-1 pseudolabel,crossed_frac,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,description,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,design_end,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,design_start,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,designer,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,eterna_id,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,ex,19759,19759,0,0.0,ALWAYS_PRESENT,
+pseudolabels,Ribo-1 pseudolabel,ey,19759,19759,0,0.0,ALWAYS_PRESENT,
+pseudolabels,Ribo-1 pseudolabel,fold_size,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,global_fold_id,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,global_seq_cluster_id,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,gpde,19759,19759,0,0.0,ALWAYS_PRESENT,
+pseudolabels,Ribo-1 pseudolabel,id,19759,19759,0,0.0,ALWAYS_PRESENT,
+pseudolabels,Ribo-1 pseudolabel,in_shortlist,19759,19759,0,0.0,ALWAYS_PRESENT,
+pseudolabels,Ribo-1 pseudolabel,iptm,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,is_novel_v341,19759,19759,0,0.0,ALWAYS_PRESENT,
+pseudolabels,Ribo-1 pseudolabel,key,19759,19759,0,0.0,ALWAYS_PRESENT,
+pseudolabels,Ribo-1 pseudolabel,length,19759,19759,0,0.0,ALWAYS_PRESENT,
+pseudolabels,Ribo-1 pseudolabel,letter,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,mean_prot_2a3,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,member_dbs,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,mohca_regime_frac,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,motifs,19759,19759,0,0.0,ALWAYS_PRESENT,
+pseudolabels,Ribo-1 pseudolabel,msa_depth,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,n_crossed_pairs,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,n_rare,19759,19759,0,0.0,ALWAYS_PRESENT,
+pseudolabels,Ribo-1 pseudolabel,n_tert,19759,19759,0,0.0,ALWAYS_PRESENT,
+pseudolabels,Ribo-1 pseudolabel,name,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,near,19759,19750,9,0.05,EXPLAINABLE_PARTIAL,"9 missing total (9 explainable, 0 suspicious)"
+pseudolabels,Ribo-1 pseudolabel,near_title,19759,19750,9,0.05,EXPLAINABLE_PARTIAL,"9 missing total (9 explainable, 0 suspicious)"
+pseudolabels,Ribo-1 pseudolabel,notes,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,openknot,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,overhang3,19759,19121,638,3.23,EXPLAINABLE_PARTIAL,"638 missing total (638 explainable, 0 suspicious)"
+pseudolabels,Ribo-1 pseudolabel,overhang5,19759,19121,638,3.23,EXPLAINABLE_PARTIAL,"638 missing total (638 explainable, 0 suspicious)"
+pseudolabels,Ribo-1 pseudolabel,overlap_ae,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,overlap_global_fold_id,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,plddt,19759,19759,0,0.0,ALWAYS_PRESENT,
+pseudolabels,Ribo-1 pseudolabel,pred_pearson_2a3,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,pred_pearson_dms,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,pred_spearman_2a3,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,pred_spearman_dms,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,pseudoknot,19759,19759,0,0.0,ALWAYS_PRESENT,
+pseudolabels,Ribo-1 pseudolabel,ptm,19759,19759,0,0.0,ALWAYS_PRESENT,
+pseudolabels,Ribo-1 pseudolabel,r2a3,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,rfam_id,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,rfam_name,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,rna_type,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,rnacentral_id,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,rnacentral_name,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,score,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,seq_cluster_size,19759,19759,0,0.0,ALWAYS_PRESENT,
+pseudolabels,Ribo-1 pseudolabel,shape_agr,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,shape_ok,19759,19759,0,0.0,ALWAYS_PRESENT,
+pseudolabels,Ribo-1 pseudolabel,source,19759,19759,0,0.0,ALWAYS_PRESENT,
+pseudolabels,Ribo-1 pseudolabel,source_group,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,ss_class,19759,19759,0,0.0,ALWAYS_PRESENT,
+pseudolabels,Ribo-1 pseudolabel,struct_rep,19759,19759,0,0.0,ALWAYS_PRESENT,
+pseudolabels,Ribo-1 pseudolabel,sublibrary,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,target_dbn,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,termini_bp,19759,19759,0,0.0,ALWAYS_PRESENT,
+pseudolabels,Ribo-1 pseudolabel,termini_trim,19759,19759,0,0.0,ALWAYS_PRESENT,
+pseudolabels,Ribo-1 pseudolabel,trrosetta_url,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,true_design_length,19759,0,19759,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 19759 records)
+pseudolabels,Ribo-1 pseudolabel,uucg_tetraloop,19759,19759,0,0.0,ALWAYS_PRESENT,
+openknot,OpenKnot,best_sample,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,best_tm1,3698,3698,0,0.0,ALWAYS_PRESENT,
+openknot,OpenKnot,bp_fraction,3698,3698,0,0.0,ALWAYS_PRESENT,
+openknot,OpenKnot,clashscore,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,contact_ratio,3698,3698,0,0.0,ALWAYS_PRESENT,
+openknot,OpenKnot,crossed_frac,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,description,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,design_end,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,design_start,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,designer,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,eterna_id,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,ex,3698,3698,0,0.0,ALWAYS_PRESENT,
+openknot,OpenKnot,ey,3698,3698,0,0.0,ALWAYS_PRESENT,
+openknot,OpenKnot,fold_size,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,global_fold_id,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,global_seq_cluster_id,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,gpde,3698,3698,0,0.0,ALWAYS_PRESENT,
+openknot,OpenKnot,id,3698,3698,0,0.0,ALWAYS_PRESENT,
+openknot,OpenKnot,in_shortlist,3698,3698,0,0.0,ALWAYS_PRESENT,
+openknot,OpenKnot,iptm,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,is_novel_v341,3698,3698,0,0.0,ALWAYS_PRESENT,
+openknot,OpenKnot,key,3698,3698,0,0.0,ALWAYS_PRESENT,
+openknot,OpenKnot,length,3698,3698,0,0.0,ALWAYS_PRESENT,
+openknot,OpenKnot,letter,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,mean_prot_2a3,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,member_dbs,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,mohca_regime_frac,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,motifs,3698,3698,0,0.0,ALWAYS_PRESENT,
+openknot,OpenKnot,msa_depth,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,n_crossed_pairs,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,n_rare,3698,3698,0,0.0,ALWAYS_PRESENT,
+openknot,OpenKnot,n_tert,3698,3698,0,0.0,ALWAYS_PRESENT,
+openknot,OpenKnot,name,3698,3698,0,0.0,ALWAYS_PRESENT,
+openknot,OpenKnot,near,3698,3698,0,0.0,ALWAYS_PRESENT,
+openknot,OpenKnot,near_title,3698,3698,0,0.0,ALWAYS_PRESENT,
+openknot,OpenKnot,notes,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,openknot,3698,0,3698,100.0,SUSPICIOUS_DATASET_GAP,"The OpenKnot dataset's own `openknot` (OpenKnot pseudoknot score) field is null for all 3,698 records, while its two later derived companions (openknot_long, openknot_long_seq) have it populated on 100% of records. The score join looks like it was implemented for the newer builders but never back-filled for the original dataset."
+openknot,OpenKnot,overhang3,3698,445,3253,87.97,EXPLAINABLE_PARTIAL,"3253 missing total (3253 explainable, 0 suspicious)"
+openknot,OpenKnot,overhang5,3698,445,3253,87.97,EXPLAINABLE_PARTIAL,"3253 missing total (3253 explainable, 0 suspicious)"
+openknot,OpenKnot,overlap_ae,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,overlap_global_fold_id,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,plddt,3698,3698,0,0.0,ALWAYS_PRESENT,
+openknot,OpenKnot,pred_pearson_2a3,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,pred_pearson_dms,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,pred_spearman_2a3,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,pred_spearman_dms,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,pseudoknot,3698,3698,0,0.0,ALWAYS_PRESENT,
+openknot,OpenKnot,ptm,3698,3698,0,0.0,ALWAYS_PRESENT,
+openknot,OpenKnot,r2a3,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,rfam_id,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,rfam_name,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,rna_type,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,rnacentral_id,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,rnacentral_name,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,score,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,seq_cluster_size,3698,3698,0,0.0,ALWAYS_PRESENT,
+openknot,OpenKnot,shape_agr,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,shape_ok,3698,3698,0,0.0,ALWAYS_PRESENT,
+openknot,OpenKnot,source,3698,3698,0,0.0,ALWAYS_PRESENT,
+openknot,OpenKnot,source_group,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,ss_class,3698,3698,0,0.0,ALWAYS_PRESENT,
+openknot,OpenKnot,struct_rep,3698,3698,0,0.0,ALWAYS_PRESENT,
+openknot,OpenKnot,sublibrary,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,target_dbn,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,termini_bp,3698,3698,0,0.0,ALWAYS_PRESENT,
+openknot,OpenKnot,termini_trim,3698,3698,0,0.0,ALWAYS_PRESENT,
+openknot,OpenKnot,trrosetta_url,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,true_design_length,3698,0,3698,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 3698 records)
+openknot,OpenKnot,uucg_tetraloop,3698,3698,0,0.0,ALWAYS_PRESENT,
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",best_sample,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",best_tm1,4600,4600,0,0.0,ALWAYS_PRESENT,
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",bp_fraction,4600,4600,0,0.0,ALWAYS_PRESENT,
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",clashscore,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",contact_ratio,4600,4600,0,0.0,ALWAYS_PRESENT,
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",crossed_frac,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",description,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",design_end,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",design_start,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",designer,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",eterna_id,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",ex,4600,4600,0,0.0,ALWAYS_PRESENT,
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",ey,4600,4600,0,0.0,ALWAYS_PRESENT,
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",fold_size,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",global_fold_id,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",global_seq_cluster_id,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",gpde,4600,4600,0,0.0,ALWAYS_PRESENT,
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",id,4600,4600,0,0.0,ALWAYS_PRESENT,
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",in_shortlist,4600,4600,0,0.0,ALWAYS_PRESENT,
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",iptm,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",is_novel_v341,4600,4600,0,0.0,ALWAYS_PRESENT,
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",key,4600,4600,0,0.0,ALWAYS_PRESENT,
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",length,4600,4600,0,0.0,ALWAYS_PRESENT,
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",letter,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",mean_prot_2a3,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",member_dbs,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",mohca_regime_frac,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",motifs,4600,4600,0,0.0,ALWAYS_PRESENT,
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",msa_depth,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",n_crossed_pairs,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",n_rare,4600,4600,0,0.0,ALWAYS_PRESENT,
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",n_tert,4600,4600,0,0.0,ALWAYS_PRESENT,
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",name,4600,2309,2291,49.8,EXPLAINABLE_PARTIAL,"2291 missing total (2291 explainable, 0 suspicious)"
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",near,4600,4600,0,0.0,ALWAYS_PRESENT,
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",near_title,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",notes,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",openknot,4600,4600,0,0.0,ALWAYS_PRESENT,
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",overhang3,4600,1886,2714,59.0,EXPLAINABLE_PARTIAL,"2714 missing total (2714 explainable, 0 suspicious)"
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",overhang5,4600,1886,2714,59.0,EXPLAINABLE_PARTIAL,"2714 missing total (2714 explainable, 0 suspicious)"
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",overlap_ae,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",overlap_global_fold_id,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",plddt,4600,4600,0,0.0,ALWAYS_PRESENT,
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",pred_pearson_2a3,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",pred_pearson_dms,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",pred_spearman_2a3,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",pred_spearman_dms,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",pseudoknot,4600,4600,0,0.0,ALWAYS_PRESENT,
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",ptm,4600,4600,0,0.0,ALWAYS_PRESENT,
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",r2a3,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",rfam_id,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",rfam_name,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",rna_type,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",rnacentral_id,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",rnacentral_name,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",score,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",seq_cluster_size,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",shape_agr,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",shape_ok,4600,4600,0,0.0,ALWAYS_PRESENT,
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",source,4600,4600,0,0.0,ALWAYS_PRESENT,
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",source_group,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",ss_class,4600,4600,0,0.0,ALWAYS_PRESENT,
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",struct_rep,4600,4600,0,0.0,ALWAYS_PRESENT,
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",sublibrary,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",target_dbn,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",termini_bp,4600,4600,0,0.0,ALWAYS_PRESENT,
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",termini_trim,4600,4600,0,0.0,ALWAYS_PRESENT,
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",trrosetta_url,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",true_design_length,4600,0,4600,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4600 records)
+openknot_long,"OpenKnot OK7b/OK8 240-mer, SHAPE-guided",uucg_tetraloop,4600,4600,0,0.0,ALWAYS_PRESENT,
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",best_sample,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",best_tm1,4593,4593,0,0.0,ALWAYS_PRESENT,
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",bp_fraction,4593,4593,0,0.0,ALWAYS_PRESENT,
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",clashscore,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",contact_ratio,4593,4593,0,0.0,ALWAYS_PRESENT,
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",crossed_frac,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",description,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",design_end,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",design_start,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",designer,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",eterna_id,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",ex,4593,4593,0,0.0,ALWAYS_PRESENT,
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",ey,4593,4593,0,0.0,ALWAYS_PRESENT,
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",fold_size,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",global_fold_id,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",global_seq_cluster_id,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",gpde,4593,4593,0,0.0,ALWAYS_PRESENT,
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",id,4593,4593,0,0.0,ALWAYS_PRESENT,
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",in_shortlist,4593,4593,0,0.0,ALWAYS_PRESENT,
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",iptm,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",is_novel_v341,4593,4593,0,0.0,ALWAYS_PRESENT,
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",key,4593,4593,0,0.0,ALWAYS_PRESENT,
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",length,4593,4593,0,0.0,ALWAYS_PRESENT,
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",letter,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",mean_prot_2a3,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",member_dbs,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",mohca_regime_frac,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",motifs,4593,4593,0,0.0,ALWAYS_PRESENT,
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",msa_depth,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",n_crossed_pairs,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",n_rare,4593,4593,0,0.0,ALWAYS_PRESENT,
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",n_tert,4593,4593,0,0.0,ALWAYS_PRESENT,
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",name,4593,2301,2292,49.9,EXPLAINABLE_PARTIAL,"2292 missing total (2292 explainable, 0 suspicious)"
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",near,4593,4593,0,0.0,ALWAYS_PRESENT,
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",near_title,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",notes,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",openknot,4593,4593,0,0.0,ALWAYS_PRESENT,
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",overhang3,4593,1872,2721,59.24,EXPLAINABLE_PARTIAL,"2721 missing total (2721 explainable, 0 suspicious)"
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",overhang5,4593,1872,2721,59.24,EXPLAINABLE_PARTIAL,"2721 missing total (2721 explainable, 0 suspicious)"
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",overlap_ae,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",overlap_global_fold_id,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",plddt,4593,4593,0,0.0,ALWAYS_PRESENT,
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",pred_pearson_2a3,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",pred_pearson_dms,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",pred_spearman_2a3,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",pred_spearman_dms,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",pseudoknot,4593,4593,0,0.0,ALWAYS_PRESENT,
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",ptm,4593,4593,0,0.0,ALWAYS_PRESENT,
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",r2a3,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",rfam_id,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",rfam_name,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",rna_type,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",rnacentral_id,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",rnacentral_name,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",score,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",seq_cluster_size,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",shape_agr,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",shape_ok,4593,4593,0,0.0,ALWAYS_PRESENT,
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",source,4593,4593,0,0.0,ALWAYS_PRESENT,
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",source_group,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",ss_class,4593,4593,0,0.0,ALWAYS_PRESENT,
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",struct_rep,4593,4593,0,0.0,ALWAYS_PRESENT,
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",sublibrary,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",target_dbn,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",termini_bp,4593,4593,0,0.0,ALWAYS_PRESENT,
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",termini_trim,4593,4593,0,0.0,ALWAYS_PRESENT,
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",trrosetta_url,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",true_design_length,4593,0,4593,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 4593 records)
+openknot_long_seq,"OpenKnot OK7b/OK8 240-mer, sequence-only",uucg_tetraloop,4593,4593,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",best_sample,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",best_tm1,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",bp_fraction,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",clashscore,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",contact_ratio,28,0,28,100.0,SUSPICIOUS_DATASET_GAP,"`contact_ratio` (C1'-C1' compactness, a pure 3D-geometry calc) is null for all 28 records, even though bp_fraction/ss_class/plddt -- computed from the same structures -- are populated. Looks like an omitted step in the OK8 cryo-EM candidate builder."
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",crossed_frac,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",description,28,11,17,60.71,EXPLAINABLE_PARTIAL,"17 missing total (17 explainable, 0 suspicious)"
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",design_end,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",design_start,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",designer,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",eterna_id,28,12,16,57.14,EXPLAINABLE_PARTIAL,"16 missing total (16 explainable, 0 suspicious)"
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",ex,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",ey,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",fold_size,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",global_fold_id,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",global_seq_cluster_id,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",gpde,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",id,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",in_shortlist,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",iptm,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",is_novel_v341,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",key,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",length,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",letter,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",mean_prot_2a3,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",member_dbs,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",mohca_regime_frac,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",motifs,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",msa_depth,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",n_crossed_pairs,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",n_rare,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",n_tert,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",name,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",near,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",near_title,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",notes,28,14,14,50.0,EXPLAINABLE_PARTIAL,"14 missing total (14 explainable, 0 suspicious)"
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",openknot,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",overhang3,28,12,16,57.14,EXPLAINABLE_PARTIAL,"16 missing total (16 explainable, 0 suspicious)"
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",overhang5,28,12,16,57.14,EXPLAINABLE_PARTIAL,"16 missing total (16 explainable, 0 suspicious)"
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",overlap_ae,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",overlap_global_fold_id,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",plddt,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",pred_pearson_2a3,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",pred_pearson_dms,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",pred_spearman_2a3,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",pred_spearman_dms,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",pseudoknot,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",ptm,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",r2a3,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",rfam_id,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",rfam_name,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",rna_type,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",rnacentral_id,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",rnacentral_name,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",score,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",seq_cluster_size,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",shape_agr,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",shape_ok,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",source,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",source_group,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",ss_class,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",struct_rep,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",sublibrary,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",target_dbn,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",termini_bp,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",termini_trim,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",trrosetta_url,28,24,4,14.29,EXPLAINABLE_PARTIAL,"4 missing total (4 explainable, 0 suspicious)"
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",true_design_length,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_seq,"OK8 cryo-EM candidates, sequence-only",uucg_tetraloop,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",best_sample,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",best_tm1,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",bp_fraction,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",clashscore,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",contact_ratio,28,0,28,100.0,SUSPICIOUS_DATASET_GAP,"Same as openknot_cryoem_seq: contact_ratio null for all 28 records despite other structure-derived fields (bp_fraction, ss_class, plddt) being populated."
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",crossed_frac,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",description,28,11,17,60.71,EXPLAINABLE_PARTIAL,"17 missing total (17 explainable, 0 suspicious)"
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",design_end,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",design_start,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",designer,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",eterna_id,28,12,16,57.14,EXPLAINABLE_PARTIAL,"16 missing total (16 explainable, 0 suspicious)"
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",ex,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",ey,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",fold_size,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",global_fold_id,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",global_seq_cluster_id,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",gpde,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",id,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",in_shortlist,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",iptm,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",is_novel_v341,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",key,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",length,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",letter,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",mean_prot_2a3,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",member_dbs,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",mohca_regime_frac,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",motifs,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",msa_depth,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",n_crossed_pairs,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",n_rare,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",n_tert,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",name,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",near,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",near_title,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",notes,28,14,14,50.0,EXPLAINABLE_PARTIAL,"14 missing total (14 explainable, 0 suspicious)"
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",openknot,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",overhang3,28,12,16,57.14,EXPLAINABLE_PARTIAL,"16 missing total (16 explainable, 0 suspicious)"
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",overhang5,28,12,16,57.14,EXPLAINABLE_PARTIAL,"16 missing total (16 explainable, 0 suspicious)"
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",overlap_ae,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",overlap_global_fold_id,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",plddt,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",pred_pearson_2a3,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",pred_pearson_dms,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",pred_spearman_2a3,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",pred_spearman_dms,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",pseudoknot,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",ptm,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",r2a3,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",rfam_id,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",rfam_name,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",rna_type,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",rnacentral_id,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",rnacentral_name,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",score,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",seq_cluster_size,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",shape_agr,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",shape_ok,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",source,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",source_group,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",ss_class,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",struct_rep,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",sublibrary,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",target_dbn,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",termini_bp,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",termini_trim,28,28,0,0.0,ALWAYS_PRESENT,
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",trrosetta_url,28,24,4,14.29,EXPLAINABLE_PARTIAL,"4 missing total (4 explainable, 0 suspicious)"
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",true_design_length,28,0,28,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 28 records)
+openknot_cryoem_msa,"OK8 cryo-EM candidates, MSA-conditioned",uucg_tetraloop,28,28,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",best_sample,42631,0,42631,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 42631 records)
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",best_tm1,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",bp_fraction,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",clashscore,42631,0,42631,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 42631 records)
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",contact_ratio,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",crossed_frac,42631,0,42631,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 42631 records)
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",description,42631,0,42631,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 42631 records)
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",design_end,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",design_start,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",designer,42631,0,42631,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 42631 records)
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",eterna_id,42631,0,42631,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 42631 records)
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",ex,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",ey,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",fold_size,42631,0,42631,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 42631 records)
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",global_fold_id,42631,0,42631,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 42631 records)
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",global_seq_cluster_id,42631,0,42631,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 42631 records)
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",gpde,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",id,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",in_shortlist,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",iptm,42631,0,42631,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 42631 records)
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",is_novel_v341,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",key,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",length,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",letter,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",mean_prot_2a3,42631,0,42631,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 42631 records)
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",member_dbs,42631,0,42631,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 42631 records)
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",mohca_regime_frac,42631,0,42631,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 42631 records)
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",motifs,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",msa_depth,42631,0,42631,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 42631 records)
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",n_crossed_pairs,42631,0,42631,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 42631 records)
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",n_rare,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",n_tert,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",name,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",near,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",near_title,42631,0,42631,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 42631 records)
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",notes,42631,0,42631,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 42631 records)
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",openknot,42631,0,42631,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 42631 records)
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",overhang3,42631,21234,21397,50.19,EXPLAINABLE_PARTIAL,"21397 missing total (21397 explainable, 0 suspicious)"
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",overhang5,42631,21234,21397,50.19,EXPLAINABLE_PARTIAL,"21397 missing total (21397 explainable, 0 suspicious)"
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",overlap_ae,42631,0,42631,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 42631 records)
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",overlap_global_fold_id,42631,0,42631,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 42631 records)
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",plddt,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",pred_pearson_2a3,42631,26880,15751,36.95,EXPLAINABLE_PARTIAL,"15751 missing total (15751 explainable, 0 suspicious)"
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",pred_pearson_dms,42631,26880,15751,36.95,EXPLAINABLE_PARTIAL,"15751 missing total (15751 explainable, 0 suspicious)"
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",pred_spearman_2a3,42631,26880,15751,36.95,EXPLAINABLE_PARTIAL,"15751 missing total (15751 explainable, 0 suspicious)"
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",pred_spearman_dms,42631,26880,15751,36.95,EXPLAINABLE_PARTIAL,"15751 missing total (15751 explainable, 0 suspicious)"
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",pseudoknot,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",ptm,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",r2a3,42631,26880,15751,36.95,EXPLAINABLE_PARTIAL,"15751 missing total (15751 explainable, 0 suspicious)"
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",rfam_id,42631,0,42631,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 42631 records)
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",rfam_name,42631,0,42631,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 42631 records)
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",rna_type,42631,14216,28415,66.65,EXPLAINABLE_PARTIAL,"28415 missing total (28415 explainable, 0 suspicious)"
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",rnacentral_id,42631,0,42631,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 42631 records)
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",rnacentral_name,42631,0,42631,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 42631 records)
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",score,42631,0,42631,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 42631 records)
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",seq_cluster_size,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",shape_agr,42631,26880,15751,36.95,EXPLAINABLE_PARTIAL,"15751 missing total (15751 explainable, 0 suspicious)"
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",shape_ok,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",source,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",source_group,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",ss_class,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",struct_rep,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",sublibrary,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",target_dbn,42631,0,42631,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 42631 records)
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",termini_bp,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",termini_trim,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",trrosetta_url,42631,0,42631,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 42631 records)
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",true_design_length,42631,42631,0,0.0,ALWAYS_PRESENT,
+ribo2-iq-curated-v2,"Ribonanza-2 curated I-Q, de-padded union v2",uucg_tetraloop,42631,42631,0,0.0,ALWAYS_PRESENT,
+rfam_pdb130,RFAM-PDB 130,best_sample,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,best_tm1,1614,1601,13,0.81,EXPLAINABLE_PARTIAL,"13 missing total (13 explainable, 0 suspicious)"
+rfam_pdb130,RFAM-PDB 130,bp_fraction,1614,1614,0,0.0,ALWAYS_PRESENT,
+rfam_pdb130,RFAM-PDB 130,clashscore,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,contact_ratio,1614,1614,0,0.0,ALWAYS_PRESENT,
+rfam_pdb130,RFAM-PDB 130,crossed_frac,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,description,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,design_end,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,design_start,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,designer,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,eterna_id,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,ex,1614,1614,0,0.0,ALWAYS_PRESENT,
+rfam_pdb130,RFAM-PDB 130,ey,1614,1614,0,0.0,ALWAYS_PRESENT,
+rfam_pdb130,RFAM-PDB 130,fold_size,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,global_fold_id,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,global_seq_cluster_id,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,gpde,1614,1614,0,0.0,ALWAYS_PRESENT,
+rfam_pdb130,RFAM-PDB 130,id,1614,1614,0,0.0,ALWAYS_PRESENT,
+rfam_pdb130,RFAM-PDB 130,in_shortlist,1614,1614,0,0.0,ALWAYS_PRESENT,
+rfam_pdb130,RFAM-PDB 130,iptm,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,is_novel_v341,1614,1614,0,0.0,ALWAYS_PRESENT,
+rfam_pdb130,RFAM-PDB 130,key,1614,1614,0,0.0,ALWAYS_PRESENT,
+rfam_pdb130,RFAM-PDB 130,length,1614,1614,0,0.0,ALWAYS_PRESENT,
+rfam_pdb130,RFAM-PDB 130,letter,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,mean_prot_2a3,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,member_dbs,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,mohca_regime_frac,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,motifs,1614,1614,0,0.0,ALWAYS_PRESENT,
+rfam_pdb130,RFAM-PDB 130,msa_depth,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,n_crossed_pairs,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,n_rare,1614,1614,0,0.0,ALWAYS_PRESENT,
+rfam_pdb130,RFAM-PDB 130,n_tert,1614,1614,0,0.0,ALWAYS_PRESENT,
+rfam_pdb130,RFAM-PDB 130,name,1614,1614,0,0.0,ALWAYS_PRESENT,
+rfam_pdb130,RFAM-PDB 130,near,1614,1601,13,0.81,EXPLAINABLE_PARTIAL,"13 missing total (13 explainable, 0 suspicious)"
+rfam_pdb130,RFAM-PDB 130,near_title,1614,1601,13,0.81,EXPLAINABLE_PARTIAL,"13 missing total (13 explainable, 0 suspicious)"
+rfam_pdb130,RFAM-PDB 130,notes,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,openknot,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,overhang3,1614,1485,129,7.99,EXPLAINABLE_PARTIAL,"129 missing total (129 explainable, 0 suspicious)"
+rfam_pdb130,RFAM-PDB 130,overhang5,1614,1485,129,7.99,EXPLAINABLE_PARTIAL,"129 missing total (129 explainable, 0 suspicious)"
+rfam_pdb130,RFAM-PDB 130,overlap_ae,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,overlap_global_fold_id,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,plddt,1614,1614,0,0.0,ALWAYS_PRESENT,
+rfam_pdb130,RFAM-PDB 130,pred_pearson_2a3,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,pred_pearson_dms,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,pred_spearman_2a3,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,pred_spearman_dms,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,pseudoknot,1614,1614,0,0.0,ALWAYS_PRESENT,
+rfam_pdb130,RFAM-PDB 130,ptm,1614,1614,0,0.0,ALWAYS_PRESENT,
+rfam_pdb130,RFAM-PDB 130,r2a3,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,rfam_id,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,rfam_name,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,rna_type,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,rnacentral_id,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,rnacentral_name,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,score,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,seq_cluster_size,1614,1614,0,0.0,ALWAYS_PRESENT,
+rfam_pdb130,RFAM-PDB 130,shape_agr,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,shape_ok,1614,1614,0,0.0,ALWAYS_PRESENT,
+rfam_pdb130,RFAM-PDB 130,source,1614,1614,0,0.0,ALWAYS_PRESENT,
+rfam_pdb130,RFAM-PDB 130,source_group,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,ss_class,1614,1614,0,0.0,ALWAYS_PRESENT,
+rfam_pdb130,RFAM-PDB 130,struct_rep,1614,1614,0,0.0,ALWAYS_PRESENT,
+rfam_pdb130,RFAM-PDB 130,sublibrary,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,target_dbn,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,termini_bp,1614,1614,0,0.0,ALWAYS_PRESENT,
+rfam_pdb130,RFAM-PDB 130,termini_trim,1614,1614,0,0.0,ALWAYS_PRESENT,
+rfam_pdb130,RFAM-PDB 130,trrosetta_url,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,true_design_length,1614,0,1614,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 1614 records)
+rfam_pdb130,RFAM-PDB 130,uucg_tetraloop,1614,1614,0,0.0,ALWAYS_PRESENT,
+rfam_pdb240,RFAM-PDB 240,best_sample,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,best_tm1,2,2,0,0.0,ALWAYS_PRESENT,
+rfam_pdb240,RFAM-PDB 240,bp_fraction,2,2,0,0.0,ALWAYS_PRESENT,
+rfam_pdb240,RFAM-PDB 240,clashscore,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,contact_ratio,2,2,0,0.0,ALWAYS_PRESENT,
+rfam_pdb240,RFAM-PDB 240,crossed_frac,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,description,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,design_end,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,design_start,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,designer,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,eterna_id,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,ex,2,2,0,0.0,ALWAYS_PRESENT,
+rfam_pdb240,RFAM-PDB 240,ey,2,2,0,0.0,ALWAYS_PRESENT,
+rfam_pdb240,RFAM-PDB 240,fold_size,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,global_fold_id,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,global_seq_cluster_id,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,gpde,2,2,0,0.0,ALWAYS_PRESENT,
+rfam_pdb240,RFAM-PDB 240,id,2,2,0,0.0,ALWAYS_PRESENT,
+rfam_pdb240,RFAM-PDB 240,in_shortlist,2,2,0,0.0,ALWAYS_PRESENT,
+rfam_pdb240,RFAM-PDB 240,iptm,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,is_novel_v341,2,2,0,0.0,ALWAYS_PRESENT,
+rfam_pdb240,RFAM-PDB 240,key,2,2,0,0.0,ALWAYS_PRESENT,
+rfam_pdb240,RFAM-PDB 240,length,2,2,0,0.0,ALWAYS_PRESENT,
+rfam_pdb240,RFAM-PDB 240,letter,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,mean_prot_2a3,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,member_dbs,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,mohca_regime_frac,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,motifs,2,2,0,0.0,ALWAYS_PRESENT,
+rfam_pdb240,RFAM-PDB 240,msa_depth,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,n_crossed_pairs,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,n_rare,2,2,0,0.0,ALWAYS_PRESENT,
+rfam_pdb240,RFAM-PDB 240,n_tert,2,2,0,0.0,ALWAYS_PRESENT,
+rfam_pdb240,RFAM-PDB 240,name,2,2,0,0.0,ALWAYS_PRESENT,
+rfam_pdb240,RFAM-PDB 240,near,2,2,0,0.0,ALWAYS_PRESENT,
+rfam_pdb240,RFAM-PDB 240,near_title,2,2,0,0.0,ALWAYS_PRESENT,
+rfam_pdb240,RFAM-PDB 240,notes,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,openknot,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,overhang3,2,2,0,0.0,ALWAYS_PRESENT,
+rfam_pdb240,RFAM-PDB 240,overhang5,2,2,0,0.0,ALWAYS_PRESENT,
+rfam_pdb240,RFAM-PDB 240,overlap_ae,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,overlap_global_fold_id,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,plddt,2,2,0,0.0,ALWAYS_PRESENT,
+rfam_pdb240,RFAM-PDB 240,pred_pearson_2a3,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,pred_pearson_dms,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,pred_spearman_2a3,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,pred_spearman_dms,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,pseudoknot,2,2,0,0.0,ALWAYS_PRESENT,
+rfam_pdb240,RFAM-PDB 240,ptm,2,2,0,0.0,ALWAYS_PRESENT,
+rfam_pdb240,RFAM-PDB 240,r2a3,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,rfam_id,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,rfam_name,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,rna_type,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,rnacentral_id,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,rnacentral_name,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,score,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,seq_cluster_size,2,2,0,0.0,ALWAYS_PRESENT,
+rfam_pdb240,RFAM-PDB 240,shape_agr,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,shape_ok,2,2,0,0.0,ALWAYS_PRESENT,
+rfam_pdb240,RFAM-PDB 240,source,2,2,0,0.0,ALWAYS_PRESENT,
+rfam_pdb240,RFAM-PDB 240,source_group,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,ss_class,2,2,0,0.0,ALWAYS_PRESENT,
+rfam_pdb240,RFAM-PDB 240,struct_rep,2,2,0,0.0,ALWAYS_PRESENT,
+rfam_pdb240,RFAM-PDB 240,sublibrary,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,target_dbn,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,termini_bp,2,2,0,0.0,ALWAYS_PRESENT,
+rfam_pdb240,RFAM-PDB 240,termini_trim,2,2,0,0.0,ALWAYS_PRESENT,
+rfam_pdb240,RFAM-PDB 240,trrosetta_url,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,true_design_length,2,0,2,100.0,NOT_APPLICABLE,field never populated in this dataset (0 of 2 records)
+rfam_pdb240,RFAM-PDB 240,uucg_tetraloop,2,2,0,0.0,ALWAYS_PRESENT,

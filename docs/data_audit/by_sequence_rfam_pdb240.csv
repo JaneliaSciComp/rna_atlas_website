@@ -1,0 +1,3 @@
+dataset,id,key,letter,length,source,sublibrary,n_missing,missing_fields,n_suspicious,suspicious_fields,suspicious_notes
+rfam_pdb240,RF01807_GIR1_branching_ribozyme_URS000080DE6F_5793_1-188,RF01807_GIR1_branching_ribozyme_URS000080DE6F_5793_1-188_c5049a,,188,RFAM-PDB 240,,0,,0,,
+rfam_pdb240,RF01807_GIR1_branching_ribozyme_AJ938153.1_1498-1693,RF01807_GIR1_branching_ribozyme_AJ938153_1_1498-1693_44634d,,196,RFAM-PDB 240,,0,,0,,

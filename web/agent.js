@@ -206,11 +206,19 @@ addEventListener('resize',function(){W=innerWidth;H=innerHeight;cam.aspect=W/H;c
   }
 
   async function callAPI() {
-    const r = await fetch(API, {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-api-key": key(), "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
-      body: JSON.stringify({ model: model(), max_tokens: 1500, system: SYSTEM, tools: TOOLS, messages }),
-    });
+    const payload = { model: model(), max_tokens: 1500, system: SYSTEM, tools: TOOLS, messages };
+    // Preferred: the server-side claude-proxy (key lives in the Lambda, never the browser). The
+    // browser sends only the shared passcode. Falls back to a direct Anthropic call with a
+    // per-user key when no proxy is configured (window.CLAUDE_PROXY unset).
+    let url, headers;
+    if (window.CLAUDE_PROXY) {
+      url = window.CLAUDE_PROXY.replace(/\/+$/, "") + "/chat";
+      headers = { "content-type": "application/json", "x-atlas-token": (localStorage.getItem("atlas_token") || "") };
+    } else {
+      url = API;
+      headers = { "content-type": "application/json", "x-api-key": key(), "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" };
+    }
+    const r = await fetch(url, { method: "POST", headers, body: JSON.stringify(payload) });
     if (!r.ok) throw new Error("API " + r.status + ": " + (await r.text()).slice(0, 300));
     return r.json();
   }
@@ -288,7 +296,7 @@ addEventListener('resize',function(){W=innerWidth;H=innerHeight;cam.aspect=W/H;c
     scroll();
   }
   function ensureKey() {
-    if (key()) return true;
+    if (window.CLAUDE_PROXY || key()) return true;   // proxy holds the key server-side; no per-user key needed
     const k = prompt("Anthropic API key for the Atlas assistant (stored only in this browser):");
     if (k) { localStorage.setItem("atlas_claude_key", k.trim()); return true; }
     return false;

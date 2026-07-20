@@ -12,3 +12,4 @@ graphify-out/
 .claude/settings.local.json
 .anthropic_key
 .claude_proxy
+.infer_api.prod-backup

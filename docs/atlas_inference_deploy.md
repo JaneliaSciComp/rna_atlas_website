@@ -28,20 +28,23 @@ workspace and referenced by data source, so the `atlas` stage reuses them automa
 - **Admin SSO** (`default` profile, AdministratorAccess) is required for the pipeline (tofu) and the
   bridge (Lambda/IAM/APIGW). Refresh when expired (`aws --profile default sts get-caller-identity`).
 - The website deploy (`deploy.sh`) uses the non-expiring **`atlas-deployer`** profile (S3/CloudFront only).
-- Pipeline IaC: **OpenTofu** (`tofu`, never `terraform`) at
-  `/groups/das/home/zouinkhim/aws/RNAnix/jrc-rna-casp-servers/`. Stage = tofu **workspace** name.
+- Pipeline IaC: **OpenTofu** (`tofu`, never `terraform`) in the dedicated **`rna-atlas-aws-server`**
+  repo at `/groups/das/home/zouinkhim/aws/rna-atlas-aws-server/` — a standalone fork of the CASP
+  `jrc-rna-casp-servers` pipeline, with its OWN git history + tofu state. Stage = tofu **workspace** name.
+  (RNAnix's `jrc-rna-casp-servers` is never touched by the atlas.)
 - Bridge + website: this repo (`/groups/das/home/zouinkhim/atlas_explorer/`).
 
 ---
 
-## Step 1 — Fork the pipeline (OpenTofu → `atlas` stage)
+## Step 1 — Deploy the pipeline (OpenTofu → `atlas` stage)
 
-Config lives in `jrc-rna-casp-servers/atlas.tfvars` (mirrors `prod.tfvars`: same image SHAs, default
-server roster → atlas == prod at fork time). Divergence is applied later as pipeline **code** under the
-atlas workspace (Step 5), never by hand in the console.
+The pipeline lives in the dedicated **`rna-atlas-aws-server`** repo (seeded from CASP; see that repo's
+README). `atlas.tfvars` mirrors `prod.tfvars` (same image SHAs, default server roster → atlas == CASP
+prod at fork time). Divergence is applied as pipeline **code** in that repo (Step 5), never in the CASP
+repo and never by hand in the console.
 
 ```bash
-cd /groups/das/home/zouinkhim/aws/RNAnix/jrc-rna-casp-servers
+cd /groups/das/home/zouinkhim/aws/rna-atlas-aws-server
 export AWS_PROFILE=default AWS_DEFAULT_REGION=us-east-2   # admin SSO
 
 tofu init -input=false                 # once per checkout (idempotent)
@@ -125,17 +128,18 @@ aws --profile default --region us-east-2 s3 ls --recursive \
 The bridge already emits the full AF3 schema (rna/dna/`proteinChain`/ligand + counts), and the MSA
 container enumerates chains from `protenix_input.json`. To lift protein/DNA from single-sequence to full
 MSA accuracy (adds protein MSA DB + container + a paired-MSA branch), change the pipeline **code** in
-`jrc-rna-casp-servers/` (`containers/msa/`, `lambda/`) and redeploy **only** the atlas stage:
+the `rna-atlas-aws-server` repo (`containers/msa/`, `lambda/`) and redeploy the atlas stage:
 
 ```bash
-cd /groups/das/home/zouinkhim/aws/RNAnix/jrc-rna-casp-servers
+cd /groups/das/home/zouinkhim/aws/rna-atlas-aws-server
 export AWS_PROFILE=default AWS_DEFAULT_REGION=us-east-2
-make images                         # rebuild container images (Docker)
-make push  ENV=atlas                # push to shared ECR (tags pinned in atlas.tfvars)
+make images                         # rebuild container images (Docker) — pushes to shared ECR
+make push  ENV=atlas
 make apply ENV=atlas ARGS=-auto-approve
 ```
 
-Never run these with `ENV=prod` for website-only features — that would change the competition pipeline.
+All changes stay in `rna-atlas-aws-server`; RNAnix's `jrc-rna-casp-servers` (the competition pipeline)
+is never touched.
 
 ## Update / teardown cheatsheet
 
@@ -152,6 +156,7 @@ Never run these with `ENV=prod` for website-only features — that would change 
 - The `atlas` stage depends on **dev-owned** shared resources (ECR, `janelia-das-casp-databases`, VPC
   endpoints created under the `dev` workspace). If `dev` is ever destroyed, atlas (and prod) lose those
   inputs. Don't destroy `dev`.
-- tofu state is local, via the symlink `terraform.tfstate.d -> /groups/das/rnastruct/infra/casp_servers_tf/…`.
-- Keep `atlas.tfvars` image tags in sync with `prod.tfvars` until an intentional divergence.
+- tofu state is **local to the `rna-atlas-aws-server` repo** (`terraform.tfstate.d/`, gitignored) —
+  deliberately separate from the CASP repo's shared state.
+- Keep `atlas.tfvars` image tags in sync with CASP `prod.tfvars` until an intentional divergence.
 - Bridge stays python3.12 / 256 MB / 30 s, boto3-only (no RDKit/biopython) — ligand validation is regex.

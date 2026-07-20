@@ -54,6 +54,15 @@
     if (cur) sel.value = cur;
   }
   const curModel = () => ($("model") ? $("model").value : "");
+  function updateFleetHint() {
+    const el = $("fleet_hint"); if (!el) return;
+    const s = Math.max(1, Math.min(5, parseInt($("opt_seeds") && $("opt_seeds").value, 10) || 3));
+    const n = Math.max(1, Math.min(5, parseInt($("opt_samples") && $("opt_samples").value, 10) || 5));
+    const isFleet = /v0|base/i.test(curModel() || "");
+    el.innerHTML = isFleet
+      ? `Fleet: 5 models × ${s} seeds × ${n} samples = <b>${5 * s * n}</b> structures → top-5 kept. More = slower, usually more accurate.`
+      : `Protenix (single-model) ignores seeds/samples — one pass, fast. Pick a fleet model (daslab-v0/base) to use these.`;
+  }
 
   // ---------- jobs (monitor + cancel) ----------
   const JOBS_KEY = "infer_jobs";
@@ -656,7 +665,9 @@
     results = { nomsa: null, msa: null }; shown = null; $("ibadges").innerHTML = ""; $("predict-note").textContent = ""; updateSS();
     try { if (window.Notification && Notification.permission === "default") Notification.requestPermission(); } catch (e) {}
     const mode = $("msa_mode").value || "protenix-mt";
-    const opts = { mode };
+    const nSeeds = Math.max(1, Math.min(5, parseInt($("opt_seeds").value, 10) || 3));
+    const nSamples = Math.max(1, Math.min(5, parseInt($("opt_samples").value, 10) || 5));
+    const opts = { mode, seeds: nSeeds, samples: nSamples };
     curMsa = mode !== "none";
     const model = curModel(), jobName = $("jobname").value.trim();
     renderStages({ queued: "running" }); setStatus("submitting…");
@@ -729,7 +740,9 @@
     if ($("ss-mode")) $("ss-mode").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => setSSMode(b.dataset.m)));
     if ($("ss-dbn")) $("ss-dbn").addEventListener("click", exportDbn);
     if ($("ss-png")) $("ss-png").addEventListener("click", exportSSPng);
-    loadModels(); renderJobs(); refreshJobs(); syncServerJobs(); renderModelPanel();
+    ["opt_seeds", "opt_samples", "model"].forEach((id) => { const e = $(id); if (e) e.addEventListener("change", updateFleetHint); });
+    loadModels().then(updateFleetHint); renderJobs(); refreshJobs(); syncServerJobs(); renderModelPanel();
+    updateFleetHint();
   }
   if (GATED && !tok()) showGate(); else (document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", init) : init());
 })();

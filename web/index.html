@@ -9,6 +9,7 @@
 <link rel="shortcut icon" href="favicon.ico">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="stylesheet" href="style.css">
+<script>/* set theme before first paint to avoid a flash */try{if(localStorage.getItem("atlas_theme")==="dark")document.documentElement.setAttribute("data-theme","dark");}catch(e){}</script>
 </head>
 <body>
 <div id="gate" class="hidden">
@@ -50,6 +51,7 @@
   <a id="inference-btn" href="inference/" title="Open RNAnix — predict a structure from a sequence">&#129516; Predict</a>
   <button id="share-btn" title="Copy a link to exactly this view (filters, map position, open fold)">&#128279; Share</button>
   <button id="agent-btn" title="Ask the Atlas assistant"><img src="claude.png" alt="Ask Claude"></button>
+  <button id="theme-btn" title="Toggle light / dark theme" aria-label="Toggle light or dark theme">&#9789;</button>
   <button id="help-btn" title="What do the filters & metrics mean?">?</button>
   <span id="count" class="count"></span>
 </header>
@@ -318,6 +320,24 @@
   </div>
 </div>
 
+<script>/* theme toggle — self-contained, independent of app.js */
+(function () {
+  function sync() {
+    var dark = document.documentElement.getAttribute("data-theme") === "dark";
+    var b = document.getElementById("theme-btn");
+    if (b) { b.innerHTML = dark ? "&#9728;" : "&#9789;"; b.title = dark ? "Switch to light theme" : "Switch to dark theme"; }
+  }
+  var btn = document.getElementById("theme-btn");
+  if (btn) btn.addEventListener("click", function () {
+    var dark = document.documentElement.getAttribute("data-theme") === "dark";
+    if (dark) document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.setAttribute("data-theme", "dark");
+    try { localStorage.setItem("atlas_theme", dark ? "light" : "dark"); } catch (e) {}
+    sync();
+  });
+  sync();
+})();
+</script>
 <script src="lib/3Dmol-min.js"></script>
 <script src="config.js"></script>
 <script src="datasets.js"></script>

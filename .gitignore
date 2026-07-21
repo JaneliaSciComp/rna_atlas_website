@@ -13,3 +13,6 @@ graphify-out/
 .anthropic_key
 .claude_proxy
 .infer_api.prod-backup
+tmp_analysis/
+logs/
+codex-*.md

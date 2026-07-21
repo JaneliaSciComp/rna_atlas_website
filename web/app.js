@@ -642,7 +642,7 @@ function drawProps(f) {
     ["Closest known structure (PDB)", `${f.near || "&mdash;"}${f.near_title ? ` &mdash; ${f.near_title}` : ""}${f.best_tm1 != null ? ` &middot; TM₁ ${num(f.best_tm1, 3)}` : ""}`],
     ["Distinct vs A&ndash;E (overlap)", num(f.overlap_ae, 3)],
     ["SHAPE agr (vs 2A3)", `${f.shape_ok ? "yes" : "no"} (SHAPE–pairing agreement = ${num(f.shape_agr, 3)}, + = good; mean prot = ${num(f.mean_prot_2a3, 3)})`],
-    (f.pred_pearson_2a3 != null || f.pred_pearson_dms != null) ? ["Prediction fidelity (pred vs pseudolabel)", `2A3 r=${num(f.pred_pearson_2a3, 2)} / DMS r=${num(f.pred_pearson_dms, 2)} · Spearman 2A3 ${num(f.pred_spearman_2a3, 2)} / DMS ${num(f.pred_spearman_dms, 2)}`] : null,
+    (f.pred_pearson_2a3 != null || f.pred_pearson_dms != null) ? ["Prediction fidelity (pred vs real)", `2A3 r=${num(f.pred_pearson_2a3, 2)} / DMS r=${num(f.pred_pearson_dms, 2)} · Spearman 2A3 ${num(f.pred_spearman_2a3, 2)} / DMS ${num(f.pred_spearman_dms, 2)}`] : null,
     ["OpenKnot score", num(f.openknot, 3)],
     ["Pseudoknot", f.pseudoknot ? "yes" : "no"],
     ["Secondary-structure class", f.ss_class],
@@ -766,14 +766,14 @@ function drawReactChart(f, react) {
   }
 
   el.innerHTML = `
-    <div class="reactchart-title">Predicted vs input reactivity</div>
+    <div class="reactchart-title">Predicted vs real reactivity</div>
     <div class="reactchart-caption">DMS &mdash; Pearson ${num(f.pred_pearson_dms, 3)} &middot; Spearman ${num(f.pred_spearman_dms, 3)}</div>
     <canvas id="rc_dms"></canvas>
     <div class="reactchart-caption">2A3 &mdash; Pearson ${num(f.pred_pearson_2a3, 3)} &middot; Spearman ${num(f.pred_spearman_2a3, 3)}</div>
     <canvas id="rc_2a3"></canvas>
     <div class="reactchart-legend">
       <span><span class="reactchart-swatch" style="background:#1f77b4"></span>predicted (model)</span>
-      <span><span class="reactchart-swatch" style="background:#f59e0b"></span>input pseudolabel</span>
+      <span><span class="reactchart-swatch" style="background:#f59e0b"></span>measured (real)</span>
     </div>`;
 
   const drawChart = (canvas, pred, exp) => {

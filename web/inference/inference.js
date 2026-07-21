@@ -67,6 +67,7 @@
   // ---------- jobs (monitor + cancel) ----------
   const JOBS_KEY = "infer_jobs";
   const RUNNING = new Set(["queued", "running", "submitted", "pending"]);
+  const TERMINAL = new Set(["done", "error", "cancelled"]);
   function loadJobs() { try { return JSON.parse(localStorage.getItem(JOBS_KEY) || "[]"); } catch (e) { return []; } }
   function saveJobs(j) { try { localStorage.setItem(JOBS_KEY, JSON.stringify(j.slice(0, 20))); } catch (e) {} }
   function upsertJob(job) {
@@ -611,25 +612,41 @@
     const done = j.state === "done" || hasR;
     const err = j.state === "error";
     const mid = done ? "done" : (err ? "err" : "running");
+    // don't coincidentally default a missing/malformed state to "running" — that reads as
+    // real progress. "unknown" is the honest label when the backend gave us nothing usable.
     return {
-      state: j.state || "running", error: j.error,
+      state: j.state || "unknown", error: j.error,
       flags: { queued: "done", msa: mid, nomsa: mid, refined: done ? "done" : (err ? "err" : "wait") },
       nomsa: nm, msa: ms,
     };
   }
   async function poll(jobId) {
     curJobId = jobId;
+    // if this job already reached a terminal state locally (done/error/cancelled — e.g. the
+    // user is just re-opening an old result), a single ambiguous re-poll must never downgrade
+    // it back to "running"/"unknown". That's exactly what happened for jobs whose execution no
+    // longer resolves against the current backend (recreated pipeline, different STAGE, a
+    // job_id from a prior backend generation, ...): the server can't confirm anything, but
+    // that's not evidence the job started running again.
+    const wasTerminal = TERMINAL.has(String((loadJobs().find((x) => x.id === jobId) || {}).state || "").toLowerCase());
     for (let i = 0; i < 600; i++) {
       if (String((loadJobs().find((x) => x.id === jobId) || {}).state).toLowerCase() === "cancelled") { setStatus("cancelled"); return; }
       let j; try { j = await (await fetch(`${API}/status?job=${encodeURIComponent(jobId)}${tok() ? "&t=" + encodeURIComponent(tok()) : ""}`)).json(); }
       catch (e) { setStatus("status check failed: " + e.message); return; }
       const m = mapStatus(j);
-      upsertJob({ id: jobId, state: m.state });
+      const newState = String(m.state || "").toLowerCase();
+      if (!wasTerminal || newState === "done" || newState === "error") upsertJob({ id: jobId, state: m.state });
       renderStages(m.flags);
       if (m.nomsa && (m.nomsa.url || m.nomsa.cif) && !results.nomsa) gotResult("nomsa", await fetchCif(m.nomsa));
       if (m.msa && (m.msa.url || m.msa.cif) && !results.msa) gotResult("msa", await fetchCif(m.msa));
       if (m.state === "error") { setStatus("⚠ " + (m.error || "prediction failed")); notifyDone(jobId, false, m.error); return; }
       if (m.state === "done" || (results.nomsa && results.msa)) { setStatus("done"); notifyDone(jobId, true); return; }
+      if (wasTerminal) {
+        // already had a terminal result cached and this re-poll didn't reconfirm it — stop
+        // instead of hammering an unresolvable job every 3s for up to 30 minutes.
+        setStatus(newState === "unknown" ? "note: this job's backend record is no longer resolvable — showing the last known result." : "done");
+        return;
+      }
       await new Promise((r) => setTimeout(r, 3000));
     }
   }

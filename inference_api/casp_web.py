@@ -14,14 +14,17 @@ prediction pipeline (us-east-2). Exposes a clean JSON API the front-end already 
   POST /cancel   {job_id,token}     -> {ok}
 
 It REUSES the existing per-model handler Lambda (janelia-das-casp-daslab-<model>-prod)
-with submit=false, so predictions run through the SAME Step-Functions/SageMaker engine
-but are NOT submitted to CASP. Results (submissions/<target>/<model>/<ts>.pdb in the private
-artifacts bucket) are read server-side and returned inline, behind a shared web token.
+with submit=false, so predictions run through the SAME Step-Functions/SageMaker engine, but
+the atlas workspace's Finalize step is finalize_inference.py (not the real finalize.py) —
+CASP submission mechanics are never invoked. Results (inference/<target>/<model>/manifest.json
++ rank_NN.pdb in the private artifacts bucket) are read server-side and returned inline,
+behind a shared web token.
 
 job_id is compound: "<model>:<target_id>:<executionName>" so /status & /cancel are self-contained.
 Env: ARTIFACTS_BUCKET, WEB_TOKEN (gate passcode), ACCOUNT, REGION, STAGE.
 """
 import base64
+import gzip
 import hashlib
 import json
 import os
@@ -133,8 +136,17 @@ _CORS = {"Access-Control-Allow-Origin": "*",
 
 
 def _resp(code, obj):
-    return {"statusCode": code, "headers": {"Content-Type": "application/json", **_CORS},
-            "body": json.dumps(obj)}
+    body = json.dumps(obj)
+    headers = {"Content-Type": "application/json", **_CORS}
+    # Large results (a big structure returned inline as cif) can exceed API Gateway's ~6 MB
+    # response cap. gzip bodies over ~1 MB: a 6.8 MB PDB -> ~1.5 MB, well under the limit, and
+    # ~40 MB structures still fit. The browser (fetch) decodes Content-Encoding: gzip transparently.
+    if len(body) > 1_000_000:
+        gz = gzip.compress(body.encode())
+        return {"statusCode": code, "isBase64Encoded": True,
+                "headers": {**headers, "Content-Encoding": "gzip"},
+                "body": base64.b64encode(gz).decode()}
+    return {"statusCode": code, "headers": headers, "body": body}
 
 
 def _handler_fn(model):
@@ -149,13 +161,36 @@ def _pipeline_arn(model):
     return f"arn:aws:states:{REGION}:{ACCOUNT}:stateMachine:janelia-das-casp-{model}-pipeline-{STAGE}"
 
 
-def _latest_pdb(target_id, model):
+def _inference_result_pdb(target_id, model):
+    """Read finalize_inference.py's ranked picks (inference/<target>/<model>/manifest.json +
+    rank_NN.pdb) and reassemble them into one MODEL/ENDMDL-wrapped PDB blob — same shape the
+    frontend already expects from a single submissions/ PFRMAT-TS file, so no frontend change
+    is needed. Returns None if no result is there yet."""
     try:
-        r = s3.list_objects_v2(Bucket=ARTIFACTS_BUCKET, Prefix=f"submissions/{target_id}/{model}/")
+        manifest_key = f"inference/{target_id}/{model}/manifest.json"
+        manifest = json.loads(s3.get_object(Bucket=ARTIFACTS_BUCKET, Key=manifest_key)["Body"].read())
     except Exception:
         return None
-    keys = sorted(o["Key"] for o in r.get("Contents", []) if o["Key"].endswith(".pdb"))
-    return keys[-1] if keys else None
+    rank_keys = [k for k in manifest.get("ranks", []) if k.endswith(".pdb")]
+    if not rank_keys:
+        return None
+    bodies = []
+    for key in rank_keys:
+        try:
+            bodies.append(s3.get_object(Bucket=ARTIFACTS_BUCKET, Key=key)["Body"].read().decode())
+        except Exception:
+            continue
+    if not bodies:
+        return None
+    if len(bodies) == 1:
+        return bodies[0]
+    lines = []
+    for idx, body in enumerate(bodies, start=1):
+        lines.append(f"MODEL {idx}")
+        lines.append(body.rstrip("\n"))
+        lines.append("ENDMDL")
+    lines.append("END")
+    return "\n".join(lines)
 
 
 def lambda_handler(event, context):
@@ -242,7 +277,7 @@ def _predict(body):
     target_id = "web" + hashlib.sha256(key.encode()).hexdigest()[:12]
 
     # cache: a finalized structure already exists
-    if _latest_pdb(target_id, model):
+    if _inference_result_pdb(target_id, model):
         return _resp(200, {"job_id": f"{model}:{target_id}::{tag}", "target_id": target_id,
                            "model": model, "status": "CACHED", "mode": mode})
 
@@ -341,22 +376,28 @@ def _status(qs):
     target_id = parts[1] if len(parts) > 1 else ""
     ename = parts[2] if len(parts) > 2 else ""
     stage = parts[3] if len(parts) > 3 and parts[3] in ("msa", "nomsa") else "msa"
-    state, err = "running", None
+    # state stays None until we have POSITIVE evidence of a live execution status. Do NOT
+    # default to "running": an execution that can't be resolved (deleted/expired history, a
+    # recreated pipeline, a job_id from a prior backend generation/STAGE, ...) is not evidence
+    # it's still running. This used to default to "running" here, which silently flipped
+    # already-"done" jobs back to a false "running" the moment the client re-checked them.
+    state, err = None, None
     if ename:
         try:
             st = sfn.describe_execution(executionArn=_exec_arn(model, ename))["status"]
             state = _STATE.get(st, "running")
             if state == "error":
                 err = st
-        except Exception:
-            state = "running"
-    key = _latest_pdb(target_id, model) if target_id else None
-    if key:
-        try:
-            cif = s3.get_object(Bucket=ARTIFACTS_BUCKET, Key=key)["Body"].read().decode()
-            return _resp(200, {"state": "done", "stages": {stage: {"status": "done", "cif": cif}}})
         except Exception as e:
-            return _resp(200, {"state": "error", "error": f"result read failed: {e}"})
+            err = str(e)   # unresolvable execution -- leave state unset, fall through below
+    cif = _inference_result_pdb(target_id, model) if target_id else None
+    if cif:
+        return _resp(200, {"state": "done", "stages": {stage: {"status": "done", "cif": cif}}})
+    if state is None:
+        # no live execution to report AND no finalized result in S3 -- genuinely unknown
+        # (e.g. a foreign/prior-generation job_id), distinct from "running" so the client
+        # never mistakes "we can't resolve this" for real progress.
+        state = "unknown"
     return _resp(200, {"state": state, "error": err, "stages": {}})
 
 

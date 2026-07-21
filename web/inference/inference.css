@@ -1,6 +1,9 @@
 #back-link { color: #cdd6dd; text-decoration: none; font-size: 13px; margin-left: 14px; }
 #back-link:hover { color: #fff; }
 
+#model-help-link { margin-left: 14px; font-size: 13px; font-weight: 600; border: 1px solid #3a4a63; background: #2a3b54; color: #fff; cursor: pointer; border-radius: 5px; padding: 4px 10px; display: inline-block; text-decoration: none; }
+#model-help-link:hover { background: #2e6f95; }
+
 #ilayout { display: flex; height: calc(100vh - 46px); width: 100%; }
 #ipanel { width: 340px; overflow-y: auto; padding: 14px 16px; background: #fff; border-right: 1px solid #dde3e8; }
 #ipanel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: #5b6670; margin: 2px 0 12px; }

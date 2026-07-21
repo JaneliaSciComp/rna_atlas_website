@@ -355,6 +355,38 @@ tbody tr:hover { background: var(--row-hover); }
 #showmore #all-btn { background: var(--text-muted); }
 .sm-note { color: var(--text-faint); font-size: 12px; margin-left: 8px; }
 
+/* ---------- panoramic (dashboard) deep-view — AlphaFold-DB-style tiling ----------
+   Full-screen overlay that tiles every panel as a clean card, sized to fit the
+   viewport (no horizontal scrollbars — the track/2D SVGs are fluid via viewBox).
+   The column count adapts to screen width at the breakpoints below. */
+.deep-tools button.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+#deep.mode-panoramic { position: fixed; inset: 0; background: var(--scrim); display: flex; padding: 2.2vh 1.4vw; z-index: 50; backdrop-filter: blur(2px); }
+#deep.mode-panoramic .deep-card { width: 100%; height: 100%; max-width: none; border-radius: var(--radius-lg); box-shadow: var(--shadow-3); overflow: auto; padding: 14px 18px; background: var(--bg); }
+#deep.mode-panoramic .deep-body { display: grid; gap: 14px; grid-template-columns: 1fr; align-items: start; }
+/* every panel → card */
+#deep.mode-panoramic .deep-body > div { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-1); padding: 12px 14px; min-width: 0; }
+#deep.mode-panoramic #viewer3d { padding: 0; overflow: hidden; }
+#deep.mode-panoramic #reactchart:empty { display: none; }
+/* fluid track / 2D SVGs: scale to the card instead of forcing a scrollbar */
+#deep.mode-panoramic #tracks { overflow-x: visible; }
+#deep.mode-panoramic #tracks svg { width: 100%; height: auto; max-width: none; display: block; }
+@media (min-width: 1000px) {
+  #deep.mode-panoramic .deep-body {
+    grid-template-columns: 1.25fr 1fr;
+    grid-template-areas: "viewer tracks" "props react";
+  }
+  #deep.mode-panoramic #viewer3d { grid-area: viewer; height: 100%; min-height: 62vh; }
+  #deep.mode-panoramic #tracks { grid-area: tracks; }
+  #deep.mode-panoramic #props { grid-area: props; }
+  #deep.mode-panoramic #reactchart { grid-area: react; grid-column: auto; }
+}
+@media (min-width: 1600px) {
+  #deep.mode-panoramic .deep-body {
+    grid-template-columns: 1.35fr 1fr 1fr;
+    grid-template-areas: "viewer tracks tracks" "viewer props react";
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }

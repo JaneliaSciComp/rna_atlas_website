@@ -404,6 +404,12 @@ function wireStatic() {
   $("deep").addEventListener("click", (e) => { if (e.target.id === "deep") closeDeep(); });
   document.querySelectorAll('#layoutctl button[data-mode]').forEach((b) =>
     b.addEventListener("click", () => setDeepMode(b.dataset.mode)));
+  if ($("deep-pano")) $("deep-pano").addEventListener("click", () => {
+    setDeepMode(currentMode() === "panoramic" ? "modal" : "panoramic");
+    // re-fit the canvas chart + tracks to the new layout (the SVGs are fluid; the
+    // reactivity chart is a <canvas> that must be re-sized to its new container)
+    if (currentDeep) { drawTracks(currentDeep.f, currentDeep.react); drawReactChart(currentDeep.f, currentDeep.react); }
+  });
   document.querySelectorAll('#viewctl button[data-view]').forEach((b) =>
     b.addEventListener("click", () => setView(b.dataset.view)));
   if ($("share-btn")) $("share-btn").addEventListener("click", copyShareLink);
@@ -587,10 +593,11 @@ function updateLayout() {
   if (open && m === "right") document.body.classList.add("deepopen-right");
   if (open && m === "bottom") document.body.classList.add("deepopen-bottom");
   document.querySelectorAll('#layoutctl button[data-mode]').forEach((b) => b.classList.toggle("active", b.dataset.mode === m));
+  const pb = $("deep-pano"); if (pb) pb.classList.toggle("active", m === "panoramic");
 }
 function setDeepMode(m) {
   const d = $("deep");
-  d.classList.remove("mode-modal", "mode-right", "mode-bottom");
+  d.classList.remove("mode-modal", "mode-right", "mode-bottom", "mode-panoramic");
   d.classList.add("mode-" + m);
   localStorage.setItem("atlas_deepmode", m);
   updateLayout();
@@ -717,7 +724,7 @@ function drawTracks(f, react) {
   ];
   const hasPred = !!(react && (react.pred_dms || react.pred_a23));
   const yPair = ySeq + 16 + reactRows.length * 16, H = yPair + 18;
-  let svg = `<svg width="${W + 40}" height="${H}" font-size="9">`;
+  let svg = `<svg width="${W + 40}" height="${H}" viewBox="0 0 ${W + 40} ${H}" preserveAspectRatio="xMinYMin meet" font-size="9">`;
   // motif bars
   motifs.forEach((m) => {
     m.ranges.forEach(([a, b]) => {

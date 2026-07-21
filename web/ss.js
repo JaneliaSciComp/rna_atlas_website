@@ -28,7 +28,7 @@ function arcDiagram(dbn, n, cw, W) {   // SVG arc plot of the predicted secondar
   const cap = 120; let maxH = 12;
   const segs = pairs.map((p) => { const h = Math.min(cap, 6 + (p.j - p.i) * cw * 0.55); maxH = Math.max(maxH, h); return { p, h }; });
   const aH = maxH + 8, base = aH - 2;
-  let s = `<svg width="${W + 40}" height="${aH}" font-size="9"><line x1="0" y1="${base}" x2="${W}" y2="${base}" stroke="#dfe3e8"/>`;
+  let s = `<svg width="${W + 40}" height="${aH}" viewBox="0 0 ${W + 40} ${aH}" preserveAspectRatio="xMinYMin meet" font-size="9"><line x1="0" y1="${base}" x2="${W}" y2="${base}" stroke="#dfe3e8"/>`;
   segs.forEach(({ p, h }) => {
     const xi = p.i * cw + cw / 2, xj = p.j * cw + cw / 2, mx = (xi + xj) / 2;
     s += `<path d="M${xi.toFixed(1)} ${base} Q ${mx.toFixed(1)} ${(base - h).toFixed(1)} ${xj.toFixed(1)} ${base}" fill="none" stroke="${p.pk ? "#c1440e" : "#2e6f95"}" stroke-width="1.2" opacity="0.55"><title>${p.i + 1}–${p.j + 1}${p.pk ? " (pseudoknot)" : ""}</title></path>`;
@@ -68,7 +68,7 @@ function forna2D(id, dbn, seq, react, box, alt) {
   const pad = 12, sc = Math.min((box - 2 * pad) / ((maxx - minx) || 1), (box - 2 * pad) / ((maxy - miny) || 1));
   const X = (v) => (pad + (v - minx) * sc).toFixed(1), Y = (v) => (pad + (v - miny) * sc).toFixed(1);
   const r = Math.max(2.4, Math.min(7, sc * 7));
-  let s = `<svg width="${box}" height="${box}" font-size="7">`;
+  let s = `<svg width="${box}" height="${box}" viewBox="0 0 ${box} ${box}" preserveAspectRatio="xMidYMid meet" font-size="7">`;
   let path = "M";
   for (let i = 0; i < n; i++) path += `${X(pos[i].x)} ${Y(pos[i].y)}${i < n - 1 ? " L" : ""} `;
   s += `<path d="${path}" fill="none" stroke="#cdd6dd" stroke-width="1.4"/>`;

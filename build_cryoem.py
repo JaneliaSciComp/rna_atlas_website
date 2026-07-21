@@ -28,6 +28,28 @@ import os
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
 
+def contact_ratio(path):
+    """C1'-C1' globularity proxy: pairs within 8 A, sequence separation >=6, / length.
+    Same calc as build_dataset.py / build_feature_table.py / build_openknot_long.py."""
+    import gemmi
+    import numpy as np
+    st = gemmi.read_structure(path)
+    pts = []
+    for r in st[0][0]:
+        for atom in r:
+            if atom.name in ("C1'", "C1*"):
+                pts.append([atom.pos.x, atom.pos.y, atom.pos.z]); break
+    n = len(pts)
+    if n < 2:
+        return None
+    P = np.asarray(pts)
+    D = np.sqrt(((P[:, None, :] - P[None, :, :]) ** 2).sum(-1))
+    idx = np.arange(n)
+    sep = np.abs(idx[:, None] - idx[None, :])
+    mask = np.triu((D <= 8.0) & (sep >= 6), 1)
+    return round(int(mask.sum()) / n, 4)
+
+
 def best_sample(pred_dir, name):
     """Return (sample_idx, conf_dict, pdb_path) for the highest-pLDDT sample."""
     preds = f"{pred_dir}/{name}/seed_101/predictions"
@@ -68,6 +90,10 @@ def main():
             continue
         k, conf, pdb_path = picked
         key = name  # ok8cryo-NN is already filename-safe
+        try:
+            cr = contact_ratio(pdb_path)
+        except Exception:
+            cr = None
         # struct: gzip the raw pdb
         with open(pdb_path, "rb") as fh:
             raw = fh.read()
@@ -104,7 +130,7 @@ def main():
             "openknot": fl(mrec.get("openknot")),
             "overlap_ae": None,
             "is_novel_v341": None, "best_tm1": None, "near": None, "near_title": None,
-            "score": None, "contact_ratio": None, "bp_fraction": None,
+            "score": None, "contact_ratio": cr, "bp_fraction": None,
             "in_shortlist": 0, "seq_cluster_size": None, "struct_rep": 1,
             "termini_bp": 0, "termini_trim": 0, "overhang5": 0, "overhang3": 0,
             "uucg_tetraloop": 0,

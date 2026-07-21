@@ -17,8 +17,8 @@ from collections import Counter
 ROOT = os.path.dirname(os.path.abspath(__file__))
 MANIFEST = os.environ.get(
     "AH_MANIFEST",
-    "/groups/das/home/zouinkhim/ribonanza_inf_aws/RNAnix/imgs_tmp/tt/"
-    "ext/ribonanza2_distillation_AE_FGH_handoff/annotation_manifest.parquet")
+    "/groups/das/home/joshic/RNAnix/projects/20260609_ribonanza2_distillation_FGH/"
+    "handoff/annotation_manifest.parquet")
 
 
 def toi(x):

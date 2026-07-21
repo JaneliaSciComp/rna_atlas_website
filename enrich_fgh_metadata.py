@@ -10,6 +10,14 @@ Source: /groups/das/rnastruct/bioinformatics/202606-distill/ribo2_metadata_enhan
 Sets per fold (when present): rnacentral_id (URS_taxid), rnacentral_name (description, also
 upgrades display name), rna_type, member_dbs, rfam_id (RF accession), rfam_name.
 Join by fasta_index. Run in the `rna` env; updates data/folds.json.
+
+Each letter's parquet carries a GLOBAL fasta_index, not local to that file -- confirmed via
+parquet row-group statistics: F is 0-7,999,999, G is 8,000,000-15,999,999, H is
+16,000,000-23,999,999 (each file is a full 8,000,000-row block of one combined numbering
+scheme, not reset to 0 per letter). The `id` field's numeric prefix, by contrast, IS local to
+its letter (e.g. G's ids range ~42k-8.0M, same range as F's and H's) -- so the join key needs
+the block offset added before filtering, or every G/H row misses (this was the actual bug:
+G/H shipped 0% RNAcentral/Rfam coverage while F was ~100%).
 """
 import json
 import os
@@ -17,6 +25,7 @@ import re
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 ENH = "/groups/das/rnastruct/bioinformatics/202606-distill/ribo2_metadata_enhanced/Ribonanza2{L}.parquet"
+OFFSET = {"F": 0, "G": 8_000_000, "H": 16_000_000}
 COLS = ["fasta_index", "rnacentral_urs", "rnacentral_taxid", "rnacentral_description",
         "rnacentral_member_dbs", "rnacentral_rna_type", "rnacentral_family_acc",
         "rfam_family_id", "rfam_family_name"]
@@ -40,7 +49,8 @@ def main():
             for k in ("rnacentral_id", "rnacentral_name", "rna_type", "member_dbs", "rfam_id", "rfam_name"):
                 f.pop(k, None)
             f["name"] = default_name(f.get("sublibrary", "") or "")
-            by[f["letter"]][int(f["id"].split("-")[0]) - 1] = f
+            local_idx = int(f["id"].split("-")[0]) - 1
+            by[f["letter"]][local_idx + OFFSET[f["letter"]]] = f
     n_urs = n_rfam = 0
     for lib, idx2f in by.items():
         if not idx2f:

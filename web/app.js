@@ -649,6 +649,15 @@ function drawProps(f) {
     ["SHAPE agr (vs 2A3)", `${f.shape_ok ? "yes" : "no"} (SHAPE–pairing agreement = ${num(f.shape_agr, 3)}, + = good; mean prot = ${num(f.mean_prot_2a3, 3)})`],
     (f.pred_pearson_2a3 != null || f.pred_pearson_dms != null) ? ["Prediction fidelity (pred vs real)", `2A3 r=${num(f.pred_pearson_2a3, 2)} / DMS r=${num(f.pred_pearson_dms, 2)} · Spearman 2A3 ${num(f.pred_spearman_2a3, 2)} / DMS ${num(f.pred_spearman_dms, 2)}`] : null,
     ["OpenKnot score", num(f.openknot, 3)],
+    (f.designer || f.design_method || f.design_round) ? ["Design",
+      [f.design_round && esc(f.design_round),
+       f.designer && ("by " + esc(f.designer)),
+       f.design_method && ("via " + esc(f.design_method))].filter(Boolean).join(" &middot; ")] : null,
+    f.design_title ? ["Design name", esc(f.design_title.length > 80 ? f.design_title.slice(0, 80) + "…" : f.design_title)] : null,
+    f.organism ? ["Organism (design source)", esc(f.organism)] : null,
+    (f.reads_dms != null || f.reads_2a3 != null) ? ["Read depth (DMS / 2A3)",
+      `${f.reads_dms != null ? Math.round(f.reads_dms).toLocaleString() : "&mdash;"} / ${f.reads_2a3 != null ? Math.round(f.reads_2a3).toLocaleString() : "&mdash;"}`]
+      : (f.reads != null ? ["Read depth", Math.round(f.reads).toLocaleString()] : null),
     ["Pseudoknot", f.pseudoknot ? "yes" : "no"],
     ["Secondary-structure class", f.ss_class],
     ["5′/3′ termini", f.termini_bp ? "ends base-paired (1↔N)"

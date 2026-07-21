@@ -54,6 +54,15 @@
         <span><label class="ilbl" for="opt_samples">Samples / seed</label><input id="opt_samples" class="numopt" type="number" min="1" max="5" step="1" value="5"></span>
       </div>
       <div class="ihint" id="fleet_hint"></div>
+      <div class="optrow">
+        <span><label class="ilbl" for="opt_relax"><input id="opt_relax" type="checkbox" checked> Relax structures (OpenMM)</label></span>
+      </div>
+      <div class="ihint" id="relax_hint">Post-process each pick with energy minimization and keep whichever of raw/relaxed has fewer clashes. Recommended; adds some time per prediction.</div>
+      <div class="optrow">
+        <span><label class="ilbl" for="opt_expert"><input id="opt_expert" type="checkbox"> Expert mode — literature-informed templates</label></span>
+      </div>
+      <div class="ihint" id="expert_hint">Claude researches this RNA's family and curates a 3D template from homologous PDB structures before folding. Slower (adds real minutes of research time) and more thorough.</div>
+      <textarea id="opt_description" hidden rows="2" placeholder="What is this RNA? (used for research — e.g. &quot;a glycine riboswitch aptamer&quot;, &quot;a de-novo Eterna design&quot;, &quot;a group II intron&quot;)"></textarea>
     </fieldset>
     <button id="predict-btn">Predict</button>
     <p id="predict-note" class="muted"></p>
@@ -61,6 +70,7 @@
   </aside>
 
   <main id="iresult">
+    <div id="iloading" class="iloading" hidden>Loading…</div>
     <div id="stages"></div>
     <div id="iview">
       <div class="vtoggle" id="vtoggle">
@@ -86,6 +96,19 @@
       </div>
       <div id="ss-svg" class="ss-svg"></div>
       <div class="ss-note">Derived client-side from the predicted 3D (canonical WC/wobble pairs only). <span style="color:#c1440e">orange = pseudoknot</span>.</div>
+    </div>
+    <div id="why-picks" class="why-picks" hidden>
+      <div class="why-head">
+        <span class="why-title">Why these picks</span>
+        <span class="why-gate" id="why-gate"></span>
+      </div>
+      <div class="why-family" id="why-family"></div>
+      <div class="why-brief" id="why-brief"></div>
+      <div class="why-rationale" id="why-rationale"></div>
+      <details class="why-thinking-wrap" id="why-thinking-wrap" hidden>
+        <summary>Claude's reasoning</summary>
+        <div class="why-thinking" id="why-thinking"></div>
+      </details>
     </div>
     <div id="iplaceholder">Submit a sequence to predict its 3D structure. Runs single-sequence by default (fast); tick “compute MSA” for a slower, usually more accurate model.</div>
   </main>

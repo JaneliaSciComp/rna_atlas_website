@@ -8,6 +8,7 @@ prediction pipeline (us-east-2). Exposes a clean JSON API the front-end already 
   GET  /status?job=<job_id>&t=<tok> -> {state, stages:{msa:{status,cif?}}}
   GET  /msa?job=<job_id>&t=<tok>    -> {files:[{name,content}]}   (alignment files)
   GET  /template?job=<job_id>&t=<tok> -> {files:[{name,content}]} (JohnTBM template CSVs)
+  GET  /brief?job=<job_id>&t=<tok>  -> {gate,template_pdb_ids,brief,rationale,thinking} (Expert-mode research)
   GET  /pool?job=<job_id>&t=<tok>   -> {files:[{key,name,size}],count,bytes}  (full sample pool)
   GET  /poolfile?job=<job_id>&key=<k>&t=<tok> -> raw file content (one pool member)
   GET  /jobs?t=<tok>                -> {jobs:[{job_id,model,state,name}]}
@@ -24,14 +25,17 @@ job_id is compound: "<model>:<target_id>:<executionName>" so /status & /cancel a
 Env: ARTIFACTS_BUCKET, WEB_TOKEN (gate passcode), ACCOUNT, REGION, STAGE.
 """
 import base64
+import datetime
 import gzip
 import hashlib
 import json
 import os
 import re
+import time
 import uuid
 
 import boto3
+from botocore.client import Config
 
 lam = boto3.client("lambda")
 sfn = boto3.client("stepfunctions")
@@ -43,6 +47,13 @@ REGION = os.environ.get("REGION", "us-east-2")
 STAGE = os.environ.get("STAGE", "prod")
 ARTIFACTS_BUCKET = os.environ.get("ARTIFACTS_BUCKET", "janelia-das-casp-artifacts-prod")
 WEB_TOKEN = os.environ.get("WEB_TOKEN", "")
+
+# Presigned URLs must use the REGIONAL virtual-hosted endpoint (bucket.s3.<region>.amazonaws.com).
+# The default/global bucket.s3.amazonaws.com host 307-redirects a non-us-east-1 bucket to its region,
+# and browsers do NOT carry CORS headers across that redirect -> the client fetch() fails even though
+# curl (which ignores CORS) succeeds. Pinning region + virtual addressing removes the redirect.
+s3_presign = boto3.client("s3", region_name=REGION,
+                          config=Config(signature_version="s3v4", s3={"addressing_style": "virtual"}))
 
 MODELS = [
     {"id": "daslab-ptnx1", "label": "Protenix (ptnx1)"},
@@ -163,15 +174,18 @@ def _pipeline_arn(model):
 
 def _inference_result_pdb(target_id, model):
     """Read finalize_inference.py's ranked picks (inference/<target>/<model>/manifest.json +
-    rank_NN.pdb) and reassemble them into one MODEL/ENDMDL-wrapped PDB blob — same shape the
-    frontend already expects from a single submissions/ PFRMAT-TS file, so no frontend change
-    is needed. Returns None if no result is there yet."""
+    rank_NN.{pdb,cif} — whichever format the model actually wrote) and return the top-ranked
+    structure. inference.js content-sniffs format (fmtOf(): 'data_'/'_atom_site' -> cif, else
+    pdb), so raw text of either format is fine — but MODEL/ENDMDL bracketing (which the old
+    submissions/ PFRMAT-TS path used to show all 5 in one blob) is PDB-only syntax and would
+    corrupt real mmCIF, so only PDB-format results get concatenated; CIF returns just the best
+    pick. Returns None if no result is there yet."""
     try:
         manifest_key = f"inference/{target_id}/{model}/manifest.json"
         manifest = json.loads(s3.get_object(Bucket=ARTIFACTS_BUCKET, Key=manifest_key)["Body"].read())
     except Exception:
         return None
-    rank_keys = [k for k in manifest.get("ranks", []) if k.endswith(".pdb")]
+    rank_keys = manifest.get("ranks", [])
     if not rank_keys:
         return None
     bodies = []
@@ -182,7 +196,8 @@ def _inference_result_pdb(target_id, model):
             continue
     if not bodies:
         return None
-    if len(bodies) == 1:
+    is_cif = bodies[0].startswith("data_") or "_atom_site" in bodies[0]
+    if is_cif or len(bodies) == 1:
         return bodies[0]
     lines = []
     for idx, body in enumerate(bodies, start=1):
@@ -191,6 +206,30 @@ def _inference_result_pdb(target_id, model):
         lines.append("ENDMDL")
     lines.append("END")
     return "\n".join(lines)
+
+
+def _submissions_result_url(target_id, model):
+    """Fallback for jobs from the pre-inference/ backend generation (the CASP-prod results copied
+    into this bucket): those live at submissions/<target>/<model>/<ts>.pdb — a single CASP PFRMAT-TS
+    PDB (already MODEL/ENDMDL-bracketed, renders as-is). Rather than stream the file (up to ~9 MB)
+    back through the Lambda + API Gateway on every click (~20 s, and near the 30 s Lambda timeout),
+    hand the browser a short-lived presigned S3 URL so it downloads straight from S3 — much faster
+    and cheaper (no Lambda runtime / API GW payload). Returns the newest object's URL, or None.
+    Only consulted when inference/ has nothing and the execution is unresolvable, so it never
+    touches the live-prediction hot path."""
+    prefix = f"submissions/{target_id}/{model}/"
+    try:
+        resp = s3.list_objects_v2(Bucket=ARTIFACTS_BUCKET, Prefix=prefix)
+    except Exception:
+        return None
+    pdbs = sorted(o["Key"] for o in resp.get("Contents", []) if o["Key"].endswith(".pdb"))
+    if not pdbs:
+        return None
+    try:
+        return s3_presign.generate_presigned_url(
+            "get_object", Params={"Bucket": ARTIFACTS_BUCKET, "Key": pdbs[-1]}, ExpiresIn=3600)
+    except Exception:
+        return None
 
 
 def lambda_handler(event, context):
@@ -225,6 +264,8 @@ def lambda_handler(event, context):
         return _msa(qs)
     if path.endswith("/template") or path.endswith("/templates"):
         return _templates(qs)
+    if path.endswith("/brief"):
+        return _brief(qs)
     if path.endswith("/poolfile"):
         return _poolfile(qs)
     if path.endswith("/pool"):
@@ -273,7 +314,12 @@ def _predict(body):
     # target key covers the full ORDERED entity list (type|seq-or-ligand|count) + model + mode +
     # fleet knobs, so distinct complexes/settings never collide (homodimer count:2 vs monomer; 1 vs 5 seeds).
     parts = [f"{e['type']}:{e.get('seq', e.get('value', ''))}:{e['count']}" for e in entities]
-    key = f"{model}|{mode}|s{n_seeds}|n{n_sample}|" + "|".join(parts)
+    expert = bool(opt.get("expert", False))
+    description = str(opt.get("description", "") or "")[:500]
+    # expert/description change what gets folded (a curated template feeds the fold job), so they
+    # must be part of the cache key -- otherwise an expert request could return a stale non-expert
+    # cached result, or two different descriptions for the same sequence could collide.
+    key = f"{model}|{mode}|s{n_seeds}|n{n_sample}|expert{int(expert)}|{description}|" + "|".join(parts)
     target_id = "web" + hashlib.sha256(key.encode()).hexdigest()[:12]
 
     # cache: a finalized structure already exists
@@ -359,6 +405,9 @@ def _predict(body):
         "rmsa_tool_version": env.get("RMSA_TOOL_VERSION", ""),
         "artifacts_bucket": env.get("ARTIFACTS_BUCKET", ""),
         "total_residues": total, "effective_msa_kind": eff,
+        "relax": bool(opt.get("relax", True)),  # OpenMM relax post-process; checked by default
+        "expert": expert,  # Claude research + curated template; unchecked by default
+        "description": description,
     }
     try:
         sfn.start_execution(stateMachineArn=env["STATE_MACHINE_ARN"], name=ename,
@@ -391,8 +440,23 @@ def _status(qs):
         except Exception as e:
             err = str(e)   # unresolvable execution -- leave state unset, fall through below
     cif = _inference_result_pdb(target_id, model) if target_id else None
-    if cif:
+    # legacy fallback: jobs from the pre-inference/ backend generation (CASP-prod results copied
+    # here) have no inference/ manifest and an unresolvable execution (state is None). Read their
+    # submissions/<target>/<model>/<ts>.pdb so those "done" jobs keep opening. Gated on state is
+    # None so a live prediction (state="running"/"done") never hits the extra S3 list.
+    legacy_url = None
+    if cif is None and state is None and target_id:
+        legacy_url = _submissions_result_url(target_id, model)   # presigned S3 URL, fetched client-side
+    # Only trust a readable manifest as "done" when the execution isn't actively RUNNING.
+    # finalize_inference now writes its manifest before RelaxPicks (Phase 2) runs after it, so a
+    # readable manifest no longer means the whole pipeline finished -- state="running" from a
+    # live, resolvable execution overrides it. (state is None -- unresolvable/expired history,
+    # e.g. an old job from a prior backend generation -- still trusts the S3 result, unchanged.)
+    if cif and state != "running":
         return _resp(200, {"state": "done", "stages": {stage: {"status": "done", "cif": cif}}})
+    # legacy job: return the presigned URL, not the bytes -- the browser downloads straight from S3.
+    if legacy_url:
+        return _resp(200, {"state": "done", "stages": {stage: {"status": "done", "url": legacy_url}}})
     if state is None:
         # no live execution to report AND no finalized result in S3 -- genuinely unknown
         # (e.g. a foreign/prior-generation job_id), distinct from "running" so the client
@@ -490,6 +554,49 @@ def _templates(qs):
     return _resp(200, {"files": files})
 
 
+def _brief(qs):
+    """Return the Phase 3 (Expert mode) research brief/rationale/thinking + gate verdict for a
+    job, for the web UI's "Why these picks" panel. finalize_inference.py writes
+    gate/template_pdb_ids into inference/<target>/<model>/manifest.json; the research Lambda
+    itself writes brief.md/rationale.md/thinking.md under research/<target>/<model>/ (a separate
+    prefix -- that Lambda's IAM role is scoped read/write to research/* only, it never touches
+    inference/*). thinking.md is Claude's own summarized extended-thinking trace from the
+    research call -- the actual reasoning, not just the final brief/rationale conclusions.
+    Non-expert jobs simply have nothing at either location, so this always returns 200 with
+    empty strings/SUSPECT."""
+    job = qs.get("job") or ""
+    parts = job.split(":")
+    model = parts[0] if parts else "daslab-ptnx1"
+    target_id = parts[1] if len(parts) > 1 else ""
+    if not target_id:
+        return _resp(200, {"gate": "SUSPECT", "template_pdb_ids": [], "brief": "", "rationale": "", "thinking": ""})
+
+    gate, template_pdb_ids = "SUSPECT", []
+    try:
+        manifest = json.loads(s3.get_object(
+            Bucket=ARTIFACTS_BUCKET, Key=f"inference/{target_id}/{model}/manifest.json")["Body"].read())
+        gate = manifest.get("gate", "SUSPECT")
+        template_pdb_ids = manifest.get("template_pdb_ids", [])
+    except Exception:
+        pass
+
+    def _read(name):
+        try:
+            return s3.get_object(
+                Bucket=ARTIFACTS_BUCKET, Key=f"research/{target_id}/{model}/{name}"
+            )["Body"].read().decode("utf-8", "replace")
+        except Exception:
+            return ""
+
+    return _resp(200, {
+        "gate": gate,
+        "template_pdb_ids": template_pdb_ids,
+        "brief": _read("brief.md"),
+        "rationale": _read("rationale.md"),
+        "thinking": _read("thinking.md"),
+    })
+
+
 def _pool_prefix(job):
     """predictions/<target_id>/<model>/ — the SageMaker predict step writes the full
     sample pool here (one <branch>-<ts>/<target>/seed_<N>/predictions/ tree per MSA
@@ -540,20 +647,94 @@ def _poolfile(qs):
             "body": body.decode("utf-8", "replace")}
 
 
+def _list_all(prefix, max_pages=8):
+    """Paginated list_objects_v2 (capped) -> list of {Key, LastModified}."""
+    out, token, pages = [], None, 0
+    while pages < max_pages:
+        kw = {"Bucket": ARTIFACTS_BUCKET, "Prefix": prefix}
+        if token:
+            kw["ContinuationToken"] = token
+        try:
+            resp = s3.list_objects_v2(**kw)
+        except Exception:
+            break
+        out.extend(resp.get("Contents", []))
+        token = resp.get("NextContinuationToken")
+        pages += 1
+        if not token:
+            break
+    return out
+
+
+def _ts_from_name(name):
+    """submissions/<...>/<YYYYMMDDTHHMMSSZ>.pdb -> epoch seconds (the real fold time; the object's
+    LastModified is just when it was copied into the bucket, so it's useless for ordering)."""
+    try:
+        return datetime.datetime.strptime(name.split(".")[0], "%Y%m%dT%H%M%SZ").replace(
+            tzinfo=datetime.timezone.utc).timestamp()
+    except Exception:
+        return None
+
+
+_STORED_CACHE = {"ts": 0.0, "map": None}
+
+
+def _stored_web_jobs():
+    """{web-target_id: (model, ts)} for every completed job with a result in storage
+    (inference/<t>/<m>/manifest.json or submissions/<t>/<m>/<ts>.pdb). Lets ANY browser see a
+    finished job it didn't submit, not just the one held in that browser's localStorage. Only
+    website (web*) jobs -- CASP targets are excluded. Cached ~60 s since it lists the bucket."""
+    now = time.time()
+    c = _STORED_CACHE
+    if c["map"] is not None and now - c["ts"] < 60:
+        return c["map"]
+    stored = {}
+
+    def note(tgt, model, ts):
+        if not tgt.startswith("web") or model not in MODEL_IDS or ts is None:
+            return
+        if tgt not in stored or ts > stored[tgt][1]:
+            stored[tgt] = (model, ts)
+
+    for o in _list_all("inference/"):
+        p = o["Key"].split("/")
+        if len(p) >= 3 and p[-1] == "manifest.json":
+            note(p[1], p[2], o["LastModified"].timestamp())
+    for o in _list_all("submissions/"):
+        p = o["Key"].split("/")
+        if len(p) >= 4 and p[-1].endswith(".pdb"):
+            note(p[1], p[2], _ts_from_name(p[-1]) or o["LastModified"].timestamp())
+    c["map"], c["ts"] = stored, now
+    return stored
+
+
 def _jobs():
-    jobs = []
+    # Merge two sources so completed jobs are reachable from any browser (deduped by target_id):
+    #   1) recent atlas executions -> live state (running / error / done), authoritative
+    #   2) completed web* results in storage -> "done" (covers other browsers / prior generations)
+    by_tgt = {}
     for m in MODELS:
         try:
-            r = sfn.list_executions(stateMachineArn=_pipeline_arn(m["id"]), maxResults=8)
+            r = sfn.list_executions(stateMachineArn=_pipeline_arn(m["id"]), maxResults=10)
         except Exception:
             continue
         for e in r.get("executions", []):
             if not e["name"].startswith(f"{m['id']}-web"):
                 continue
             tgt = e["name"][len(m["id"]) + 1:].rsplit("-", 1)[0]
-            jobs.append({"job_id": f"{m['id']}:{tgt}:{e['name']}", "model": m["id"],
-                         "name": tgt, "state": _STATE.get(e["status"], e["status"].lower())})
-    return _resp(200, {"jobs": jobs[:20]})
+            ts = e["startDate"].timestamp()
+            cur = by_tgt.get(tgt)
+            if not cur or ts > cur["_ts"]:
+                by_tgt[tgt] = {"job_id": f"{m['id']}:{tgt}:{e['name']}", "model": m["id"],
+                               "name": tgt, "state": _STATE.get(e["status"], e["status"].lower()), "_ts": ts}
+    for tgt, (model, ts) in _stored_web_jobs().items():
+        if tgt in by_tgt:
+            continue   # a live/recent execution is more authoritative than the stored result
+        by_tgt[tgt] = {"job_id": f"{model}:{tgt}", "model": model, "name": tgt, "state": "done", "_ts": ts}
+    jobs = sorted(by_tgt.values(), key=lambda j: j["_ts"], reverse=True)
+    for j in jobs:
+        j.pop("_ts", None)
+    return _resp(200, {"jobs": jobs[:50]})
 
 
 def _cancel(body):

@@ -178,12 +178,15 @@ function ssParseResidues(text) {
       const cComp = col.label_comp_id != null ? col.label_comp_id : col.auth_comp_id;
       const cAsym = col.label_asym_id != null ? col.label_asym_id : col.auth_asym_id;
       const cSeq = col.auth_seq_id != null ? col.auth_seq_id : col.label_seq_id;
+      const cModel = col.pdbx_PDB_model_num;              // multi-model ensemble: keep model[0] only
       const cx = col.Cartn_x, cy = col.Cartn_y, cz = col.Cartn_z;
+      let firstModel = null;
       for (; j < lines.length; j++) {
         const t = lines[j].trim();
         if (t === "" || t === "#" || t === "loop_" || t.startsWith("_") || t.startsWith("data_")) break;
         const f = t.split(/\s+/);
         if (f.length < tags.length) continue;
+        if (cModel != null) { if (firstModel === null) firstModel = f[cModel]; else if (f[cModel] !== firstModel) continue; }
         const an = (f[cAtom] || "").replace(/^['"]|['"]$/g, "");
         add(String(f[cAsym]), String(f[cSeq]), String(f[cComp]), an,
           parseFloat(f[cx]), parseFloat(f[cy]), parseFloat(f[cz]));
@@ -192,6 +195,8 @@ function ssParseResidues(text) {
     }
   } else {
     for (const l of text.split("\n")) {
+      if (l.startsWith("ENDMDL")) break;                  // model[0] only — the bridge stacks the
+      // top-N ranked picks as separate MODEL records; SS is derived from the best (first) one.
       if (!(l.startsWith("ATOM") || l.startsWith("HETATM"))) continue;
       add((l.slice(21, 22).trim() || "A"), l.slice(22, 27).trim(), l.slice(17, 20).trim(),
         l.slice(12, 16).trim(), parseFloat(l.slice(30, 38)), parseFloat(l.slice(38, 46)), parseFloat(l.slice(46, 54)));

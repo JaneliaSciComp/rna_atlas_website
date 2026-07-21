@@ -43,9 +43,9 @@ cat > /tmp/casp-web-policy.json <<JSON
  {"Sid":"lambdacfg","Effect":"Allow","Action":"lambda:GetFunctionConfiguration","Resource":"arn:aws:lambda:$REGION:$ACCOUNT:function:janelia-das-casp-daslab-*-$STAGE"},
  {"Sid":"sfnexec","Effect":"Allow","Action":["states:DescribeExecution","states:StopExecution"],"Resource":"arn:aws:states:$REGION:$ACCOUNT:execution:janelia-das-casp-daslab-*-pipeline-$STAGE:*"},
  {"Sid":"sfnsm","Effect":"Allow","Action":["states:StartExecution","states:ListExecutions"],"Resource":"arn:aws:states:$REGION:$ACCOUNT:stateMachine:janelia-das-casp-daslab-*-pipeline-$STAGE"},
- {"Sid":"s3get","Effect":"Allow","Action":"s3:GetObject","Resource":["arn:aws:s3:::$ARTIFACTS_BUCKET/submissions/*","arn:aws:s3:::$ARTIFACTS_BUCKET/cache/*","arn:aws:s3:::$ARTIFACTS_BUCKET/predictions/*"]},
+ {"Sid":"s3get","Effect":"Allow","Action":"s3:GetObject","Resource":["arn:aws:s3:::$ARTIFACTS_BUCKET/submissions/*","arn:aws:s3:::$ARTIFACTS_BUCKET/cache/*","arn:aws:s3:::$ARTIFACTS_BUCKET/predictions/*","arn:aws:s3:::$ARTIFACTS_BUCKET/inference/*","arn:aws:s3:::$ARTIFACTS_BUCKET/research/*"]},
  {"Sid":"s3put","Effect":"Allow","Action":"s3:PutObject","Resource":"arn:aws:s3:::$ARTIFACTS_BUCKET/requests/*"},
- {"Sid":"s3list","Effect":"Allow","Action":"s3:ListBucket","Resource":"arn:aws:s3:::$ARTIFACTS_BUCKET","Condition":{"StringLike":{"s3:prefix":["submissions/*","cache/*","requests/*","predictions/*"]}}}
+ {"Sid":"s3list","Effect":"Allow","Action":"s3:ListBucket","Resource":"arn:aws:s3:::$ARTIFACTS_BUCKET","Condition":{"StringLike":{"s3:prefix":["submissions/*","cache/*","requests/*","predictions/*","research/*","inference/*"]}}}
 ]}
 JSON
 aws --profile "$PROFILE" iam put-role-policy --role-name "$ROLE" \

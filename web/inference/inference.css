@@ -79,6 +79,8 @@
 .optrow { display: flex; gap: 10px; margin-top: 4px; }
 .optrow span { flex: 1 1 0; min-width: 0; }
 .numopt { width: 100%; padding: 6px 8px; border: 1px solid #cdd6dd; border-radius: 5px; font-size: 13px; margin: 2px 0 2px; background: #fff; }
+#opt_description { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #cdd6dd; border-radius: 5px; font-size: 12px; margin: 2px 0 2px; background: #fff; font-family: inherit; resize: vertical; }
+#opt_description[hidden] { display: none; }
 .jobs { margin-top: 14px; }
 .jobs-h { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #5b6670; font-weight: 600; margin-bottom: 4px; }
 .job { display: flex; align-items: center; gap: 7px; font-size: 12px; padding: 5px 0; border-top: 1px solid #eef2f5; }
@@ -129,3 +131,26 @@
 .ss-svg { background: #fff; border: 1px solid #e6ebef; border-radius: 8px; padding: 8px; overflow: auto; }
 .ss-svg svg { display: block; max-width: 100%; height: auto; }
 .ss-note { font-size: 10px; color: #8a94a0; margin-top: 5px; line-height: 1.4; }
+
+/* "Why these picks" panel — Expert-mode research brief/rationale (Phase 3) */
+.why-picks { margin-top: 14px; border-top: 1px solid #e6ebef; padding-top: 10px; }
+.why-picks[hidden] { display: none; }
+.why-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.why-title { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #5b6670; font-weight: 600; }
+.why-gate { font-size: 11px; color: #2e6f95; font-weight: 600; }
+.why-family { font-size: 12px; color: #1f324d; margin-bottom: 4px; }
+.why-brief, .why-rationale { font-size: 12px; color: #3c4650; line-height: 1.5; white-space: pre-wrap; margin-bottom: 6px; }
+.why-rationale { color: #5b6670; font-style: italic; }
+.why-thinking-wrap { margin-top: 4px; }
+.why-thinking-wrap[hidden] { display: none; }
+.why-thinking-wrap summary { font-size: 11px; color: #2e6f95; cursor: pointer; font-weight: 600; }
+.why-thinking-wrap summary:hover { text-decoration: underline; }
+.why-thinking { font-size: 11px; color: #5b6670; line-height: 1.5; white-space: pre-wrap; margin-top: 6px; max-height: 340px; overflow-y: auto; background: #fafcfe; border: 1px solid #e6ebef; border-radius: 6px; padding: 8px 10px; }
+
+/* top "Loading…" banner — shown while opening a stored result (large structures can take a moment) */
+.iloading { display: flex; align-items: center; gap: 8px; background: #eaf3f8; border: 1px solid #cfe1ec;
+  color: #2e6f95; font-size: 13px; font-weight: 600; border-radius: 8px; padding: 8px 12px; margin-bottom: 10px; }
+.iloading[hidden] { display: none; }
+.iloading::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: #2e6f95;
+  animation: iload-pulse 1s ease-in-out infinite; flex: 0 0 auto; }
+@keyframes iload-pulse { 0%, 100% { opacity: .25; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.15); } }

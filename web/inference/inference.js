@@ -111,7 +111,8 @@
     if (!API) { setStatus("backend not connected — can't open stored results here."); return; }
     curMsa = ((loadJobs().find((x) => x.id === id) || {}).mode || "protenix-mt") !== "none";
     results = { nomsa: null, msa: null }; shown = null; $("ibadges").innerHTML = ""; updateSS();
-    setStatus("opening job " + String(id).slice(0, 16) + "…"); poll(id);
+    if ($("why-picks")) $("why-picks").hidden = true;
+    setLoading("Loading structure… (large models can take ~20 s to fetch and render)"); setStatus("opening job " + String(id).slice(0, 16) + "…"); poll(id);
   }
 
   // ---------- gate ----------
@@ -255,7 +256,7 @@
   }
   function showResultArea() { $("iplaceholder").style.display = "none"; $("iview").classList.add("show"); }
   // add (or re-show) a stage's structure in the registry, then render + focus it
-  function openModel(k) {
+  async function openModel(k) {
     if (!results[k]) return;
     const uid = modelUid(k);
     let m = openModels.find((x) => x.uid === uid);
@@ -269,12 +270,20 @@
     } else { m.visible = true; m.text = results[k]; }
     shown = k; lastText = m.text;
     showResultArea();
-    renderModels(true); renderBadges(); renderModelPanel(); updateSS();
+    // data-driven UI (download/export, model list, 2D structure) is derived from the result text
+    // and MUST NOT depend on the 3D viewer — render it first so a slow/failed 3D render can never
+    // hide the export button. Then attempt the 3D render separately, tolerating failure.
+    renderBadges(); renderModelPanel(); updateSS();
+    try { await renderModels(true); }
+    catch (e) { setStatus("3D preview failed to render — the structure is still available to download. " + e.message); }
   }
   async function renderModels(fit) {
     if (!openModels.length) return;
     showResultArea();
-    if (vmode === "molstar") await renderModelsMolstar(fit);
+    // Mol* stalls on very large structures (e.g. a 6+ MB multi-model CASP PDB); the lighter 3Dmol
+    // handles them. Route big ones straight to 3Dmol so we don't sit through a Mol* stall/timeout.
+    const big = openModels.some((m) => (m.text || "").length > 2_000_000);
+    if (vmode === "molstar" && !big) await renderModelsMolstar(fit);
     else renderModels3Dmol(fit);
   }
   function renderModels3Dmol(fit) {
@@ -302,16 +311,22 @@
         layoutIsExpanded: false, layoutShowControls: true, layoutShowSequence: true,
         layoutShowLog: false, viewportShowExpand: true, viewportShowSelectionMode: false,
       });
-    } catch (e) { setStatus("Mol* init failed: " + e.message); return; }
+    } catch (e) { setStatus("Mol* init failed — using 3Dmol"); return renderModels3Dmol(fit); }
     const seq = ++_molstarSeq;
     try {
       await mstar.plugin.clear();                  // FIX: clear so visible models don't stack
       for (const m of openModels) {
         if (!m.visible) continue;
         if (seq !== _molstarSeq) return;           // a newer render superseded this one
-        await mstar.loadStructureFromData(m.text, fmtOf(m.text) === "cif" ? "mmcif" : "pdb");
+        // Big / non-standard structures (e.g. a 6+ MB CASP PFRMAT-TS multi-model PDB) can stall
+        // Mol*. Cap the wait and fall back to the lighter, more tolerant 3Dmol viewer so the
+        // structure always shows rather than silently never appearing.
+        await Promise.race([
+          mstar.loadStructureFromData(m.text, fmtOf(m.text) === "cif" ? "mmcif" : "pdb"),
+          new Promise((_, rej) => setTimeout(() => rej(new Error("Mol* timed out")), 25000)),
+        ]);
       }
-    } catch (e) { setStatus("Mol* render failed: " + e.message); }
+    } catch (e) { setStatus("Mol* couldn't render this one — using 3Dmol"); return renderModels3Dmol(fit); }
   }
   function toggleModel(uid, visible) {
     const m = openModels.find((x) => x.uid === uid); if (!m) return;
@@ -374,9 +389,10 @@
   }
   function updateSS() {
     const blk = $("issblock"); if (!blk) return;
-    // the client SS derivation reads only the first chain, so hide it for multi-chain complexes
-    // (misleading otherwise); single-RNA and legacy/server jobs behave exactly as before.
-    if (!isSingleChainJob()) { blk.setAttribute("hidden", ""); if ($("ss-svg")) $("ss-svg").innerHTML = ""; return; }
+    // the client SS derivation reads the first chain of the top model only. For a complex that's
+    // "chain A" (labeled as such in renderSS) rather than the whole assembly — still useful, so we
+    // show it instead of hiding. It naturally disappears (n==0) when chain A has no RNA pairs
+    // (e.g. a protein-first complex).
     deriveCurrentSS();
     if (!curSS || !curSS.n) { blk.setAttribute("hidden", ""); if ($("ss-svg")) $("ss-svg").innerHTML = ""; return; }
     blk.removeAttribute("hidden"); renderSS();
@@ -392,7 +408,8 @@
       svg = forna2D("infer:" + curSS.uid, curSS.dbn, curSS.seq, null, 380, false);
     }
     $("ss-svg").innerHTML = svg || '<div class="muted" style="padding:6px 0">No canonical base pairs detected — the model looks single-stranded.</div>';
-    $("ss-info").textContent = `${curSS.cls} · ${(curSS.bpf * 100).toFixed(0)}% paired · ${n} nt`;
+    const scope = isSingleChainJob() ? "" : "chain A only · ";
+    $("ss-info").textContent = `${scope}${curSS.cls} · ${(curSS.bpf * 100).toFixed(0)}% paired · ${n} nt`;
     if ($("ss-mode")) $("ss-mode").querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.m === ssMode));
   }
   function setSSMode(m) {
@@ -465,8 +482,8 @@
       }
     }
   }
-  function view(k) { openModel(k); }   // a stage badge opens that stage into the model registry
-  function gotResult(k, text) { results[k] = text; if (k === "msa" || !results.msa) view(k); else renderBadges(); }
+  function view(k) { return openModel(k); }   // a stage badge opens that stage into the model registry
+  async function gotResult(k, text) { results[k] = text; if (k === "msa" || !results.msa) await view(k); else renderBadges(); }
 
   // ---------- export bundle (pdb + cif + png + txt -> zip; same store-zip as the main atlas) ----------
   const _enc = (s) => new TextEncoder().encode(s);
@@ -630,17 +647,20 @@
     // that's not evidence the job started running again.
     const wasTerminal = TERMINAL.has(String((loadJobs().find((x) => x.id === jobId) || {}).state || "").toLowerCase());
     for (let i = 0; i < 600; i++) {
-      if (String((loadJobs().find((x) => x.id === jobId) || {}).state).toLowerCase() === "cancelled") { setStatus("cancelled"); return; }
+      if (String((loadJobs().find((x) => x.id === jobId) || {}).state).toLowerCase() === "cancelled") { setLoading(false); setStatus("cancelled"); return; }
       let j; try { j = await (await fetch(`${API}/status?job=${encodeURIComponent(jobId)}${tok() ? "&t=" + encodeURIComponent(tok()) : ""}`)).json(); }
-      catch (e) { setStatus("status check failed: " + e.message); return; }
+      catch (e) { setLoading(false); setStatus("status check failed: " + e.message); return; }
       const m = mapStatus(j);
       const newState = String(m.state || "").toLowerCase();
       if (!wasTerminal || newState === "done" || newState === "error") upsertJob({ id: jobId, state: m.state });
       renderStages(m.flags);
-      if (m.nomsa && (m.nomsa.url || m.nomsa.cif) && !results.nomsa) gotResult("nomsa", await fetchCif(m.nomsa));
-      if (m.msa && (m.msa.url || m.msa.cif) && !results.msa) gotResult("msa", await fetchCif(m.msa));
+      try {
+        if (m.nomsa && (m.nomsa.url || m.nomsa.cif) && !results.nomsa) await gotResult("nomsa", await fetchCif(m.nomsa));
+        if (m.msa && (m.msa.url || m.msa.cif) && !results.msa) await gotResult("msa", await fetchCif(m.msa));
+      } catch (e) { setStatus("could not render structure: " + e.message); }
+      setLoading(false);   // response received + structure rendered (or fell back / failed)
       if (m.state === "error") { setStatus("⚠ " + (m.error || "prediction failed")); notifyDone(jobId, false, m.error); return; }
-      if (m.state === "done" || (results.nomsa && results.msa)) { setStatus("done"); notifyDone(jobId, true); return; }
+      if (m.state === "done" || (results.nomsa && results.msa)) { setStatus("done"); notifyDone(jobId, true); showWhyPicks(jobId); return; }
       if (wasTerminal) {
         // already had a terminal result cached and this re-poll didn't reconfirm it — stop
         // instead of hammering an unresolvable job every 3s for up to 30 minutes.
@@ -650,7 +670,33 @@
       await new Promise((r) => setTimeout(r, 3000));
     }
   }
+  // Expert-mode "Why these picks" panel — best-effort, non-blocking; silently stays hidden for
+  // non-expert jobs (empty brief/rationale) or if the fetch fails.
+  async function showWhyPicks(jobId) {
+    if (!API || !jobId) return;
+    let r;
+    try { r = await (await fetch(`${API}/brief?job=${encodeURIComponent(jobId)}${tok() ? "&t=" + encodeURIComponent(tok()) : ""}`)).json(); }
+    catch (e) { return; }
+    const panel = $("why-picks");
+    if (!panel || (!r.brief && !r.rationale && !r.thinking && !(r.template_pdb_ids || []).length)) { if (panel) panel.hidden = true; return; }
+    $("why-gate").textContent = r.gate === "TRUST" ? "template used" : "no template";
+    $("why-family").textContent = (r.template_pdb_ids || []).length ? "Templates: " + r.template_pdb_ids.join(", ") : "";
+    $("why-brief").textContent = r.brief || "";
+    $("why-rationale").textContent = r.rationale || "";
+    const thinkWrap = $("why-thinking-wrap");
+    if (thinkWrap) {
+      thinkWrap.hidden = !r.thinking;
+      if (r.thinking) $("why-thinking").textContent = r.thinking;
+    }
+    panel.hidden = false;
+  }
   function setStatus(t) { $("infer-status").textContent = t; }
+  // top banner shown while a stored result is being fetched/rendered (big structures take a moment)
+  function setLoading(msg) {
+    const el = $("iloading"); if (!el) return;
+    if (msg) { el.textContent = msg; el.removeAttribute("hidden"); }
+    else el.setAttribute("hidden", "");
+  }
   // ---------- browser notification + tab-title flash on completion ----------
   const baseTitle = document.title;
   function flashTitle(tag) {
@@ -680,11 +726,15 @@
     const firstRna = ents.find((e) => e.type === "rna");
     const legacySeq = firstRna ? firstRna.sequence : "";
     results = { nomsa: null, msa: null }; shown = null; $("ibadges").innerHTML = ""; $("predict-note").textContent = ""; updateSS();
+    if ($("why-picks")) $("why-picks").hidden = true;
     try { if (window.Notification && Notification.permission === "default") Notification.requestPermission(); } catch (e) {}
     const mode = $("msa_mode").value || "protenix-mt";
     const nSeeds = Math.max(1, Math.min(5, parseInt($("opt_seeds").value, 10) || 3));
     const nSamples = Math.max(1, Math.min(5, parseInt($("opt_samples").value, 10) || 5));
-    const opts = { mode, seeds: nSeeds, samples: nSamples };
+    const relax = $("opt_relax") ? $("opt_relax").checked : true;
+    const expert = $("opt_expert") ? $("opt_expert").checked : false;
+    const description = $("opt_description") ? $("opt_description").value.trim() : "";
+    const opts = { mode, seeds: nSeeds, samples: nSamples, relax, expert, description };
     curMsa = mode !== "none";
     const model = curModel(), jobName = $("jobname").value.trim();
     renderStages({ queued: "running" }); setStatus("submitting…");
@@ -758,6 +808,9 @@
     if ($("ss-dbn")) $("ss-dbn").addEventListener("click", exportDbn);
     if ($("ss-png")) $("ss-png").addEventListener("click", exportSSPng);
     ["opt_seeds", "opt_samples", "model"].forEach((id) => { const e = $(id); if (e) e.addEventListener("change", updateFleetHint); });
+    if ($("opt_expert") && $("opt_description")) {
+      $("opt_expert").addEventListener("change", () => { $("opt_description").hidden = !$("opt_expert").checked; });
+    }
     loadModels().then(updateFleetHint); renderJobs(); refreshJobs(); syncServerJobs(); renderModelPanel();
     updateFleetHint();
   }

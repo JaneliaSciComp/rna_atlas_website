@@ -13,7 +13,10 @@ Output (explorer dataset layout):
   dist/datasets/<name>/react/<key>.json        ({seq, dms:null, a23[], sn})
   dist/datasets/<name>/data/folds.json         (one record/design)
   dist/datasets/<name>/data/motifs.json        ({} -- no tertiary-motif scan for this source)
-Then run:  derive_ss.py --name <name>   (pairing.json + ss/termini fields)
+Then run:  enrich_openknot_long_react.py --names <name>   (replaces the placeholder a23/dms
+             above with real 1D cmuts DMS+2A3 -- OpenKnotBench's own coverage tops out around
+             ~100nt median for these ~240nt designs, so most of it is otherwise null/sparse)
+           derive_ss.py --name <name>   (pairing.json + ss/termini fields)
            compute_embedding.py --name <name>   (ex,ey for the map)
 
 Run in the `rna` env.

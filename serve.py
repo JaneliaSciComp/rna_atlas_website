@@ -112,12 +112,13 @@ def reactivity(seq_id):
                     md = float(np.max(np.abs(seg[m] - pa2[m])))
                     if best is None or md < best[0]:
                         best = (md, sh)
-                if best is not None and best[0] < 0.02:
+                if best is not None and best[0] < 0.02 and len(seq) == L:
                     sh = best[1]
                     with h5py.File(f"{UNIFORM_DIR}Ribonanza2FGH_2A3.h5", "r") as u2, \
                          h5py.File(f"{UNIFORM_DIR}Ribonanza2FGH_DMS.h5", "r") as ud:
+                        dms_seg = np.asarray(ud["reactivity"][row][sh:sh + L], np.float32)
                         out["a23"] = _nan_list(np.asarray(u2["reactivity"][row][sh:sh + L], np.float32))
-                        out["dms"] = _nan_list(np.asarray(ud["reactivity"][row][sh:sh + L], np.float32))
+                        out["dms"] = _nan_list([dms_seg[i] if seq[i] in "AC" else np.nan for i in range(len(seq))])
                         out["sn"] = [round(float(ud["SNR"][row]), 2), round(float(u2["SNR"][row]), 2)]
     return out
 

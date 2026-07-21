@@ -181,10 +181,13 @@ def main():
                     row = FGH_LIBOFF[lib] + int(sid.split("-")[0]) - 1
                     if np.isfinite(pa2).sum() >= 5:
                         bo = fgh_offset(pa2, np.asarray(d2r[row], np.float32))
-                        if bo is not None and bo[0] < 0.02:              # offset locked to the default h5
+                        if bo is not None and bo[0] < 0.02 and len(seq) == L:  # offset locked to the default h5
                             sh = bo[1]
-                            rec["a23"] = nan_list(np.asarray(u2r[row][sh:sh + L], np.float32))
-                            rec["dms"] = nan_list(np.asarray(udr[row][sh:sh + L], np.float32))
+                            a23_seg = np.asarray(u2r[row][sh:sh + L], np.float32)
+                            dms_seg = np.asarray(udr[row][sh:sh + L], np.float32)
+                            rec["a23"] = nan_list(a23_seg)
+                            rec["dms"] = nan_list([dms_seg[i] if seq[i] in "AC" else float("nan")
+                                                    for i in range(len(seq))])
                             rec["sn"] = [round(float(udsn[row]), 2), round(float(u2sn[row]), 2)]
                             n_fgh_ok += 1
                     if rec["a23"] is None:

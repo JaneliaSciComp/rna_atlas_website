@@ -69,7 +69,7 @@
   const RUNNING = new Set(["queued", "running", "submitted", "pending"]);
   const TERMINAL = new Set(["done", "error", "cancelled"]);
   function loadJobs() { try { return JSON.parse(localStorage.getItem(JOBS_KEY) || "[]"); } catch (e) { return []; } }
-  function saveJobs(j) { try { localStorage.setItem(JOBS_KEY, JSON.stringify(j.slice(0, 20))); } catch (e) {} }
+  function saveJobs(j) { try { localStorage.setItem(JOBS_KEY, JSON.stringify(j.slice(0, 50))); } catch (e) {} }
   function upsertJob(job) {
     const j = loadJobs(); const i = j.findIndex((x) => x.id === job.id);
     if (i >= 0) j[i] = { ...j[i], ...job }; else j.unshift(job);
@@ -113,6 +113,31 @@
     results = { nomsa: null, msa: null }; shown = null; $("ibadges").innerHTML = ""; updateSS();
     if ($("why-picks")) $("why-picks").hidden = true;
     setLoading("Loading structure… (large models can take ~20 s to fetch and render)"); setStatus("opening job " + String(id).slice(0, 16) + "…"); poll(id);
+  }
+  // "Open by ID": visualize ANY submitted job, even one not in this browser's list. Accepts a full
+  // job id (model:target[:exec]) or a bare target hash — for a bare hash we probe each model for a
+  // stored result and open the first that resolves, adding it to the local list.
+  async function openById(raw) {
+    raw = String(raw || "").trim();
+    if (!raw) return;
+    if (!API) { setStatus("backend not connected — can't open stored results here."); return; }
+    if (raw.includes(":")) { const el = $("openid"); if (el) el.value = ""; return reopenJob(raw); }
+    setLoading("Looking up " + raw.slice(0, 24) + "…");
+    const ids = ($("model") ? Array.from($("model").options).map((o) => o.value).filter(Boolean) : []);
+    const models = ids.length ? ids : MODELS_FALLBACK.map((x) => x.id);
+    for (const m of models) {
+      const jid = m + ":" + raw;
+      try {
+        const j = await (await fetch(`${API}/status?job=${encodeURIComponent(jid)}${tok() ? "&t=" + encodeURIComponent(tok()) : ""}`)).json();
+        const hasR = j.stages && Object.values(j.stages).some((s) => s && (s.cif || s.url));
+        if (j.state === "done" || hasR) {
+          upsertJob({ id: jid, name: raw, model: m, state: "done", fromServer: true, ts: Date.now() });
+          const el = $("openid"); if (el) el.value = "";
+          setLoading(false); return reopenJob(jid);
+        }
+      } catch (e) {}
+    }
+    setLoading(false); setStatus("no stored result found for id: " + raw);
   }
 
   // ---------- gate ----------
@@ -786,13 +811,15 @@
     const server = (data && data.jobs) || [];
     if (!server.length) return;
     const local = loadJobs();
-    const haveExec = new Set(local.map((x) => String(x.id).split(":")[2]).filter(Boolean));
+    // dedupe by target_id (parts[1]) so both live 3-part exec ids and 2-part stored ids merge
+    // cleanly — the same job never shows twice, and completed jobs from other browsers appear.
+    const haveTgt = new Set(local.map((x) => String(x.id).split(":")[1]).filter(Boolean));
     let added = 0;
     for (const s of server) {
-      const exec = String(s.job_id || "").split(":")[2];
-      if (!exec || haveExec.has(exec)) continue;   // already tracked locally
+      const tgt = String(s.job_id || "").split(":")[1];
+      if (!tgt || haveTgt.has(tgt)) continue;   // already tracked locally (by target)
       local.push({ id: s.job_id, name: s.name, model: s.model, state: s.state, fromServer: true });
-      haveExec.add(exec); added++;
+      haveTgt.add(tgt); added++;
     }
     if (added) { saveJobs(local); renderJobs(); }
   }
@@ -811,6 +838,8 @@
     if ($("opt_expert") && $("opt_description")) {
       $("opt_expert").addEventListener("change", () => { $("opt_description").hidden = !$("opt_expert").checked; });
     }
+    if ($("openid-go")) $("openid-go").addEventListener("click", () => openById($("openid").value));
+    if ($("openid")) $("openid").addEventListener("keydown", (e) => { if (e.key === "Enter") openById($("openid").value); });
     loadModels().then(updateFleetHint); renderJobs(); refreshJobs(); syncServerJobs(); renderModelPanel();
     updateFleetHint();
   }

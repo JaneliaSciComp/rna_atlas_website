@@ -154,3 +154,12 @@
 .iloading::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: #2e6f95;
   animation: iload-pulse 1s ease-in-out infinite; flex: 0 0 auto; }
 @keyframes iload-pulse { 0%, 100% { opacity: .25; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.15); } }
+
+/* "Open by ID" — visualize any submitted job (even one not in this browser's Recent list) */
+.openid-row { display: flex; gap: 6px; margin: 10px 0 4px; }
+.openid-row input { flex: 1 1 auto; min-width: 0; font-size: 12px; padding: 5px 8px;
+  border: 1px solid #cdd6dd; border-radius: 6px; background: #fff; color: #1f324d; }
+.openid-row input:focus { outline: none; border-color: #2e6f95; }
+.openid-row button { flex: 0 0 auto; font-size: 12px; padding: 5px 12px; border: 1px solid #2e6f95;
+  background: #2e6f95; color: #fff; border-radius: 6px; cursor: pointer; }
+.openid-row button:hover { background: #24597a; }

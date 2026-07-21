@@ -9,6 +9,11 @@ const DATASETS = window.DATASETS || [{ id: "ribo2", label: "curated", base: "", 
 const DSBYID = {}; DATASETS.forEach((d) => { DSBYID[d.id] = d; });
 const LOADED = {};        // dsid -> {folds, motifs, pairing} cache (loaded once)
 function dsFor(f) { return DSBYID[f._dsid] || DATASETS[0]; }
+// Per-fold struct/react filenames: every dataset except the base ribo2 (A-H) names files by
+// `key` (a hashed id); ribo2 itself never got a key-based build and still uses raw `id` — so
+// `f.key` can't be used as a blanket "prefer key" fallback now that ribo2 records also carry
+// a `key` field (added for clustering, not file naming).
+function fileStem(f, ds) { return (ds.id !== "ribo2" && f.key) ? f.key : f.id; }
 // Companion datasets share a parent source's checkbox + per-letter filter and load lazily.
 function companionsOf(srcId) { return DATASETS.filter((d) => d.parent === srcId); }
 function companionLetterSet() { return new Set(DATASETS.filter((d) => d.parent).flatMap((d) => d.letters || [])); }
@@ -610,7 +615,7 @@ async function openDeep(key) {
   drawProps(f);
   let react = null;
   if (ds.react) {
-    try { react = await (await fetch(durl(prefix(ds) + "react/" + (f.key || id) + ".json"), { cache: "no-cache" })).json(); } catch (e) { react = null; }
+    try { react = await (await fetch(durl(prefix(ds) + "react/" + fileStem(f, ds) + ".json"), { cache: "no-cache" })).json(); } catch (e) { react = null; }
   }
   currentDeep = { f, react };
   saveState();
@@ -892,7 +897,7 @@ async function load3D(f, react) {
   const ds = dsFor(f);
   let data;
   viewerModel = null; if (currentDeep) { currentDeep.structText = null; currentDeep.structFmt = null; }
-  try { data = await (await fetch(durl(prefix(ds) + "structs/" + (f.key || f.id) + "." + (ds.ext || "cif")))).text(); }
+  try { data = await (await fetch(durl(prefix(ds) + "structs/" + fileStem(f, ds) + "." + (ds.ext || "cif")))).text(); }
   catch (e) { el.innerHTML = '<p style="color:#fff;padding:8px">structure unavailable</p>'; return; }
   const fmt = data.startsWith("data_") || data.includes("_atom_site") ? "cif" : "pdb";
   if (currentDeep) { currentDeep.structText = data; currentDeep.structFmt = fmt; }

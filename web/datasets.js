@@ -10,7 +10,7 @@
 //   and its data loads lazily the first time one of those letters is enabled. Per-fold
 //   struct/react/pairing still dispatch via `_dsid`, so the companion keeps its own base/ext.
 window.DATASETS = [
-  { id: "ribo2", label: "Ribonanza-2 curated · A–Q (34,931)", base: "", ext: "cif", react: true, motifs: true, cond: [] },
+  { id: "ribo2", label: "Ribonanza-2 curated · A–Q (50,388)", base: "", ext: "cif", react: true, motifs: true, cond: [] },
   { id: "pseudolabels", label: "Ribo-1 pseudolabel (19,759)", base: "data/datasets/pseudolabels", ext: "pdb", react: true, motifs: true, cond: [] },
   { id: "openknot", label: "OpenKnot (3,698)", base: "data/datasets/openknot", ext: "pdb", react: true, motifs: true, cond: [] },
   { id: "openknot_long", label: "OpenKnot OK7b/OK8 240-mer · SHAPE-guided (4,600)", base: "data/datasets/openknot_long", ext: "pdb", react: true, motifs: true, cond: ["chemmap"] },

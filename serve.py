@@ -15,8 +15,15 @@ import argparse
 import gzip
 import json
 import os
+import threading
 from functools import lru_cache
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+# h5py / gemmi native reads segfault under concurrent access (HDF5 global state is not
+# thread-safe). This is a single-user dev/review server, so we serve single-threaded
+# (plain HTTPServer, one request at a time) — the safe, simple fix. The lock below is a
+# belt-and-suspenders guard in case the server class is ever switched back to threaded.
+_NATIVE_LOCK = threading.RLock()
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 WEB, DATA = os.path.join(ROOT, "web"), os.path.join(ROOT, "data")
@@ -153,10 +160,13 @@ class H(BaseHTTPRequestHandler):
             if path == "/":
                 return self._serve_file(os.path.join(WEB, "index.html"))
             if path.startswith("/structs/") and path.endswith(".cif"):
-                data = read_struct(path[len("/structs/"):-len(".cif")])
+                with _NATIVE_LOCK:
+                    data = read_struct(path[len("/structs/"):-len(".cif")])
                 return self._send(data, "text/plain") if data else self._send("not found", code=404)
             if path.startswith("/react/") and path.endswith(".json"):
-                return self._send(json.dumps(reactivity(path[len("/react/"):-len(".json")])), "application/json")
+                with _NATIVE_LOCK:
+                    payload = json.dumps(reactivity(path[len("/react/"):-len(".json")]))
+                return self._send(payload, "application/json")
             if path.startswith("/data/datasets/"):   # extra atlases live under /data/ (already gated)
                 rel = path[len("/data/datasets/"):]
                 base = os.path.join(ROOT, "dist", "datasets")
@@ -191,7 +201,7 @@ def main():
     ap.add_argument("--host", default="0.0.0.0")
     args = ap.parse_args()
     print(f"RNA Atlas Explorer: http://{args.host}:{args.port}/  ({len(SEQ)} folds)")
-    ThreadingHTTPServer((args.host, args.port), H).serve_forever()
+    HTTPServer((args.host, args.port), H).serve_forever()
 
 
 if __name__ == "__main__":

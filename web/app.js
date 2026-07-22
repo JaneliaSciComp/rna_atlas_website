@@ -384,7 +384,7 @@ function wireStatic() {
     $("rank_key").value = "best_tm1:asc"; $("topn").value = 200;
     if ($("color_by")) $("color_by").value = "a23";
     if ($("motif_mode")) $("motif_mode").value = "any";
-    if ($("ss_view")) $("ss_view").value = "forna";
+    if ($("ss_view")) $("ss_view").value = "proj";
     if ($("search")) $("search").value = "";
     sortOverride = null; saveState(); syncLabels(); render();
   });
@@ -392,7 +392,9 @@ function wireStatic() {
   if ($("alt_palette")) $("alt_palette").addEventListener("change", () => { if (currentDeep) { drawTracks(currentDeep.f, currentDeep.react); load3D(currentDeep.f, currentDeep.react); } });
   if ($("color_by")) $("color_by").addEventListener("change", () => { if ($("deep_color_by")) $("deep_color_by").value = $("color_by").value; if (currentDeep) load3D(currentDeep.f, currentDeep.react); });
   if ($("deep_color_by")) $("deep_color_by").addEventListener("change", () => { if ($("color_by")) $("color_by").value = $("deep_color_by").value; saveState(); if (currentDeep) load3D(currentDeep.f, currentDeep.react); });
-  if ($("ss_view")) $("ss_view").addEventListener("change", () => { if (currentDeep) drawTracks(currentDeep.f, currentDeep.react); });
+  if ($("ss_view")) $("ss_view").addEventListener("change", () => { if ($("deep_ss_view")) $("deep_ss_view").value = $("ss_view").value; if (currentDeep) drawTracks(currentDeep.f, currentDeep.react); });
+  if ($("deep_ss_view")) $("deep_ss_view").addEventListener("change", () => { if ($("ss_view")) $("ss_view").value = $("deep_ss_view").value; saveState(); if (currentDeep) drawTracks(currentDeep.f, currentDeep.react); });
+  initProjDrag();   // drag the 2D projection to rotate (drives the 3D + gallery)
   // collapsible sections (click a legend) + collapse-all (click the panel heading)
   document.querySelectorAll("#config fieldset legend").forEach((lg) =>
     lg.addEventListener("click", () => { lg.parentElement.classList.toggle("collapsed"); saveState(); }));
@@ -404,6 +406,12 @@ function wireStatic() {
   $("deep").addEventListener("click", (e) => { if (e.target.id === "deep") closeDeep(); });
   document.querySelectorAll('#layoutctl button[data-mode]').forEach((b) =>
     b.addEventListener("click", () => setDeepMode(b.dataset.mode)));
+  if ($("deep-pano")) $("deep-pano").addEventListener("click", () => {
+    setDeepMode(currentMode() === "panoramic" ? "modal" : "panoramic");
+    // re-render for the new layout: 3D switches between single viewer and the per-channel
+    // gallery; tracks/2D reflow (fluid SVGs); the reactivity <canvas> must be re-sized.
+    if (currentDeep) { load3D(currentDeep.f, currentDeep.react); drawTracks(currentDeep.f, currentDeep.react); drawReactChart(currentDeep.f, currentDeep.react); }
+  });
   document.querySelectorAll('#viewctl button[data-view]').forEach((b) =>
     b.addEventListener("click", () => setView(b.dataset.view)));
   if ($("share-btn")) $("share-btn").addEventListener("click", copyShareLink);
@@ -587,10 +595,11 @@ function updateLayout() {
   if (open && m === "right") document.body.classList.add("deepopen-right");
   if (open && m === "bottom") document.body.classList.add("deepopen-bottom");
   document.querySelectorAll('#layoutctl button[data-mode]').forEach((b) => b.classList.toggle("active", b.dataset.mode === m));
+  const pb = $("deep-pano"); if (pb) pb.classList.toggle("active", m === "panoramic");
 }
 function setDeepMode(m) {
   const d = $("deep");
-  d.classList.remove("mode-modal", "mode-right", "mode-bottom");
+  d.classList.remove("mode-modal", "mode-right", "mode-bottom", "mode-panoramic");
   d.classList.add("mode-" + m);
   localStorage.setItem("atlas_deepmode", m);
   updateLayout();
@@ -599,7 +608,10 @@ function setDeepMode(m) {
 function closeDeep() {
   $("deep").classList.add("hidden");
   updateLayout();
-  if (viewer) { try { viewer.resize(); } catch (e) {} }
+  if (_projRaf) { cancelAnimationFrame(_projRaf); _projRaf = 0; }   // don't let a queued proj redraw fire after close
+  disposePano();
+  loseGL($("viewer3d"));                                            // release WebGL contexts on close
+  viewer = null;
   currentDeep = null;
   saveState();
 }
@@ -674,8 +686,11 @@ function drawProps(f) {
   ].filter(Boolean);
   const chips = (f.motifs || []).map((m) =>
     `<span class="motif-chip" style="background:${motifColor(m)}">${m.replace(/_/g, " ").toLowerCase()}</span>`).join(" ");
-  $("props").innerHTML = "<table>" + rowsHtml.filter(Boolean).map(([k, v]) => `<tr><td class="muted">${k}</td><td>${v}</td></tr>`).join("")
+  $("props").innerHTML =
+    `<div class="meta-size"><button type="button" onclick="setMetaScale(-1)" title="smaller text">A−</button><button type="button" onclick="setMetaScale(1)" title="larger text">A+</button></div>`
+    + "<table>" + rowsHtml.filter(Boolean).map(([k, v]) => `<tr><td class="muted">${k}</td><td>${v}</td></tr>`).join("")
     + `<tr><td class="muted">Motifs</td><td>${chips}</td></tr></table>`;
+  $("props").style.fontSize = metaScale() + "px";
 }
 
 function crossedResiSet(f) {
@@ -726,7 +741,7 @@ function drawTracks(f, react) {
   ];
   const hasPred = !!(react && (react.pred_dms || react.pred_a23));
   const yPair = ySeq + 16 + reactRows.length * 16, H = yPair + 18;
-  let svg = `<svg width="${W + 40}" height="${H}" font-size="9">`;
+  let svg = `<svg width="${W + 40}" height="${H}" viewBox="0 0 ${W + 40} ${H}" preserveAspectRatio="xMinYMin meet" font-size="9">`;
   // motif bars
   motifs.forEach((m) => {
     m.ranges.forEach(([a, b]) => {
@@ -741,7 +756,7 @@ function drawTracks(f, react) {
   }
   // reactivity rows
   const rrow = (arr, y, label) => {
-    let s = `<text x="${W + 3}" y="${y + 11}" fill="#5b6670">${label}</text>`;
+    let s = `<text x="${W + 3}" y="${y + 11}" fill="currentColor">${label}</text>`;
     for (let i = 0; i < n; i++) {
       const v = arr ? arr[i] : null;
       s += `<rect x="${i * cw}" y="${y}" width="${cw - 0.5}" height="13" fill="${shapeColor(v)}"><title>${label} ${i + 1}: ${v == null ? "n/a" : (+v).toFixed(2)}</title></rect>`;
@@ -752,7 +767,7 @@ function drawTracks(f, react) {
   reactRows.forEach((row) => { svg += rrow(row.arr, yReact, row.label); yReact += 16; });
   // predicted pairing track: unpaired = light red, paired = white (eyeball SHAPE agreement)
   const dbn = (PAIRING_BY_DS[f._dsid] || {})[f.id] || "";
-  let pr = `<text x="${W + 3}" y="${yPair + 11}" fill="#5b6670">pair</text>`;
+  let pr = `<text x="${W + 3}" y="${yPair + 11}" fill="currentColor">pair</text>`;
   for (let i = 0; i < n; i++) {
     const ch = dbn[i];
     const paired = ch && ch !== "." && ch !== "-";
@@ -760,12 +775,28 @@ function drawTracks(f, react) {
     pr += `<rect x="${i * cw}" y="${yPair}" width="${cw - 0.5}" height="13" fill="${fill}" stroke="#dfe3e8" stroke-width="0.5"><title>pos ${i + 1}: ${ch ? (paired ? "paired" : "unpaired") : "n/a"}</title></rect>`;
   }
   svg += pr + "</svg>";
-  const ssMode = ($("ss_view") ? $("ss_view").value : "forna");
-  const ss = (dbn && ssMode === "arc") ? arcDiagram(dbn, n, cw, W) : (dbn ? forna2D(f.id, dbn, seq, react, 340, altPalette()) : "");
-  const ssLbl = ssMode === "arc" ? "arcs link base pairs" : "2D layout — nodes colored by base";
-  const ssBlock = ss ? `<div style="font-size:11px;color:#5b6670;margin:10px 0 3px">predicted secondary structure (${ssLbl}; <span style="color:#c1440e">orange = pseudoknot</span>)</div>${ss}` : "";
+  const ssMode = ($("ss_view") ? $("ss_view").value : "proj");
+  let ss = "", ssLbl = "";
+  if (ssMode === "arc") {
+    ss = dbn ? arcDiagram(dbn, n, cw, W) : ""; ssLbl = "arcs link base pairs";
+  } else if (ssMode === "proj") {
+    const st = currentDeep && currentDeep.structText;
+    if (st) {
+      if (!currentDeep._proj) currentDeep._proj = projParse(st);
+      if (currentDeep._proj) { ss = proj2D(currentDeep._proj, dbn, seq, 340, altPalette(), activeQuat()); ssLbl = "flattened 3D fold — follows the 3D viewer as you rotate it"; }
+    }
+    if (!ss) { ss = dbn ? forna2D(f.id, dbn, seq, react, 340, altPalette()) : ""; ssLbl = "abstract layout (loading 3D…)"; }
+  } else {
+    ss = dbn ? forna2D(f.id, dbn, seq, react, 340, altPalette()) : ""; ssLbl = "abstract spring layout — nodes colored by base";
+  }
+  const hasSS = !!(dbn || (currentDeep && currentDeep.structText));
+  const pills = [["proj", "3D projection"], ["forna", "2D layout"], ["arc", "arc"]]
+    .map(([m, lbl]) => `<button type="button" class="ss-pill${m === ssMode ? " active" : ""}" onclick="setSSView('${m}')">${lbl}</button>`).join("");
+  const ssBlock = hasSS
+    ? `<div class="ss-cap">secondary structure <span class="ss-switch">${pills}</span>${ssLbl ? ` <span class="ss-note">${ssLbl}; backbone grey · <span style="color:#7b61ff">base pair</span> · <span style="color:#e83e8c">pseudoknot (dashed)</span></span>` : ""}</div><div class="ss2d${ssMode === "arc" ? " ss2d-arc" : ""}${ssMode === "proj" ? " ss2d-proj" : ""}">${ss || '<span class="muted">no 2D available</span>'}</div>`
+    : "";
   const predNote = hasPred ? " &middot; *pred = RNAnix-predicted" : "";
-  $("tracks").innerHTML = `<div style="font-size:11px;color:#5b6670;margin-bottom:3px">motif lanes &middot; sequence &middot; DMS &middot; 2A3 reactivity (white=protected &rarr; red=reactive) &middot; pairing (white=paired, light red=unpaired)${predNote}</div>` + svg + ssBlock;
+  $("tracks").innerHTML = `<div style="font-size:11px;color:var(--text-muted);margin-bottom:3px">motif lanes &middot; sequence &middot; DMS &middot; 2A3 reactivity (white=protected &rarr; red=reactive) &middot; pairing (white=paired, light red=unpaired)${predNote}</div>` + svg + ssBlock;
 }
 
 function drawReactChart(f, react) {
@@ -896,9 +927,22 @@ function ensureViewerResizeObserver(el) {            // re-fit the active viewer
   });
   _v3dRO.observe(el);
 }
+// explicitly release the WebGL context(s) in a container before dropping its canvases —
+// 3Dmol's clear() keeps the renderer/context alive, so without this, cycling the single
+// viewer / gallery leaks contexts until the browser's limit blanks the viewers.
+function loseGL(container) {
+  if (!container) return;
+  container.querySelectorAll("canvas").forEach((cv) => {
+    try { const gl = cv.getContext("webgl") || cv.getContext("webgl2"); const ext = gl && gl.getExtension("WEBGL_lose_context"); if (ext) ext.loseContext(); } catch (e) {}
+  });
+}
 async function load3D(f, react) {
   const el = $("viewer3d");
+  disposePano();
+  loseGL(el);                     // free any live WebGL contexts before we drop the canvases
   el.innerHTML = "";
+  el.classList.remove("pano-gallery");
+  viewer = null;
   ensureViewerResizeObserver(el);
   try { if (mstar && mstar.dispose) mstar.dispose(); } catch (e) {}
   mstar = null;
@@ -907,42 +951,197 @@ async function load3D(f, react) {
   let data;
   viewerModel = null; if (currentDeep) { currentDeep.structText = null; currentDeep.structFmt = null; }
   try { data = await (await fetch(durl(prefix(ds) + "structs/" + fileStem(f, ds) + "." + (ds.ext || "cif")))).text(); }
-  catch (e) { el.innerHTML = '<p style="color:#fff;padding:8px">structure unavailable</p>'; return; }
+  catch (e) { if (currentDeep && currentDeep.f === f) el.innerHTML = '<p style="color:#fff;padding:8px">structure unavailable</p>'; return; }
+  // a newer fold may have opened while this fetch was in flight — don't clobber it
+  if (!currentDeep || currentDeep.f !== f) return;
   const fmt = data.startsWith("data_") || data.includes("_atom_site") ? "cif" : "pdb";
-  if (currentDeep) { currentDeep.structText = data; currentDeep.structFmt = fmt; }
+  currentDeep.structText = data; currentDeep.structFmt = fmt; currentDeep._proj = null;
   if ($("deep_color_by") && $("color_by")) $("deep_color_by").value = $("color_by").value;
+  if ($("deep_ss_view") && $("ss_view")) $("deep_ss_view").value = $("ss_view").value;
+  // panoramic always uses the 3Dmol channel gallery (before the Mol* branch, so Mol* + panoramic
+  // still gives the small-multiples rather than a single Mol* viewer)
+  if (currentMode() === "panoramic" && typeof $3Dmol !== "undefined") { renderChannelGallery(f, react, data, fmt); return; }
   if (deepEngine === "molstar") { renderMolstar(el, data, fmt); return; }
   if (typeof $3Dmol === "undefined") { el.innerHTML = '<p style="color:#fff;padding:8px">3Dmol.js not loaded.</p>'; return; }
   viewer = $3Dmol.createViewer(el, { backgroundColor: "0x0d1117" });
   viewerModel = viewer.addModel(data, fmt);
+  const mode = ($("color_by") && $("color_by").value) || "a23";
+  paintViewer(viewer, f, react, mode);
+  // now that the 3D camera exists, re-draw the "3D projection" 2D so it matches this orientation,
+  // and keep it in sync as the user rotates the 3D
+  if ($("ss_view") && $("ss_view").value === "proj" && currentDeep) drawTracks(f, react);
+  try { viewer.setViewChangeCallback(refreshProjIfActive); } catch (e) {}
+}
+// panoramic gallery column count (fewer = bigger structures), persisted
+function panoCols() { const n = parseInt(localStorage.getItem("atlas_pano_cols") || "2", 10); return Math.max(1, Math.min(4, n || 2)); }
+function setPanoCols(n) {
+  n = Math.max(1, Math.min(4, n));
+  try { localStorage.setItem("atlas_pano_cols", String(n)); } catch (e) {}
+  const el = $("viewer3d");
+  if (el && el.classList.contains("pano-gallery")) {
+    el.style.gridTemplateColumns = "repeat(" + n + ",1fr)";
+    requestAnimationFrame(() => panoViewers.forEach((v) => { try { v.resize(); v.render(); } catch (e) {} }));
+  }
+}
+// metadata (props) text size, persisted
+function metaScale() { const n = parseInt(localStorage.getItem("atlas_meta_scale") || "12", 10); return Math.max(10, Math.min(18, n || 12)); }
+function setMetaScale(delta) {
+  const n = Math.max(10, Math.min(18, metaScale() + delta));
+  try { localStorage.setItem("atlas_meta_scale", String(n)); } catch (e) {}
+  if ($("props")) $("props").style.fontSize = n + "px";
+}
+// per-channel value legend for the panoramic gallery (matches the exact palettes used in 3D)
+function channelLegend(key, alt) {
+  const bar = (grad, lo, hi) => `<span class="leg-lab">${lo}</span><span class="leg-bar" style="background:${grad}"></span><span class="leg-lab">${hi}</span>`;
+  const sw = (items) => items.map(([c, l]) => `<span class="leg-sw" style="background:${c}"></span>${l}`).join(" ");
+  let inner = "";
+  if (key === "a23" || key === "dms") inner = bar("linear-gradient(90deg,#fff,#ffd4c2,#f08a5d,#b81d24)", "prot", "react");
+  else if (key === "plddt") inner = bar("linear-gradient(90deg,#ff7d45,#ffdb13 45%,#65cbf3 72%,#0053d6)", "0", "100");
+  else if (key === "pairing") inner = sw([["#ffffff", "paired"], ["#f3a0a0", "unpaired"]]);
+  else if (key === "nuc") inner = sw([[nucColor("A", alt), "A"], [nucColor("C", alt), "C"], [nucColor("G", alt), "G"], [nucColor("U", alt), "U"]]);
+  else if (key === "spectrum") inner = bar("linear-gradient(90deg,#2166ac,#4dac26,#fee08b,#d73027)", "5′", "3′");
+  return inner ? `<div class="chan-leg">${inner}</div>` : "";
+}
+// the 3D viewer the 2D projection tracks (single viewer, or the linked gallery's first viewer)
+function projActiveViewer() { return (currentMode() === "panoramic" && panoViewers[0]) ? panoViewers[0] : viewer; }
+// let the user drag the 2D "3D projection" to rotate — it drives the 3D viewer, which re-projects
+// the 2D (and, in panoramic, spins the linked gallery) via the existing view-change plumbing.
+let _projDrag = null;
+function initProjDrag() {
+  document.addEventListener("pointerdown", (e) => {
+    const box = e.target.closest && e.target.closest("#tracks .ss2d");
+    if (!box || !($("ss_view") && $("ss_view").value === "proj") || !projActiveViewer()) return;
+    _projDrag = { x: e.clientX, y: e.clientY };
+    document.body.style.cursor = "grabbing";
+    e.preventDefault();
+  });
+  document.addEventListener("pointermove", (e) => {
+    if (!_projDrag) return;
+    const v = projActiveViewer(); if (!v) { _projDrag = null; return; }
+    const dx = e.clientX - _projDrag.x, dy = e.clientY - _projDrag.y;
+    _projDrag.x = e.clientX; _projDrag.y = e.clientY;
+    try {
+      v.rotate(dx * 0.5, "y", 0); v.rotate(dy * 0.5, "x", 0); v.render();
+      if (currentMode() === "panoramic") { const view = v.getView(); panoViewers.forEach((o) => { if (o !== v) { try { o.setView(view); o.render(); } catch (e2) {} } }); }
+    } catch (e2) {}
+    refreshProjIfActive();
+  });
+  const end = () => { if (_projDrag) { _projDrag = null; document.body.style.cursor = ""; } };
+  document.addEventListener("pointerup", end);
+  document.addEventListener("pointercancel", end);
+}
+// quaternion of the active 3D viewer's current camera (for aligning the 2D projection to it)
+function activeQuat() {
+  try {
+    const v = (currentMode() === "panoramic" && panoViewers && panoViewers[0]) ? panoViewers[0] : viewer;
+    if (v && typeof v.getView === "function") { const a = v.getView(); if (a && a.length >= 8) return [a[4], a[5], a[6], a[7]]; }
+  } catch (e) {}
+  return null;
+}
+// switch the 2D secondary-structure rendering (called from the inline pills next to the diagram)
+function setSSView(m) {
+  if ($("ss_view")) $("ss_view").value = m;
+  if ($("deep_ss_view")) $("deep_ss_view").value = m;
+  saveState();
+  if (currentDeep) drawTracks(currentDeep.f, currentDeep.react);
+}
+// live-follow: when the 3D camera moves and the 2D is in "3D projection" mode, re-project just
+// the .ss2d SVG (parse is cached on currentDeep._proj, so this only rotates + redraws). rAF-throttled.
+let _projRaf = 0;
+function refreshProjIfActive() {
+  if (!($("ss_view") && $("ss_view").value === "proj")) return;
+  if (!currentDeep || !currentDeep.structText || _projRaf) return;
+  const fold = currentDeep.f;   // pin the fold this frame is for
+  _projRaf = requestAnimationFrame(() => {
+    _projRaf = 0;
+    // re-validate after the frame delay: fold may have closed/changed, or the view switched to forna/arc
+    if (!currentDeep || currentDeep.f !== fold || !currentDeep.structText) return;
+    if (!($("ss_view") && $("ss_view").value === "proj")) return;
+    const box = document.querySelector("#tracks .ss2d");
+    if (!box) return;
+    if (!currentDeep._proj) currentDeep._proj = projParse(currentDeep.structText);
+    if (!currentDeep._proj) return;
+    const dbn = (PAIRING_BY_DS[fold._dsid] || {})[fold.id] || "";
+    const svg = proj2D(currentDeep._proj, dbn, (currentDeep.react && currentDeep.react.seq) || "", 340, altPalette(), activeQuat());
+    if (svg) box.innerHTML = svg;
+  });
+}
+// nucColor() returns a CSS hex ("#rrggbb"); 3Dmol colorfuncs want 0x-prefixed hex.
+function hexCF(c) { return (c || "#cccccc").replace("#", "0x"); }
+// 3Dmol style object for a given coloring channel (shared by the single viewer + the gallery).
+function styleForMode(mode, f, react) {
   const a23 = react && react.a23, dms = react && react.dms;
   const dbn = (PAIRING_BY_DS[f._dsid] || {})[f.id] || "";
-  const mode = ($("color_by") && $("color_by").value) || "a23";
-  let style;
-  if (mode === "plddt") {                       // per-residue pLDDT from the B-factor (AlphaFold palette)
-    style = { cartoon: { colorfunc: (a) => plddtCF(a.b), ringMode: 3 } };
-  } else if (mode === "pairing") {              // predicted secondary structure: paired vs unpaired
-    style = { cartoon: { colorfunc: (a) => { const c = dbn[a.resi - 1]; const p = c && c !== "." && c !== "-"; return p ? "0xffffff" : (c ? "0xf3a0a0" : "0x9aa7b0"); }, ringMode: 3 } };
-  } else if (mode === "nuc") {                   // nucleotide identity (same palette as the sequence track)
-    const alt = altPalette();
-    style = { cartoon: { colorfunc: (a) => hexCF(nucColor((a.resn || "").trim(), alt)), ringMode: 3 } };
-  } else if (mode === "crossed") {              // tertiary crossed-pairs: pinned residues red, rest grey
-    const cs = crossedResiSet(f);
-    style = { cartoon: { colorfunc: (a) => cs.has(a.resi) ? "0xb5121b" : "0x9aa7b0", ringMode: 3 } };
-  } else if (mode === "spectrum") {
-    style = { cartoon: { color: "spectrum", ringMode: 3 } };
-  } else {                                       // a23 / dms reactivity; spectrum if absent
-    const arr = mode === "dms" ? dms : a23;
-    style = arr ? { cartoon: { colorfunc: (a) => shapeColorHex(arr[a.resi - 1]), ringMode: 3 } }
-                : { cartoon: { color: "spectrum", ringMode: 3 } };
-  }
-  viewer.setStyle({}, style);
+  if (mode === "plddt") return { cartoon: { colorfunc: (a) => plddtCF(a.b), ringMode: 3 } };
+  if (mode === "pairing") return { cartoon: { colorfunc: (a) => { const c = dbn[a.resi - 1]; const p = c && c !== "." && c !== "-"; return p ? "0xffffff" : (c ? "0xf3a0a0" : "0x9aa7b0"); }, ringMode: 3 } };
+  if (mode === "nuc") { const alt = altPalette(); return { cartoon: { colorfunc: (a) => hexCF(nucColor((a.resn || "").trim(), alt)), ringMode: 3 } }; }
+  if (mode === "crossed") { const cs = crossedResiSet(f); return { cartoon: { colorfunc: (a) => cs.has(a.resi) ? "0xb5121b" : "0x9aa7b0", ringMode: 3 } }; }
+  if (mode === "spectrum") return { cartoon: { color: "spectrum", ringMode: 3 } };
+  const arr = mode === "dms" ? dms : a23;                     // a23 / dms reactivity; spectrum if absent
+  return arr ? { cartoon: { colorfunc: (a) => shapeColorHex(arr[a.resi - 1]), ringMode: 3 } } : { cartoon: { color: "spectrum", ringMode: 3 } };
+}
+function paintViewer(v, f, react, mode) {
+  v.setStyle({}, styleForMode(mode, f, react));
   spansFor(f).forEach((m) => {
     const resi = [];
     m.ranges.forEach(([a, b]) => { for (let r = a; r <= b; r++) resi.push(r); });
-    viewer.addStyle({ resi }, { stick: { color: motifColor(m.type), radius: 0.28 } });
+    v.addStyle({ resi }, { stick: { color: motifColor(m.type), radius: 0.28 } });
   });
-  viewer.zoomTo(); viewer.render();
+  v.zoomTo(); v.render();
+}
+const PANO_CHANNELS = [
+  { k: "a23", label: "2A3 reactivity", need: (r) => r && r.a23 },
+  { k: "dms", label: "DMS reactivity", need: (r) => r && r.dms },
+  { k: "plddt", label: "pLDDT confidence" },
+  { k: "pairing", label: "base pairing" },
+  { k: "nuc", label: "nucleotide" },
+  { k: "spectrum", label: "5′→3′ spectrum" },
+];
+let panoViewers = [];
+function disposePano() { panoViewers.forEach((v) => { try { v.setViewChangeCallback(null); } catch (e) {} try { v.clear(); } catch (e) {} }); panoViewers = []; }
+function renderChannelGallery(f, react, data, fmt) {
+  const el = $("viewer3d");
+  disposePano();
+  el.innerHTML = "";
+  el.classList.add("pano-gallery");
+  el.style.gridTemplateColumns = "repeat(" + panoCols() + ",1fr)";
+  const alt = altPalette();
+  PANO_CHANNELS.filter((c) => !c.need || c.need(react)).forEach((c) => {
+    const cell = document.createElement("div"); cell.className = "chan-cell";
+    const lab = document.createElement("div"); lab.className = "chan-lab"; lab.textContent = c.label;
+    const vd = document.createElement("div"); vd.className = "chan-viewer";
+    cell.appendChild(vd); cell.appendChild(lab);
+    cell.insertAdjacentHTML("beforeend", channelLegend(c.k, alt));   // value scale, bottom-right
+    el.appendChild(cell);
+    try {
+      const v = $3Dmol.createViewer(vd, { backgroundColor: "0x0d1117" });
+      v.addModel(data, fmt);
+      paintViewer(v, f, react, c.k);
+      panoViewers.push(v);
+    } catch (e) {}
+  });
+  // +/- to resize the panels (fewer columns = bigger structures)
+  const zoom = document.createElement("div"); zoom.className = "pano-zoom";
+  zoom.innerHTML = '<button type="button" title="smaller">−</button><button type="button" title="larger">+</button>';
+  el.appendChild(zoom);
+  const zb = zoom.querySelectorAll("button");
+  zb[0].onclick = () => setPanoCols(panoCols() + 1);
+  zb[1].onclick = () => setPanoCols(panoCols() - 1);
+  // link cameras: dragging/rotating any panel rotates all the others in lock-step
+  let syncing = false;
+  panoViewers.forEach((v) => {
+    try {
+      v.setViewChangeCallback((view) => {
+        if (syncing) return;
+        syncing = true;
+        panoViewers.forEach((o) => { if (o !== v) { try { o.setView(view); o.render(); } catch (e) {} } });
+        syncing = false;
+        refreshProjIfActive();
+      });
+    } catch (e) {}
+  });
+  // align the "3D projection" 2D to the gallery's shared camera now that it exists
+  if ($("ss_view") && $("ss_view").value === "proj" && currentDeep) drawTracks(f, react);
 }
 function plddtCF(b) {                              // AlphaFold confidence palette
   if (b == null || Number.isNaN(b)) return "0xcccccc";

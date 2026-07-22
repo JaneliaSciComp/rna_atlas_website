@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Fathom - beautiful, simple website analytics -->
+<script src="https://cdn.usefathom.com/script.js" data-site="RSXPYHRE" data-spa="auto" defer></script>
+<!-- / Fathom -->
 <title>RNAnix — predict a structure</title>
 <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32x32.png">
 <link rel="shortcut icon" href="../favicon.ico">
@@ -63,6 +66,9 @@
       </div>
       <div class="ihint" id="expert_hint">Claude researches this RNA's family and curates a 3D template from homologous PDB structures before folding. Slower (adds real minutes of research time) and more thorough.</div>
       <textarea id="opt_description" hidden rows="2" placeholder="What is this RNA? (used for research — e.g. &quot;a glycine riboswitch aptamer&quot;, &quot;a de-novo Eterna design&quot;, &quot;a group II intron&quot;)"></textarea>
+      <div class="optrow" id="live_thinking_row" hidden>
+        <span><label class="ilbl" for="opt_live_thinking"><input id="opt_live_thinking" type="checkbox"> Show live reasoning</label></span>
+      </div>
     </fieldset>
     <button id="predict-btn">Predict</button>
     <p id="predict-note" class="muted"></p>

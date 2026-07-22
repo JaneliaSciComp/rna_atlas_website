@@ -94,6 +94,40 @@
     if (!jobFilter) return j;
     return j.filter((x) => (String(x.name || "") + " " + String(x.id || "") + " " + String(x.model || "")).toLowerCase().includes(jobFilter));
   }
+  // "Date" column: jobs created via predict()/demo()/openById() carry ts (Date.now() at submit
+  // time); jobs merged in from syncServerJobs() (self-healed from the server) don't have one — the
+  // /jobs bridge endpoint doesn't expose a timestamp — so this degrades to an em dash rather than
+  // showing an invalid date.
+  function fmtJobDate(ts) {
+    const n = Number(ts);
+    if (!n || !isFinite(n)) return null;
+    const d = new Date(n);
+    if (isNaN(d.getTime())) return null;
+    return { short: d.toLocaleDateString(undefined, { month: "short", day: "numeric" }), full: d.toLocaleString() };
+  }
+  // "Seq length" column: derived from data already stored on the job record at submit time —
+  // the multi-entity `entities` list (AF3-style: RNA/protein/DNA/ligand, each with a copy count),
+  // falling back to the legacy single `seq` string for older records. Convention: sum residues
+  // across all polymer entities × copy count (ligands don't count, same as polyLen()/totalResidues()
+  // on the submit form); use that entity type's unit (nt/aa/bp) when every entity shares one type,
+  // else the generic "res" — mirrors ENT_TYPES' own unit labels instead of inventing new wording.
+  function jobSeqLen(x) {
+    if (Array.isArray(x.entities) && x.entities.length) {
+      let total = 0; const parts = [], types = new Set();
+      for (const e of x.entities) {
+        if (!e || e.type === "ligand") continue;
+        const n = String(e.sequence || "").length * (e.count || 1);
+        if (!n) continue;
+        total += n; types.add(e.type);
+        parts.push(((e.count || 1) > 1 ? (e.count + "×") : "") + (e.type || "seq") + " " + n);
+      }
+      if (!total) return null;
+      const unit = types.size === 1 ? ((ENT_TYPES[[...types][0]] || {}).unit || "res") : "res";
+      return { n: total, unit, full: parts.join(" + ") };
+    }
+    if (typeof x.seq === "string" && x.seq) return { n: x.seq.length, unit: "nt", full: x.seq.length + " nt" };
+    return null;
+  }
   function renderJobs() {
     const el = $("jobs"); if (!el) return;
     const total = uniqueJobs().length;
@@ -105,11 +139,19 @@
       // server-recovered jobs (fromServer) show the internal target_id — the friendly label
       // was browser-only. Show it muted + a ✎ to relabel; user labels persist in localStorage.
       const label = x.name || x.id.slice(0, 10);
-      return `<div class="job"><span class="jn jopen${x.fromServer && x.name === x.id.split(":")[1] ? " jn-id" : ""}" data-id="${esc(x.id)}" title="open this result">${esc(label)}</span>`
+      const dt = fmtJobDate(x.ts), len = jobSeqLen(x);
+      return `<div class="job">`
+        + `<div class="job-main">`
+        + `<span class="jn jopen${x.fromServer && x.name === x.id.split(":")[1] ? " jn-id" : ""}" data-id="${esc(x.id)}" title="open this result">${esc(label)}</span>`
         + `<button class="jren" data-id="${esc(x.id)}" title="rename this job">&#9998;</button>`
         + `<span class="jm">${esc(x.model || "default")}</span>`
         + `<span class="js js-${esc(String(x.state || "").toLowerCase())}">${esc(x.state || "")}</span>`
         + (run ? `<button class="jkill" data-id="${esc(x.id)}" title="stop this job">kill</button>` : "")
+        + `</div>`
+        + `<div class="job-meta">`
+        + `<span class="jd" title="${dt ? esc(dt.full) : "submission date unknown"}">${dt ? esc(dt.short) : "—"}</span>`
+        + `<span class="jl" title="${len ? esc(len.full) : "sequence length unknown"}">${len ? esc(len.n + " " + len.unit) : "—"}</span>`
+        + `</div>`
         + `</div>`;
     }).join("");
     el.innerHTML = `<div class="jobs-h">Recent jobs <span class="jobs-count">${count}</span></div>`
@@ -703,6 +745,7 @@
     // job_id from a prior backend generation, ...): the server can't confirm anything, but
     // that's not evidence the job started running again.
     const wasTerminal = TERMINAL.has(String((loadJobs().find((x) => x.id === jobId) || {}).state || "").toLowerCase());
+    const liveThinking = !!(loadJobs().find((x) => x.id === jobId) || {}).liveThinking;
     for (let i = 0; i < 600; i++) {
       if (String((loadJobs().find((x) => x.id === jobId) || {}).state).toLowerCase() === "cancelled") { setLoading(false); setStatus("cancelled"); return; }
       let j; try { j = await (await fetch(`${API}/status?job=${encodeURIComponent(jobId)}${tok() ? "&t=" + encodeURIComponent(tok()) : ""}`)).json(); }
@@ -718,6 +761,10 @@
       setLoading(false);   // response received + structure rendered (or fell back / failed)
       if (m.state === "error") { setStatus("⚠ " + (m.error || "prediction failed")); notifyDone(jobId, false, m.error); return; }
       if (m.state === "done" || (results.nomsa && results.msa)) { setStatus("done"); notifyDone(jobId, true); showWhyPicks(jobId); return; }
+      // "Show live reasoning": the research Lambda flushes partial thinking.md to S3 every few
+      // seconds while it runs — poll /brief during "running" (not just at "done") so the panel
+      // fills in as Claude reasons, instead of only appearing once the whole job finishes.
+      if (liveThinking && m.state === "running") showWhyPicks(jobId);
       if (wasTerminal) {
         // already had a terminal result cached and this re-poll didn't reconfirm it — stop
         // instead of hammering an unresolvable job every 3s for up to 30 minutes.
@@ -791,7 +838,8 @@
     const relax = $("opt_relax") ? $("opt_relax").checked : true;
     const expert = $("opt_expert") ? $("opt_expert").checked : false;
     const description = $("opt_description") ? $("opt_description").value.trim() : "";
-    const opts = { mode, seeds: nSeeds, samples: nSamples, relax, expert, description };
+    const liveThinking = expert && $("opt_live_thinking") ? $("opt_live_thinking").checked : false;
+    const opts = { mode, seeds: nSeeds, samples: nSamples, relax, expert, description, live_thinking: liveThinking };
     curMsa = mode !== "none";
     const model = curModel(), jobName = $("jobname").value.trim();
     renderStages({ queued: "running" }); setStatus("submitting…");
@@ -801,7 +849,7 @@
       const r = await fetch(`${API}/predict`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sequence: legacySeq, entities: ents, name: jobName, model, options: opts, token: tok() }) });
       if (!r.ok) throw new Error("HTTP " + r.status); j0 = await r.json(); jobId = j0.job_id;
     } catch (e) { setStatus("submit failed: " + e.message); $("predict-note").textContent = "Could not reach the inference backend."; return; }
-    upsertJob({ id: jobId, name: jobName || jobId.slice(0, 10), model, mode, seq: legacySeq, entities: ents, summary, state: (j0.status || "submitted").toLowerCase(), ts: Date.now() });
+    upsertJob({ id: jobId, name: jobName || jobId.slice(0, 10), model, mode, seq: legacySeq, entities: ents, summary, state: (j0.status || "submitted").toLowerCase(), liveThinking, ts: Date.now() });
     if (String(j0.status).toUpperCase() === "CACHED") { $("predict-note").innerHTML = "<b>Cached</b> — this input + model was already predicted; showing the stored result."; }
     setStatus("running — job " + jobId); poll(jobId);
   }
@@ -835,6 +883,10 @@
   // Recent-jobs list lives in localStorage (per browser), so clearing site data loses it.
   // The server still knows recent web executions (+ cached results) — merge them back so the
   // list self-heals. Server ids are 3-part (model:target:exec); /status re-opens them fine.
+  // The bridge's /jobs never tracks the submitted sequence, so self-healed rows always show "—"
+  // for Seq length — but it does carry a `ts` (epoch-ms, same unit Date.now()/fmtJobDate use)
+  // once casp_web.py's _jobs() is redeployed to include it; store it so the Date column can heal
+  // too, both for newly-merged rows and for ones this browser already self-healed before that.
   async function syncServerJobs() {
     if (!API) return;
     let data;
@@ -845,15 +897,23 @@
     const local = loadJobs();
     // dedupe by target_id (parts[1]) so both live 3-part exec ids and 2-part stored ids merge
     // cleanly — the same job never shows twice, and completed jobs from other browsers appear.
-    const haveTgt = new Set(local.map((x) => String(x.id).split(":")[1]).filter(Boolean));
-    let added = 0;
+    const byTgt = new Map(local.map((x) => [String(x.id).split(":")[1], x]).filter((p) => p[0]));
+    let changed = false;
     for (const s of server) {
       const tgt = String(s.job_id || "").split(":")[1];
-      if (!tgt || haveTgt.has(tgt)) continue;   // already tracked locally (by target)
-      local.push({ id: s.job_id, name: s.name, model: s.model, state: s.state, fromServer: true });
-      haveTgt.add(tgt); added++;
+      if (!tgt) continue;
+      const have = byTgt.get(tgt);
+      if (!have) {
+        local.push({ id: s.job_id, name: s.name, model: s.model, state: s.state, ts: s.ts, fromServer: true });
+        byTgt.set(tgt, true); changed = true;
+        continue;
+      }
+      // backfill a previously self-healed row's date once the server actually returns a ts —
+      // never touch a job this browser created itself (predict()/demo() already stamp an
+      // accurate ts at submit time).
+      if (have.fromServer && !have.ts && s.ts) { have.ts = s.ts; changed = true; }
     }
-    if (added) { saveJobs(local); renderJobs(); }
+    if (changed) { saveJobs(local); renderJobs(); }
   }
   function init() {
     renderEntities();
@@ -868,7 +928,11 @@
     if ($("ss-png")) $("ss-png").addEventListener("click", exportSSPng);
     ["opt_seeds", "opt_samples", "model"].forEach((id) => { const e = $(id); if (e) e.addEventListener("change", updateFleetHint); });
     if ($("opt_expert") && $("opt_description")) {
-      $("opt_expert").addEventListener("change", () => { $("opt_description").hidden = !$("opt_expert").checked; });
+      $("opt_expert").addEventListener("change", () => {
+        const on = $("opt_expert").checked;
+        $("opt_description").hidden = !on;
+        if ($("live_thinking_row")) $("live_thinking_row").hidden = !on;
+      });
     }
     if ($("openid-go")) $("openid-go").addEventListener("click", openFromSearch);
     if ($("openid")) {

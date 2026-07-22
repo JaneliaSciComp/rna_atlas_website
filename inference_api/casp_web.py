@@ -316,6 +316,7 @@ def _predict(body):
     parts = [f"{e['type']}:{e.get('seq', e.get('value', ''))}:{e['count']}" for e in entities]
     expert = bool(opt.get("expert", False))
     description = str(opt.get("description", "") or "")[:500]
+    live_thinking = bool(opt.get("live_thinking", False))
     # expert/description change what gets folded (a curated template feeds the fold job), so they
     # must be part of the cache key -- otherwise an expert request could return a stale non-expert
     # cached result, or two different descriptions for the same sequence could collide.
@@ -408,6 +409,7 @@ def _predict(body):
         "relax": bool(opt.get("relax", True)),  # OpenMM relax post-process; checked by default
         "expert": expert,  # Claude research + curated template; unchecked by default
         "description": description,
+        "live_thinking": live_thinking,  # stream + periodically flush thinking.md while researching
     }
     try:
         sfn.start_execution(stateMachineArn=env["STATE_MACHINE_ARN"], name=ename,
@@ -733,7 +735,10 @@ def _jobs():
         by_tgt[tgt] = {"job_id": f"{model}:{tgt}", "model": model, "name": tgt, "state": "done", "_ts": ts}
     jobs = sorted(by_tgt.values(), key=lambda j: j["_ts"], reverse=True)
     for j in jobs:
-        j.pop("_ts", None)
+        # expose the internal sort timestamp as epoch-ms ("ts", matching Date.now() on the
+        # frontend, which is what fmtJobDate()/upsertJob() already expect on locally-created
+        # jobs) so self-healed "Recent jobs" entries can show a real submission date too.
+        j["ts"] = int(j.pop("_ts") * 1000)
     return _resp(200, {"jobs": jobs[:50]})
 
 

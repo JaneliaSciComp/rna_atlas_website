@@ -83,7 +83,8 @@
 #opt_description[hidden] { display: none; }
 .jobs { margin-top: 14px; }
 .jobs-h { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #5b6670; font-weight: 600; margin-bottom: 4px; }
-.job { display: flex; align-items: center; gap: 7px; font-size: 12px; padding: 5px 0; border-top: 1px solid #eef2f5; }
+.job { padding: 5px 0; border-top: 1px solid #eef2f5; }
+.job-main { display: flex; align-items: center; gap: 7px; font-size: 12px; }
 .job .jn { font-weight: 600; color: #1f324d; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .job .jopen { cursor: pointer; }
 .job .jopen:hover { color: #2e6f95; text-decoration: underline; }
@@ -98,6 +99,11 @@
 .js-cancelled { background: #f3e9e4; color: #c1440e; }
 .jkill { flex: 0 0 auto; border: 1px solid #e0b3a2; background: #fbeee7; color: #c1440e; border-radius: 4px; font-size: 11px; padding: 1px 8px; cursor: pointer; }
 .jkill:hover { background: #c1440e; color: #fff; border-color: #c1440e; }
+
+/* per-job meta line: Date + Seq length columns (kept on their own row so the crowded
+   name/model/status/kill row never overflows the 340px sidebar at any width) */
+.job-meta { display: flex; align-items: center; gap: 10px; font-size: 10px; color: #8a96a0; margin-top: 3px; }
+.job-meta .jd, .job-meta .jl { flex: 0 0 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 50%; }
 
 /* session model registry — visibility checkboxes + close (Feature 1) */
 .mpanel { margin-top: 10px; }

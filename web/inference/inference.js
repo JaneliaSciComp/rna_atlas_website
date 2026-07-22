@@ -26,6 +26,7 @@
   let vmode = (() => { try { return localStorage.getItem("infer_viewer") || "molstar"; } catch (e) { return "molstar"; } })();
   let ssMode = (() => { try { return localStorage.getItem("infer_ss") || "forna"; } catch (e) { return "forna"; } })();
   let curSS = null;                            // derived secondary structure of the shown model (Feature 2)
+  let jobFilter = "";                          // live search filter over the Recent-jobs list
 
   // ---------- input entities (AF3-style: RNA / protein / DNA / ligand, each with a copy count) ----------
   const ENT_TYPES = {
@@ -75,11 +76,31 @@
     if (i >= 0) j[i] = { ...j[i], ...job }; else j.unshift(job);
     saveJobs(j); renderJobs();
   }
+  // dedupe by target_id (id parts[1]) so the SAME job never shows twice — e.g. an older local
+  // entry (3-part exec id) alongside the server-synced one (2-part id). Falls back to the whole
+  // id when there's no target part; keeps the first occurrence (the user's own labeled entry).
+  function uniqueJobs() {
+    const seen = new Set(), out = [];
+    for (const x of loadJobs()) {
+      const key = String(x.id).split(":")[1] || String(x.id);
+      if (seen.has(key)) continue;
+      seen.add(key); out.push(x);
+    }
+    return out;
+  }
+  // live substring match on name / id / model, used by both the list render and the search box
+  function filteredJobs() {
+    const j = uniqueJobs();
+    if (!jobFilter) return j;
+    return j.filter((x) => (String(x.name || "") + " " + String(x.id || "") + " " + String(x.model || "")).toLowerCase().includes(jobFilter));
+  }
   function renderJobs() {
     const el = $("jobs"); if (!el) return;
-    const j = loadJobs();
-    if (!j.length) { el.innerHTML = ""; return; }
-    el.innerHTML = '<div class="jobs-h">Recent jobs</div>' + j.map((x) => {
+    const total = uniqueJobs().length;
+    if (!total) { el.innerHTML = ""; return; }
+    const j = filteredJobs();
+    const count = jobFilter ? `${j.length} of ${total}` : `${total}`;
+    const rows = j.map((x) => {
       const run = RUNNING.has(String(x.state || "").toLowerCase());
       // server-recovered jobs (fromServer) show the internal target_id — the friendly label
       // was browser-only. Show it muted + a ✎ to relabel; user labels persist in localStorage.
@@ -91,6 +112,8 @@
         + (run ? `<button class="jkill" data-id="${esc(x.id)}" title="stop this job">kill</button>` : "")
         + `</div>`;
     }).join("");
+    el.innerHTML = `<div class="jobs-h">Recent jobs <span class="jobs-count">${count}</span></div>`
+      + `<div class="jobs-list">${rows || '<div class="jobs-empty">no matching jobs</div>'}</div>`;
     el.querySelectorAll(".jkill").forEach((b) => b.onclick = (e) => { e.stopPropagation(); cancelJob(b.dataset.id); });
     el.querySelectorAll(".jren").forEach((b) => b.onclick = (e) => { e.stopPropagation(); renameJob(b.dataset.id); });
     el.querySelectorAll(".jopen").forEach((b) => b.onclick = () => reopenJob(b.dataset.id));
@@ -138,6 +161,15 @@
       } catch (e) {}
     }
     setLoading(false); setStatus("no stored result found for id: " + raw);
+  }
+  // Enter / Open button: if the live filter narrowed to exactly one job, open it; otherwise treat
+  // the text as an id to look up (full id or bare target hash).
+  function openFromSearch() {
+    const v = ($("openid") ? $("openid").value : "").trim();
+    if (!v) return;
+    const m = filteredJobs();
+    if (m.length === 1) { $("openid").value = ""; jobFilter = ""; renderJobs(); return reopenJob(m[0].id); }
+    return openById(v);
   }
 
   // ---------- gate ----------
@@ -305,10 +337,10 @@
   async function renderModels(fit) {
     if (!openModels.length) return;
     showResultArea();
-    // Mol* stalls on very large structures (e.g. a 6+ MB multi-model CASP PDB); the lighter 3Dmol
-    // handles them. Route big ones straight to 3Dmol so we don't sit through a Mol* stall/timeout.
-    const big = openModels.some((m) => (m.text || "").length > 2_000_000);
-    if (vmode === "molstar" && !big) await renderModelsMolstar(fit);
+    // Respect the chosen viewer. Mol* handles big structures now that the data path is fast
+    // (presigned URL); if it ever genuinely stalls, renderModelsMolstar's timeout falls back to
+    // 3Dmol on its own — so we no longer force big ones away from Mol*.
+    if (vmode === "molstar") await renderModelsMolstar(fit);
     else renderModels3Dmol(fit);
   }
   function renderModels3Dmol(fit) {
@@ -348,7 +380,7 @@
         // structure always shows rather than silently never appearing.
         await Promise.race([
           mstar.loadStructureFromData(m.text, fmtOf(m.text) === "cif" ? "mmcif" : "pdb"),
-          new Promise((_, rej) => setTimeout(() => rej(new Error("Mol* timed out")), 25000)),
+          new Promise((_, rej) => setTimeout(() => rej(new Error("Mol* timed out")), 45000)),
         ]);
       }
     } catch (e) { setStatus("Mol* couldn't render this one — using 3Dmol"); return renderModels3Dmol(fit); }
@@ -838,8 +870,11 @@
     if ($("opt_expert") && $("opt_description")) {
       $("opt_expert").addEventListener("change", () => { $("opt_description").hidden = !$("opt_expert").checked; });
     }
-    if ($("openid-go")) $("openid-go").addEventListener("click", () => openById($("openid").value));
-    if ($("openid")) $("openid").addEventListener("keydown", (e) => { if (e.key === "Enter") openById($("openid").value); });
+    if ($("openid-go")) $("openid-go").addEventListener("click", openFromSearch);
+    if ($("openid")) {
+      $("openid").addEventListener("input", () => { jobFilter = $("openid").value.trim().toLowerCase(); renderJobs(); });
+      $("openid").addEventListener("keydown", (e) => { if (e.key === "Enter") openFromSearch(); });
+    }
     loadModels().then(updateFleetHint); renderJobs(); refreshJobs(); syncServerJobs(); renderModelPanel();
     updateFleetHint();
   }

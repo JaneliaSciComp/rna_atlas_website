@@ -17,6 +17,9 @@ Then run:  enrich_openknot_long_react.py --names <name>   (replaces the placehol
              above with real 1D cmuts DMS+2A3 -- OpenKnotBench's own coverage tops out around
              ~100nt median for these ~240nt designs, so most of it is otherwise null/sparse)
            derive_ss.py --name <name>   (pairing.json + ss/termini fields)
+           enrich_pseudolabels_shape.py --dataset-root dist/datasets/<name>   (r2a3/shape_agr/
+             shape_ok from the real a23 vs pairing.json -- otherwise these stay null and the
+             SHAPE column reads "no" for every record despite real reactivity being present)
            compute_embedding.py --name <name>   (ex,ey for the map)
 
 Run in the `rna` env.

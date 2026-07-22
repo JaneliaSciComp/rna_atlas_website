@@ -15,7 +15,13 @@ Output (explorer dataset layout):
   dist/datasets/<name>/react/<key>.json      ({seq, dms:null, a23:null, sn:[null,null]})
   dist/datasets/<name>/data/folds.json       (one record/candidate + CSV metadata)
   dist/datasets/<name>/data/motifs.json      ({} -- rna_motif scan added later)
-Then run:  derive_ss.py --name <name>   ;   compute_embedding.py --name <name>
+Then run:  enrich_openknot_long_react.py --names <name>   (real 1D cmuts DMS+2A3 -- the cryo-EM
+             candidates ARE in ok7ab8_metadata_combined.parquet, contrary to the "no experimental
+             SHAPE" note above; the dms:null placeholder written here gets replaced)
+           derive_ss.py --name <name>   (pairing.json + bp_fraction/pseudoknot/ss_class -- these
+             stay null in folds.json until this runs, even though pairing.json may already exist)
+           enrich_pseudolabels_shape.py --dataset-root dist/datasets/<name>   (r2a3/shape_agr/shape_ok)
+           compute_embedding.py --name <name>   (ex,ey for the map -- absent until this runs)
 
 Run in the `rna` env.
 """

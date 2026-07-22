@@ -1,6 +1,8 @@
 /* ============================================================================
-   Design tokens. Every color/elevation/radius routes through a CSS variable so
-   the palette stays consistent and the whole UI can re-theme from one place.
+   Design tokens. UI chrome colors/elevation/radii route through these CSS
+   variables so the palette stays consistent and the UI can re-theme from one
+   place. (Data-visualization colors — nucleotide/reactivity/pLDDT palettes,
+   motif chips — are intentionally fixed and live in viz_style.js / inline.)
    [data-theme="dark"] overrides just the values (opt-in via the header toggle).
    Plot surfaces (--plot-bg) intentionally stay light in both themes: the map +
    reactivity canvases are drawn by JS with dark ink, so their background can't flip.
@@ -60,7 +62,7 @@
   --text: #e6edf3;
   --text-2: #cdd6dd;
   --text-muted: #9aa7b3;
-  --text-faint: #6b7684;
+  --text-faint: #93a1b0;
   --border: #2a3542;
   --border-2: #2a3542;
   --border-strong: #384656;
@@ -100,7 +102,7 @@ button { transition: background-color var(--tr-fast), color var(--tr-fast), bord
 header { display: flex; align-items: center; gap: 14px; padding: 10px 16px; background: var(--header-bg); color: var(--header-fg); box-shadow: var(--shadow-1); position: relative; z-index: 40; }
 header h1 { font-size: 17px; margin: 0; font-weight: 600; letter-spacing: .01em; }
 .hdr-logo { height: 30px; width: auto; margin-right: -6px; }
-.universe { font-size: 12px; background: #2e6f95; padding: 2px 8px; border-radius: 10px; }
+.universe { font-size: 12px; background: var(--accent); padding: 2px 8px; border-radius: 10px; }
 #sourcewrap { position: relative; }
 #source-btn { font-size: 13px; border: 1px solid var(--header-btn-brd); background: var(--header-btn); color: var(--header-fg); cursor: pointer; border-radius: var(--radius-sm); padding: 5px 11px; }
 #source-btn:hover { background: var(--accent); border-color: var(--accent); }
@@ -226,7 +228,19 @@ tbody tr:hover { background: var(--row-hover); }
 #deep-title { margin: 0; font-size: 16px; line-height: 1.3; flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .deep-body { display: grid; grid-template-columns: 1.1fr 1fr; grid-template-rows: auto auto; gap: 12px; }
 #viewer3d { position: relative; width: 100%; height: 420px; min-height: 240px; background: var(--viewer-bg); border-radius: var(--radius); grid-row: span 2; resize: vertical; overflow: hidden; }
-#tracks { width: 100%; overflow-x: auto; }
+#tracks { width: 100%; overflow-x: auto; color: var(--text-muted); }   /* color = theme for the currentColor SVG labels */
+.ss2d { text-align: center; margin-top: 4px; }
+.ss2d svg { width: 100%; max-width: 340px; height: auto; display: inline-block; }
+.ss2d-arc svg { max-width: none; }   /* arc diagram is wide — don't cap it at the square-diagram width */
+.ss2d-proj { cursor: grab; touch-action: none; }   /* the 3D projection is draggable to rotate */
+.ss-cap { font-size: 11px; color: var(--text-muted); margin: 10px 0 3px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.ss-switch { display: inline-flex; gap: 0; }
+.ss-pill { font-size: 10px; padding: 2px 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); cursor: pointer; transition: background-color var(--tr-fast), color var(--tr-fast); }
+.ss-pill:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+.ss-pill:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; border-left: 0; }
+.ss-pill:hover { background: var(--accent-soft); color: var(--accent); }
+.ss-pill.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.ss-note { color: var(--text-faint); }
 #props { font-size: 12px; }
 #props table { width: 100%; }
 #props td { white-space: normal; }
@@ -367,9 +381,26 @@ tbody tr:hover { background: var(--row-hover); }
 #deep.mode-panoramic .deep-body > div { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-1); padding: 12px 14px; min-width: 0; }
 #deep.mode-panoramic #viewer3d { padding: 0; overflow: hidden; }
 #deep.mode-panoramic #reactchart:empty { display: none; }
-/* fluid track / 2D SVGs: scale to the card instead of forcing a scrollbar */
+/* fluid reactivity lanes: scale to the card instead of forcing a scrollbar (direct-child svg
+   only — the 2D structure is wrapped in .ss2d and stays capped, see below) */
 #deep.mode-panoramic #tracks { overflow-x: visible; }
-#deep.mode-panoramic #tracks svg { width: 100%; height: auto; max-width: none; display: block; }
+#deep.mode-panoramic #tracks > svg { width: 100%; height: auto; max-width: none; display: block; }
+#deep.mode-panoramic #deep_color_by { display: none; }   /* channels are all shown → no color-by selector needed (the 2D-view selector stays) */
+/* per-channel 3D gallery (panoramic left panel): the structure colored by every channel at once */
+#viewer3d.pano-gallery { position: relative; display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; background: transparent; padding: 0; height: auto; min-height: 0; resize: none; align-content: start; }
+.chan-cell { position: relative; background: var(--viewer-bg); border-radius: var(--radius); overflow: hidden; aspect-ratio: 1 / 1; }
+.chan-viewer { position: absolute; inset: 0; }
+.chan-lab { position: absolute; top: 5px; left: 6px; z-index: 2; font-size: 10px; color: #dbe4ee; background: rgba(13,17,23,.62); padding: 1px 6px; border-radius: 4px; pointer-events: none; }
+.chan-leg { position: absolute; right: 6px; bottom: 6px; z-index: 2; display: flex; align-items: center; gap: 3px; background: rgba(13,17,23,.66); color: #dbe4ee; padding: 2px 5px; border-radius: 4px; font-size: 9px; line-height: 1.1; pointer-events: none; }
+.leg-bar { display: inline-block; width: 40px; height: 7px; border-radius: 2px; }
+.leg-sw { display: inline-block; width: 8px; height: 8px; border-radius: 2px; vertical-align: -1px; border: 1px solid rgba(255,255,255,.35); }
+.leg-lab { white-space: nowrap; }
+.pano-zoom { position: absolute; top: 6px; right: 6px; z-index: 4; display: flex; gap: 2px; }
+.pano-zoom button { width: 20px; height: 20px; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 4px; cursor: pointer; font-size: 13px; line-height: 1; padding: 0; box-shadow: var(--shadow-1); }
+.pano-zoom button:hover { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.meta-size { display: flex; justify-content: flex-end; gap: 3px; margin-bottom: 4px; }
+.meta-size button { font-size: 11px; padding: 1px 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); border-radius: var(--radius-sm); cursor: pointer; }
+.meta-size button:hover { background: var(--accent-soft); color: var(--accent); }
 @media (min-width: 1000px) {
   #deep.mode-panoramic .deep-body {
     grid-template-columns: 1.25fr 1fr;

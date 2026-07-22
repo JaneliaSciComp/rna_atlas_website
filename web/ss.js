@@ -31,7 +31,7 @@ function arcDiagram(dbn, n, cw, W) {   // SVG arc plot of the predicted secondar
   let s = `<svg width="${W + 40}" height="${aH}" viewBox="0 0 ${W + 40} ${aH}" preserveAspectRatio="xMinYMin meet" font-size="9"><line x1="0" y1="${base}" x2="${W}" y2="${base}" stroke="#dfe3e8"/>`;
   segs.forEach(({ p, h }) => {
     const xi = p.i * cw + cw / 2, xj = p.j * cw + cw / 2, mx = (xi + xj) / 2;
-    s += `<path d="M${xi.toFixed(1)} ${base} Q ${mx.toFixed(1)} ${(base - h).toFixed(1)} ${xj.toFixed(1)} ${base}" fill="none" stroke="${p.pk ? "#c1440e" : "#2e6f95"}" stroke-width="1.2" opacity="0.55"><title>${p.i + 1}–${p.j + 1}${p.pk ? " (pseudoknot)" : ""}</title></path>`;
+    s += `<path d="M${xi.toFixed(1)} ${base} Q ${mx.toFixed(1)} ${(base - h).toFixed(1)} ${xj.toFixed(1)} ${base}" fill="none" stroke="${p.pk ? "#e83e8c" : "#7b61ff"}" stroke-width="${p.pk ? 1.6 : 1.4}" opacity="0.78"${p.pk ? ' stroke-dasharray="5 3"' : ""}><title>${p.i + 1}–${p.j + 1}${p.pk ? " (pseudoknot)" : ""}</title></path>`;
   });
   return s + "</svg>";
 }
@@ -72,11 +72,95 @@ function forna2D(id, dbn, seq, react, box, alt) {
   let path = "M";
   for (let i = 0; i < n; i++) path += `${X(pos[i].x)} ${Y(pos[i].y)}${i < n - 1 ? " L" : ""} `;
   s += `<path d="${path}" fill="none" stroke="#cdd6dd" stroke-width="1.4"/>`;
-  for (const p of pairs) s += `<line x1="${X(pos[p.i].x)}" y1="${Y(pos[p.i].y)}" x2="${X(pos[p.j].x)}" y2="${Y(pos[p.j].y)}" stroke="${p.pk ? "#c1440e" : "#9aa7b0"}" stroke-width="1"/>`;
+  for (const p of pairs) s += `<line x1="${X(pos[p.i].x)}" y1="${Y(pos[p.i].y)}" x2="${X(pos[p.j].x)}" y2="${Y(pos[p.j].y)}" stroke="${p.pk ? "#e83e8c" : "#7b61ff"}" stroke-width="${p.pk ? 1.5 : 1.3}"${p.pk ? ' stroke-dasharray="4 2"' : ""}/>`;
   for (let i = 0; i < n; i++) {
     const ch = (seq && seq[i]) || "N";
     s += `<circle cx="${X(pos[i].x)}" cy="${Y(pos[i].y)}" r="${r.toFixed(1)}" fill="${nucColor(ch, alt)}" stroke="#fff" stroke-width="0.5"><title>${i + 1} ${ch}</title></circle>`;
     if (r >= 6 && seq) s += `<text x="${X(pos[i].x)}" y="${(+Y(pos[i].y) + 2.3).toFixed(1)}" text-anchor="middle" fill="#fff">${ch}</text>`;
+  }
+  return s + "</svg>";
+}
+
+// 3x3 symmetric eigendecomposition (Jacobi). Returns eigenvectors sorted by eigenvalue desc.
+function jacobiEig3(A) {
+  const a = [A[0].slice(), A[1].slice(), A[2].slice()];
+  const V = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+  for (let it = 0; it < 60; it++) {
+    let p = 0, q = 1, mx = Math.abs(a[0][1]);
+    if (Math.abs(a[0][2]) > mx) { mx = Math.abs(a[0][2]); p = 0; q = 2; }
+    if (Math.abs(a[1][2]) > mx) { mx = Math.abs(a[1][2]); p = 1; q = 2; }
+    if (mx < 1e-10) break;
+    const phi = 0.5 * Math.atan2(2 * a[p][q], a[q][q] - a[p][p]);
+    const c = Math.cos(phi), s = Math.sin(phi);
+    for (let k = 0; k < 3; k++) { const kp = a[k][p], kq = a[k][q]; a[k][p] = c * kp - s * kq; a[k][q] = s * kp + c * kq; }
+    for (let k = 0; k < 3; k++) { const pk = a[p][k], qk = a[q][k]; a[p][k] = c * pk - s * qk; a[q][k] = s * pk + c * qk; }
+    for (let k = 0; k < 3; k++) { const kp = V[k][p], kq = V[k][q]; V[k][p] = c * kp - s * kq; V[k][q] = s * kp + c * kq; }
+  }
+  const vals = [a[0][0], a[1][1], a[2][2]];
+  const idx = [0, 1, 2].sort((i, j) => vals[j] - vals[i]);
+  return idx.map((i) => [V[0][i], V[1][i], V[2][i]]);   // eigenvectors, largest variance first
+}
+
+// "3D projection" 2D: flatten the real C1' coordinates onto their best-fit viewing plane (top-2
+// principal axes) and draw backbone + base pairs there, so the diagram mirrors the actual fold's
+// shape/orientation (unlike the abstract forna spring layout). Falls back to "" if no 3D coords.
+// Parse + centroid + PCA ONCE per structure (cached by the caller) so live rotation only
+// re-projects + redraws, never re-parses the CIF.
+function projParse(structText) {
+  const res = (typeof ssParseResidues === "function") ? ssParseResidues(structText || "") : [];
+  const kept = [];   // keep each residue's ORIGINAL index so a missing C1' can't shift labels/pairs
+  res.forEach((r, i) => { if (r.atoms && r.atoms["C1'"]) kept.push({ p: r.atoms["C1'"], base: r.base, idx: i }); });
+  const n = kept.length;
+  if (n < 3) return null;
+  const pts = kept.map((k) => k.p);
+  const bases = kept.map((k) => k.base);
+  const idx = kept.map((k) => k.idx);
+  let cx = 0, cy = 0, cz = 0;
+  for (const p of pts) { cx += p[0]; cy += p[1]; cz += p[2]; }
+  cx /= n; cy /= n; cz /= n;
+  let xx = 0, xy = 0, xz = 0, yy = 0, yz = 0, zz = 0;
+  for (const p of pts) { const dx = p[0] - cx, dy = p[1] - cy, dz = p[2] - cz; xx += dx * dx; xy += dx * dy; xz += dx * dz; yy += dy * dy; yz += dy * dz; zz += dz * dz; }
+  const ev = jacobiEig3([[xx, xy, xz], [xy, yy, yz], [xz, yz, zz]]);
+  return { pts, bases, idx, cx, cy, cz, e1: ev[0], e2: ev[1] };
+}
+function proj2D(parsed, dbn, seq, box, alt, quat) {
+  if (!parsed) return "";
+  const { pts, bases, idx, cx, cy, cz, e1, e2 } = parsed;
+  const n = pts.length;
+  let pr;
+  if (quat && quat.length === 4) {
+    // orient exactly like the 3D viewer: rotate coords by the camera quaternion, then drop z
+    // (SVG y grows downward, so flip y to match the on-screen 3D orientation).
+    const [qx, qy, qz, qw] = quat;
+    pr = pts.map((p) => {
+      const x = p[0] - cx, y = p[1] - cy, z = p[2] - cz;
+      const tx = 2 * (qy * z - qz * y), ty = 2 * (qz * x - qx * z), tz = 2 * (qx * y - qy * x);
+      return { x: x + qw * tx + (qy * tz - qz * ty), y: -(y + qw * ty + (qz * tx - qx * tz)) };
+    });
+  } else {
+    // fallback: principal-axes (best-fit) plane (e1,e2 precomputed in projParse)
+    pr = pts.map((p) => { const dx = p[0] - cx, dy = p[1] - cy, dz = p[2] - cz; return { x: dx * e1[0] + dy * e1[1] + dz * e1[2], y: dx * e2[0] + dy * e2[1] + dz * e2[2] }; });
+  }
+  const xs = pr.map((p) => p.x), ys = pr.map((p) => p.y);
+  const minx = Math.min(...xs), maxx = Math.max(...xs), miny = Math.min(...ys), maxy = Math.max(...ys);
+  const pad = 14, sc = Math.min((box - 2 * pad) / ((maxx - minx) || 1), (box - 2 * pad) / ((maxy - miny) || 1));
+  const X = (v) => (pad + (v - minx) * sc).toFixed(1), Y = (v) => (pad + (v - miny) * sc).toFixed(1);
+  const r = Math.max(2.2, Math.min(6, sc * 6));
+  const pairs = ssPairs(dbn || "");
+  const posOf = {};                                   // original residue index -> projected point index
+  for (let i = 0; i < idx.length; i++) posOf[idx[i]] = i;
+  let s = `<svg width="${box}" height="${box}" viewBox="0 0 ${box} ${box}" preserveAspectRatio="xMidYMid meet" font-size="7">`;
+  let path = "M";
+  for (let i = 0; i < n; i++) path += `${X(pr[i].x)} ${Y(pr[i].y)}${i < n - 1 ? " L" : ""} `;
+  s += `<path d="${path}" fill="none" stroke="#cdd6dd" stroke-width="1.4"/>`;
+  for (const p of pairs) {
+    const pi = posOf[p.i], pj = posOf[p.j];
+    if (pi != null && pj != null) s += `<line x1="${X(pr[pi].x)}" y1="${Y(pr[pi].y)}" x2="${X(pr[pj].x)}" y2="${Y(pr[pj].y)}" stroke="${p.pk ? "#e83e8c" : "#7b61ff"}" stroke-width="${p.pk ? 1.5 : 1.3}"${p.pk ? ' stroke-dasharray="4 2"' : ""}/>`;
+  }
+  for (let i = 0; i < n; i++) {
+    const oi = idx[i], ch = (seq && seq[oi]) || bases[i] || "N";
+    s += `<circle cx="${X(pr[i].x)}" cy="${Y(pr[i].y)}" r="${r.toFixed(1)}" fill="${nucColor(ch, alt)}" stroke="#fff" stroke-width="0.5"><title>${oi + 1} ${ch}</title></circle>`;
+    if (r >= 5 && seq) s += `<text x="${X(pr[i].x)}" y="${(+Y(pr[i].y) + 2.2).toFixed(1)}" text-anchor="middle" fill="#fff">${ch}</text>`;
   }
   return s + "</svg>";
 }

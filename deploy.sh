@@ -60,8 +60,13 @@ deploy_shell() {
     && echo "  ${pfx}config.js  (DATA_BASE=\"$db\"$([ -f .infer_api ] && echo ' +INFER_API'))"
   verify_published_config "$pfx"
   for lf in web/lib/*.js; do bn=$(basename "$lf"); aws --profile $P s3 cp "$lf" "$B/${pfx}lib/$bn" --only-show-errors && echo "  ${pfx}lib/$bn"; done
-  # /inference subpage
-  for f in web/inference/*; do [ -f "$f" ] && aws --profile $P s3 cp "$f" "$B/${pfx}inference/$(basename "$f")" --only-show-errors && echo "  ${pfx}inference/$(basename "$f")"; done
+  # /inference subpage -- ROOT inference/ is no longer this repo's: it's the live RNAnix
+  # inference app (Cognito-backed), deployed by rna-atlas-inference/scripts/deploy_frontend.sh
+  # (see ticket T-0071). Only ever touch it under dev/, where the old v1 copy is intentionally
+  # left in place until T-0041 decides its fate -- never under the root/prod prefix.
+  if [ -n "$pfx" ]; then
+    for f in web/inference/*; do [ -f "$f" ] && aws --profile $P s3 cp "$f" "$B/${pfx}inference/$(basename "$f")" --only-show-errors && echo "  ${pfx}inference/$(basename "$f")"; done
+  fi
   # static image assets (favicon set + header/gate logos)
   for f in claude.png icon.png logo_exp.png favicon.ico favicon-16x16.png favicon-32x32.png \
            apple-touch-icon.png android-chrome-192x192.png android-chrome-512x512.png site.webmanifest; do
@@ -114,11 +119,11 @@ case "${1:-prod}" in
     ;;
   promote)
     echo "promote dev/ shell -> root (server-side copy of the tested bytes)"
+    # inference/* deliberately excluded (T-0071): root inference/ is the live RNAnix inference
+    # app owned by rna-atlas-inference/scripts/deploy_frontend.sh, not this repo's dev/ copy.
     for f in $SHELL_FILES lib/3Dmol-min.js lib/three.min.js lib/OrbitControls.js claude.png \
              icon.png logo_exp.png favicon.ico favicon-16x16.png favicon-32x32.png \
-             apple-touch-icon.png android-chrome-192x192.png android-chrome-512x512.png site.webmanifest \
-             inference/index.html inference/inference.js inference/inference.css \
-             inference/molstar.js inference/molstar.css; do
+             apple-touch-icon.png android-chrome-192x192.png android-chrome-512x512.png site.webmanifest; do
       aws --profile $P s3 cp "$B/dev/$f" "$B/$f" --only-show-errors && echo "  $f"
     done
     CFG=$(printf 'window.DATA_BASE = "";\nwindow.GATED = true;\n')

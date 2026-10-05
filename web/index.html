@@ -59,8 +59,9 @@
   <span id="count" class="count"></span>
   <!-- Root-relative on purpose: the session lives in this origin's localStorage, so a visitor on
        www.rna-atlas.org must sign out on www (an absolute rna-atlas.org link would leave www's
-       session to be resumed). ?logout=1 makes /login clear the session instead of resuming it. -->
-  <a id="logout-btn" href="/login?logout=1" title="Sign out of rna-atlas.org (all RNA Atlas apps)">Log out</a>
+       session to be resumed). ?logout=1 makes /login clear the session instead of resuming it;
+       next=/ sends a visitor who signs straight back in to the Atlas, not the default /inference/. -->
+  <a id="logout-btn" href="/login?logout=1&amp;next=%2F" title="Sign out of rna-atlas.org (all RNA Atlas apps)">Log out</a>
 </header>
 
 <div id="layout">

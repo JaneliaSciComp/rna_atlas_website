@@ -283,6 +283,7 @@ tbody tr:hover { background: var(--row-hover); }
 #share-btn.copied { background: var(--ok); border-color: var(--ok); }
 #inference-btn, #logout-btn { margin-left: 12px; font-size: 12px; font-weight: 600; border: 1px solid var(--header-btn-brd); background: var(--header-btn); color: var(--header-fg); cursor: pointer; border-radius: var(--radius); padding: 4px 10px; display: inline-block; text-decoration: none; }
 #inference-btn:hover, #logout-btn:hover { background: var(--accent); border-color: var(--accent); transform: translateY(-1px); }
+#logout-btn { white-space: nowrap; }   /* a two-word label; "Log / out" stacked reads as two controls */
 
 /* ---------- scatter map ---------- */
 #tbl.hidden, #mapwrap.hidden, #agent.hidden { display: none !important; }

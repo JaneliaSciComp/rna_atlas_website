@@ -1,21 +1,20 @@
-# Deploy: S3 website (shell + data) behind CloudFront, passcode-gated
+# Deploy: S3 website (shell + data) behind CloudFront
 
 Everything — the web shell *and* the data — lives under one S3 prefix and is served through a
 single CloudFront distribution (HTTPS). One origin ⇒ **no CORS**. The source code lives in a
 **private** git repo (version control only; it does not serve the site).
 
 ```
-  https://<dist>.cloudfront.net/                -> index.html, app.js, ... (shell, ungated)
-  https://<dist>.cloudfront.net/data|structs|react/...  -> data (gated by passcode ?t=)
+  https://<dist>.cloudfront.net/                -> index.html, app.js, ... (shell)
+  https://<dist>.cloudfront.net/data|structs|react/...  -> data
         |
   s3://rnanix/atlas_explorer/   (private; CloudFront reads it via OAC)
 ```
 
-Why CloudFront (not the bare S3 website endpoint): the S3 website endpoint is HTTP-only and can't
-check a passcode. CloudFront gives HTTPS + a viewer-request Function that enforces the passcode.
-
-The shell paths are **ungated** so the passcode screen can load; only `/data/`, `/structs/`,
-`/react/` require the passcode. The shell contains no findings — those are all in the gated data.
+Access control: as of T-0140 (2026-10), this site no longer has a client-side passcode. Access is
+enforced at the CloudFront edge by a Lambda@Edge viewer-request function checking Cognito group
+membership (`app:atlas`) — maintained in a separate repo, not this one. The old `atlas-explorer-gate`
+CloudFront Function (passcode-only, `/data/ /structs/ /react/`) has been retired.
 
 ## 1. Build everything into dist/
 
@@ -23,10 +22,10 @@ The shell paths are **ungated** so the passcode screen can load; only `/data/`, 
 mamba activate rna
 cd /groups/das/home/zouinkhim/atlas_explorer
 python build_feature_table.py     # data/folds.json, motifs.json (if not current)
-python build_static.py            # dist/ = shell + config.js(GATED) + data/ structs/ react/
+python build_static.py            # dist/ = shell + config.js + data/ structs/ react/
 ```
 
-`dist/config.js` is generated with `DATA_BASE="" ; GATED=true` (same-origin, passcode on).
+`dist/config.js` is generated with `DATA_BASE=""` (same-origin).
 
 ## Updating the live site (non-expiring deployer)
 
@@ -39,7 +38,7 @@ invalidate distribution `E2CV6KWMNI7AQP`. Just run:
 ./deploy.sh full       # also re-sync structs/ + react/ from dist/ (after build_static.py)
 ```
 
-`deploy.sh` deliberately does **not** upload `web/config.js` (S3 keeps the `GATED=true` deploy copy).
+`deploy.sh` deliberately does **not** upload `web/config.js` (S3 keeps the deploy-generated copy).
 Rotate the key any time: `aws iam create-access-key --user-name atlas-explorer-deployer` (and delete the old).
 
 ## 2. Upload to S3 (initial build — admin SSO; atlas-operator is read-only on rnanix)
@@ -61,53 +60,34 @@ Keep the prefix **private** — access is only through CloudFront.
 - **Default root object:** `index.html`.
 - No CORS / response-headers policy needed (single origin).
 
-## 4. Passcode gate (CloudFront Function, viewer-request)
+## 4. Access control (CloudFront edge, Cognito)
 
-`EXPECTED` is the single passcode you hand to users. They type it into the site's gate; the app
-sends it as `?t=<passcode>` on data requests; this function enforces it on data paths only.
-Rotate by editing `EXPECTED` and re-publishing. Attach on *viewer request*.
-
-```js
-function handler(event) {
-  var req = event.request;
-  var uri = req.uri;
-  var gated = uri.startsWith("/data/") || uri.startsWith("/structs/") || uri.startsWith("/react/");
-  if (!gated) return req;                       // shell loads freely (passcode screen)
-  var t = (req.querystring.t && req.querystring.t.value) || "";
-  var EXPECTED = "REPLACE_WITH_PASSCODE";       // rotate here
-  if (t !== EXPECTED) {
-    return { statusCode: 403, statusDescription: "Forbidden",
-             headers: { "content-type": { value: "text/plain" } }, body: "invalid passcode" };
-  }
-  return req;
-}
-```
-
-Note: the passcode rides in the query string (visible in access logs) — fine for a shared secret;
-rotate periodically.
+Retired (T-0140): this repo no longer has a passcode gate, client-side or CloudFront-Function.
+Access to the whole site, including `/data/ /structs/ /react/`, is enforced by a Lambda@Edge
+viewer-request function checking Cognito group `app:atlas`, maintained outside this repo. Signing
+in / access requests go through that system, not through anything here.
 
 ## 5. Use it
 
-Open `https://<dist>.cloudfront.net/`. The shell loads, shows the passcode screen; on a correct
-passcode the data loads. Share the CloudFront URL + the passcode.
+Open `https://rna-atlas.org/`. A signed-in `app:atlas` member sees the app directly; anyone else
+is redirected to sign in.
 
 ## Smoke test
 
 ```bash
-curl -I  "https://<dist>.cloudfront.net/"                              # 200 (shell, ungated)
-curl -I  "https://<dist>.cloudfront.net/data/folds.json?t=WRONG"       # 403
-curl -s  "https://<dist>.cloudfront.net/data/folds.json?t=REAL" | head -c 60   # JSON
+curl -I  "https://<dist>.cloudfront.net/"                              # 401 if not signed in
+curl -I  "https://<dist>.cloudfront.net/data/folds.json"               # 401 if not signed in
 ```
 
-## Local development (no S3, no gate)
+## Local development (no S3, no edge auth)
 
-`web/config.js` stays `DATA_BASE="" ; GATED=false` → `python serve.py` serves shell + data, no
-passcode. (The deploy `config.js` only exists inside `dist/`, so local dev is never gated.)
+`python serve.py` serves the shell + data directly from `/groups` with no access check at all —
+local dev was never gated by either the old passcode or the new edge auth.
 
 ## Scaling to v2 (414k)
 
 Same exporter + layout — extend `folds.json` + assets via the precompute pipeline, re-run
-`build_static.py`, `aws s3 sync`. No CloudFront/passcode changes.
+`build_static.py`, `aws s3 sync`. No CloudFront/access-control changes.
 
 ## AWS gotchas (from prior atlas work)
 

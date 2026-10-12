@@ -60,13 +60,12 @@ deploy_shell() {
     && echo "  ${pfx}config.js  (DATA_BASE=\"$db\"$([ -f .infer_api ] && echo ' +INFER_API'))"
   verify_published_config "$pfx"
   for lf in web/lib/*.js; do bn=$(basename "$lf"); aws --profile $P s3 cp "$lf" "$B/${pfx}lib/$bn" --only-show-errors && echo "  ${pfx}lib/$bn"; done
-  # /inference subpage -- ROOT inference/ is no longer this repo's: it's the live RNAnix
-  # inference app (Cognito-backed), deployed by rna-atlas-inference/scripts/deploy_frontend.sh
-  # (see ticket T-0071). Only ever touch it under dev/, where the old v1 copy is intentionally
-  # left in place until T-0041 decides its fate -- never under the root/prod prefix.
-  if [ -n "$pfx" ]; then
-    for f in web/inference/*; do [ -f "$f" ] && aws --profile $P s3 cp "$f" "$B/${pfx}inference/$(basename "$f")" --only-show-errors && echo "  ${pfx}inference/$(basename "$f")"; done
-  fi
+  # /inference subpage -- NEVER written here, under ANY prefix. Root inference/ is the live
+  # RNAnix inference app (Cognito-backed), deployed by rna-atlas-inference/scripts/deploy_frontend.sh
+  # (T-0071). dev/inference/ is NOT a legacy holding area either -- it's reserved for that same
+  # frontend's own dev deployment (corrected after T-0071 initially assumed otherwise). web/inference/
+  # is the retired v1 mirror: it stays in this repo's source tree but this script must never upload
+  # it anywhere again.
   # static image assets (favicon set + header/gate logos)
   for f in claude.png icon.png logo_exp.png favicon.ico favicon-16x16.png favicon-32x32.png \
            apple-touch-icon.png android-chrome-192x192.png android-chrome-512x512.png site.webmanifest; do
@@ -103,7 +102,7 @@ push_heavy() {
   aws --profile $P s3 sync dist/structs "$B/structs" --content-encoding gzip --content-type text/plain --only-show-errors || true
   for ds in dist/datasets/*/; do
     [ -d "$ds" ] || continue; name=$(basename "$ds")
-    echo "dataset $name ... (under /data/ so the existing passcode gate covers it)"
+    echo "dataset $name ... (under /data/, covered by the same edge access control as the rest of the site)"
     for j in "$ds/data"/*.json; do [ -f "$j" ] && put_json_gz "$j" "$B/data/datasets/$name/data/$(basename "$j")" && echo "  data/$(basename "$j") (gz)"; done
     aws --profile $P s3 sync "$ds/structs" "$B/data/datasets/$name/structs" --content-encoding gzip --content-type text/plain --only-show-errors || true
     [ -d "$ds/react" ] && aws --profile $P s3 sync "$ds/react" "$B/data/datasets/$name/react" --content-type application/json --only-show-errors || true
@@ -119,8 +118,8 @@ case "${1:-prod}" in
     ;;
   promote)
     echo "promote dev/ shell -> root (server-side copy of the tested bytes)"
-    # inference/* deliberately excluded (T-0071): root inference/ is the live RNAnix inference
-    # app owned by rna-atlas-inference/scripts/deploy_frontend.sh, not this repo's dev/ copy.
+    # inference/* deliberately excluded (T-0071): both dev/inference/ and root inference/ belong
+    # to rna-atlas-inference/scripts/deploy_frontend.sh now, not this repo -- nothing to copy.
     for f in $SHELL_FILES lib/3Dmol-min.js lib/three.min.js lib/OrbitControls.js claude.png \
              icon.png logo_exp.png favicon.ico favicon-16x16.png favicon-32x32.png \
              apple-touch-icon.png android-chrome-192x192.png android-chrome-512x512.png site.webmanifest; do

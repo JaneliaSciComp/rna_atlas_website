@@ -234,6 +234,9 @@ async function ensureLoaded(dsid) {
   LOADED[dsid] = { folds, motifs, pairing, tspans };
 }
 
+function showLoadError(msg) { const e = $("load-error"); e.textContent = msg; e.classList.remove("hidden"); }
+function clearLoadError() { $("load-error").classList.add("hidden"); }
+
 async function loadSources() {
   const active = activeSources();
   const comps = active.flatMap(companionsOf);                 // companions of active sources
@@ -242,7 +245,13 @@ async function loadSources() {
   const onLetters = new Set([...(Array.isArray(st.lf) ? st.lf : []), ...checkedLetters()]);
   const compLoad = comps.filter((c) => (c.letters || []).some((l) => onLetters.has(l))).map((c) => c.id);
   const toLoad = [...active, ...compLoad];
-  for (const id of toLoad) await ensureLoaded(id);
+  try {
+    for (const id of toLoad) await ensureLoaded(id);
+  } catch (e) {
+    showLoadError("Could not load data (" + (e.status || "network") + "). Try reloading the page.");
+    throw e;
+  }
+  clearLoadError();
   FOLDS = []; MOTIFS_BY_DS = {}; PAIRING_BY_DS = {}; TSPANS_BY_DS = {}; FBYK = {};
   for (const id of toLoad) {
     const L = LOADED[id]; if (!L) continue;

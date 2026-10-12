@@ -103,6 +103,8 @@ header { display: flex; align-items: center; gap: 14px; padding: 10px 16px; back
 header h1 { font-size: 17px; margin: 0; font-weight: 600; letter-spacing: .01em; }
 .hdr-logo { height: 30px; width: auto; margin-right: -6px; }
 .universe { font-size: 12px; background: var(--accent); padding: 2px 8px; border-radius: 10px; }
+#load-error { background: var(--danger-soft); color: var(--danger); border-bottom: 1px solid var(--danger); padding: 8px 16px; font-size: 13px; text-align: center; }
+#load-error.hidden { display: none; }
 #sourcewrap { position: relative; }
 #source-btn { font-size: 13px; border: 1px solid var(--header-btn-brd); background: var(--header-btn); color: var(--header-fg); cursor: pointer; border-radius: var(--radius-sm); padding: 5px 11px; }
 #source-btn:hover { background: var(--accent); border-color: var(--accent); }

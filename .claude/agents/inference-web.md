@@ -62,7 +62,10 @@ Models: `daslab-ptnx1` (Protenix), `daslab-base`, `daslab-v0`. `job_id` is compo
 
 ## Verify
 - Bridge: `curl "$(cat .infer_api)/models"`; `curl "$(cat .infer_api)/status?job=<id>&t=<token>"`.
-- Frontend: after `deploy.sh dev`, `curl <cloudfront>/dev/inference/inference.js` for your change; open
-  `/dev/inference/` behind the passcode; then promote and re-check at root.
+- Frontend: `web/inference/` is no longer deployed anywhere by `deploy.sh` (T-0071/T-0140 — the live
+  `/inference` app is owned by `rna-atlas-inference`/`rnanix_server_frontend` now). NOTE: most of this
+  file describes that retired architecture (web/inference/ as the live frontend, inference_api/casp_web.py
+  as the live bridge, janelia-das-casp-daslab-*-prod as the live pipeline) — it needs a real rewrite or
+  retirement decision, not just this one line; flagged, not fixed, as part of T-0140.
 
 See the project `CLAUDE.md` for wider atlas context (hosting, deploy, data model).

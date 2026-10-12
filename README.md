@@ -40,11 +40,12 @@ DEPLOY.md                # github.io shell + S3/CloudFront data + shared-token r
 
 ## Hosting
 
-- **Local / internal:** `python serve.py` (reads structures + reactivity live from `/groups`; no gate).
+- **Local / internal:** `python serve.py` (reads structures + reactivity live from `/groups`; no access check).
 - **Shareable (off-network):** **shell + all data on one S3 prefix** (`s3://rnanix/atlas_explorer/`)
-  served via **CloudFront (HTTPS), gated by a single passcode**. `build_static.py` stages the whole
-  site into `dist/`; users open the CloudFront URL, enter the passcode (it becomes the `?t=` token a
-  CloudFront Function validates on data paths). Source code lives in a **public** GitHub repo
+  served via **CloudFront (HTTPS)**. `build_static.py` stages the whole site into `dist/`. Access
+  is enforced at the CloudFront edge (Cognito group `app:atlas`, via a Lambda@Edge function
+  maintained in a separate repo) — there is no client-side passcode here any more (T-0140).
+  Source code lives in a **public** GitHub repo
   (version control only — it does not serve the site; `JaneliaSciComp/rna_atlas_website`, public
   since ~2026-08-03). Secrets/keys never live here — `.infer_api`/`DEPLOYED.local.md`/
   `config.json` are all gitignored and injected at deploy time (see [CLAUDE.md](CLAUDE.md)

@@ -3,11 +3,11 @@
 Orientation for Claude/dev sessions in this repo. The explorer is a **static, client-side**
 web app over the Ribonanza-2 (+ add-on) RNA prediction atlases: filter/rank folds, an embedding
 **map**, per-fold 3D + tracks + secondary structure, an in-page **Claude assistant**, and a
-(scaffolded) **/inference** page. Hosted on S3 + CloudFront, passcode-gated.
+(scaffolded) **/inference** page. Hosted on S3 + CloudFront, access-controlled at the edge.
 
 - **Repo / remote:** `github.com/JaneliaSciComp/rna_atlas_website` (**public** since ~2026-08-03;
   this dir: `/groups/das/home/zouinkhim/atlas_explorer`).
-- **Live:** `https://rna-atlas.org` (and the CloudFront domain). Secrets/IDs (passcode,
+- **Live:** `https://rna-atlas.org` (and the CloudFront domain). Secrets/IDs (
   distribution/OAC, deployer IAM, domain/cert) are in **`DEPLOYED.local.md`** (gitignored) —
   never commit those. There is no shared Anthropic key anywhere in this deployment (see
   Features below) — since the repo is now public, treat anything not gitignored as
@@ -17,10 +17,14 @@ web app over the Ribonanza-2 (+ add-on) RNA prediction atlases: filter/rank fold
 
 - **Static site** in `web/` — no backend. Filtering/ranking is 100% client-side over precomputed JSON.
 - **Hosting:** one S3 bucket `s3://rnanix/atlas_explorer` behind CloudFront (`E2CV6KWMNI7AQP`).
-- **Passcode gate + folder-index** is a CloudFront **viewer-request function** `atlas-explorer-gate`:
-  gates `/data/ /structs/ /react/` (403 without `?t=<passcode>`), 301-redirects extensionless paths
-  to add a trailing slash, and rewrites `/dir/` → `/dir/index.html`. Editing it needs an **admin**
-  token (the `atlas-deployer` IAM cannot touch CloudFront/Route53).
+- **Access control** (as of T-0140, 2026-10) is a Lambda@Edge **viewer-request** function checking
+  Cognito group `app:atlas` on every path, maintained in a separate repo (not this one) — there is
+  no client-side passcode here any more. It also owns the folder-index rewrite (301 extensionless
+  paths to add a trailing slash, `/dir/` → `/dir/index.html`) that the old CloudFront Function
+  `atlas-explorer-gate` used to do; that function is unassociated with any distribution and slated
+  for deletion (verified live: zero `FunctionAssociations` anywhere in the account). Editing the
+  edge function needs **admin** credentials (the `atlas-deployer` IAM cannot touch
+  CloudFront/Route53/Lambda@Edge).
 - **Two-tier deploy:** `dev/` prefix for staging (reuses prod data via `DATA_BASE=".."`), root for prod.
 
 ## AWS access / credentials
@@ -29,8 +33,8 @@ web app over the Ribonanza-2 (+ add-on) RNA prediction atlases: filter/rank fold
   a dedicated IAM user (`atlas-explorer-deployer`) with **non-expiring** long-lived keys, scoped to
   S3 writes on `s3://rnanix/atlas_explorer` + CloudFront `create-invalidation`. `deploy.sh` uses it.
   It **cannot** edit the CloudFront distribution/function or Route53 (least-privilege).
-- **Admin tasks** (editing the `atlas-explorer-gate` CloudFront function, Route53/ACM) use the
-  **`default`** profile = an SSO **AdministratorAccess** role with **temporary** creds that expire;
+- **Admin tasks** (editing the Lambda@Edge access-control function, CloudFront, Route53/ACM) use
+  the **`default`** profile = an SSO **AdministratorAccess** role with **temporary** creds that expire;
   refresh them (re-fetch into `~/.aws/credentials [default]`) when you get `ExpiredToken`.
 - Other profiles (`atlas-operator`, `atlas-reader`) lack CloudFront/Route53 perms.
 - The GitHub push token is read from `~/.git-credentials` (https remote).
@@ -49,7 +53,7 @@ web app over the Ribonanza-2 (+ add-on) RNA prediction atlases: filter/rank fold
   `agent.js` silently; brace-counting misses it (and gives false positives on `{`/`}` inside strings).
   `node` is at `/usr/bin/node`.
 - `config.js` is generated per-target by deploy (never upload `web/config.js`): sets `DATA_BASE`,
-  `GATED=true`, optionally `INFER_API`. There is **no Anthropic key in it, shared or otherwise** —
+  optionally `INFER_API`. There is **no Anthropic key in it, shared or otherwise** —
   `deploy.sh` refuses to upload/publish a `config.js` containing anything credential-shaped
   (`assert_safe_config`/`verify_published_config`). A shared client-side key (`window.CLAUDE_KEY`)
   leaked in 2026-07 and was removed; see `docs/incident_2026-07_claude_key_leak.md`. Each user

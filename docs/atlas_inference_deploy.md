@@ -107,7 +107,7 @@ node --check web/inference/inference.js
 
 Rollback = point `.infer_api` back at the CASP-prod bridge URL and re-deploy.
 
-## Step 4 — End-to-end verification (behind the passcode)
+## Step 4 — End-to-end verification (behind Cognito group app:atlas)
 
 At `https://rna-atlas.org/dev/inference/`:
 1. **Single RNA** (mode None) → structure returns.

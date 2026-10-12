@@ -256,21 +256,6 @@ tbody tr:hover { background: var(--row-hover); }
 .reactchart-swatch { display: inline-block; width: 10px; height: 10px; margin-right: 4px; border-radius: 2px; vertical-align: -1px; }
 .muted { color: var(--text-faint); }
 
-#gate { position: fixed; inset: 0; background: var(--header-bg); display: flex; align-items: center; justify-content: center; z-index: 100; }
-#gate.hidden { display: none; }
-.gate-card { background: var(--surface); padding: 30px 34px; border-radius: var(--radius-lg); width: 320px; text-align: center; box-shadow: var(--shadow-3); }
-.gate-card h2 { margin: 0 0 2px; font-size: 18px; color: var(--text); }
-.gate-logo { display: block; width: 240px; max-width: 82%; height: auto; margin: 0 auto 12px; }
-.gate-sub { margin: 0 0 14px; color: var(--text-muted); font-size: 13px; }
-.gate-card input { width: 100%; padding: 9px; border: 1px solid var(--border-strong); border-radius: var(--radius); font-size: 14px; background: var(--surface); color: var(--text); }
-.gate-card input:focus { border-color: var(--accent); }
-.gate-card button { width: 100%; padding: 9px; margin-top: 10px; background: var(--accent); color: var(--accent-ink); border: 0; border-radius: var(--radius); cursor: pointer; font-size: 14px; font-weight: 600; }
-.gate-card button:hover { filter: brightness(1.06); }
-.gate-err { color: var(--danger); min-height: 1em; margin: 10px 0 0; font-size: 12px; }
-.gate-note { margin: 18px 0 10px; padding-top: 14px; border-top: 1px solid var(--border-2); color: var(--text-muted); font-size: 12px; line-height: 1.5; }
-.gate-mail { display: inline-block; text-decoration: none; padding: 8px 14px; border: 1px solid var(--accent); color: var(--accent); border-radius: var(--radius); font-size: 13px; font-weight: 600; }
-.gate-mail:hover { background: var(--accent); color: var(--accent-ink); }
-
 /* ---------- view toggle + agent button (header) ---------- */
 #viewctl { margin-left: 12px; display: inline-flex; gap: 2px; }
 #viewctl button { font-size: 12px; border: 1px solid var(--header-btn-brd); background: var(--header-btn); color: var(--header-fg-dim); cursor: pointer; border-radius: var(--radius-sm); padding: 3px 9px; }

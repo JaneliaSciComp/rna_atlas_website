@@ -73,9 +73,10 @@ def main():
     for f in ("index.html", "app.js", "agent.js", "style.css", "viz_style.js", "datasets.js"):
         shutil.copy(os.path.join(ROOT, "web", f), f"{args.out}/{f}")
     shutil.copy(os.path.join(ROOT, "web", "lib", "3Dmol-min.js"), f"{args.out}/lib/3Dmol-min.js")
-    # deploy config: same-origin data, passcode-gated (overrides the local dev config.js)
+    # deploy config: same-origin data (overrides the local dev config.js). Access is enforced
+    # at the CloudFront edge (Cognito), not by a client-side passcode -- see T-0140.
     with open(f"{args.out}/config.js", "w") as o:
-        o.write('window.DATA_BASE = "";\nwindow.GATED = true;\n')
+        o.write('window.DATA_BASE = "";\n')
 
     # ids + design sequence (A-E); F-H sequence derived from the CIF
     seqmap = {}

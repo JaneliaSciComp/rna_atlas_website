@@ -10,9 +10,10 @@
 //   (status fields are read defensively; tweak mapStatus() to match the real shape.)
 (function () {
   const $ = (id) => document.getElementById(id);
-  const GATED = !!window.GATED;
   const API = (window.INFER_API || "").replace(/\/$/, "");
-  const tok = () => (GATED ? localStorage.getItem("atlas_token") || "" : "");
+  // Separate from the site's (now-removed, T-0140) passcode gate: this is the inference
+  // bridge's own optional WEB_TOKEN, unrelated to site access.
+  const tok = () => localStorage.getItem("atlas_token") || "";
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
   const EXAMPLE = "GGGAACGACUCGAGUAGAGUCGAAAAGAGUGCUCCGAGAUGCGGUGAGAUUCCGCACCUGUGGUCAAAGCCCACAAACCAGCGCAAGCUGGCCUGGCAGGUGAAAUUCCUGCGCAG";
@@ -212,14 +213,6 @@
     const m = filteredJobs();
     if (m.length === 1) { $("openid").value = ""; jobFilter = ""; renderJobs(); return reopenJob(m[0].id); }
     return openById(v);
-  }
-
-  // ---------- gate ----------
-  function showGate(msg) {
-    const g = $("gate"); g.classList.remove("hidden"); $("gate-msg").textContent = msg || "";
-    const inp = $("gate-input"); inp.value = ""; inp.focus();
-    const go = () => { const v = inp.value.trim(); if (!v) return; localStorage.setItem("atlas_token", v); g.classList.add("hidden"); init(); };
-    $("gate-go").onclick = go; inp.onkeydown = (e) => { if (e.key === "Enter") go(); };
   }
 
   // ---------- entities: clean / measure / render / validate ----------
@@ -942,5 +935,5 @@
     loadModels().then(updateFleetHint); renderJobs(); refreshJobs(); syncServerJobs(); renderModelPanel();
     updateFleetHint();
   }
-  if (GATED && !tok()) showGate(); else (document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", init) : init());
+  (document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", init) : init());
 })();

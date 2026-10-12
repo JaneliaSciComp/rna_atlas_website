@@ -30,17 +30,10 @@ function condLabel(cond) { const t = cond || []; return t.length ? t.map((x) => 
 function prefix(ds) { return ds && ds.base ? ds.base + "/" : ""; }
 function activeSources() { return [...document.querySelectorAll(".src:checked")].map((c) => c.value); }
 
-// Data source: "" = same origin (local serve.py). Otherwise a CloudFront URL
-// fronting the S3 data, gated by a shared token (prompted once, kept in localStorage).
+// Data source: "" = same origin (local serve.py). Otherwise a CloudFront URL fronting the S3
+// data; access is enforced at the edge (Cognito), not by this client.
 const DATA_BASE = (window.DATA_BASE || "").replace(/\/$/, "");
-const GATED = !!window.GATED;
-function token() { return GATED ? (localStorage.getItem("atlas_token") || "") : ""; }
-function durl(path) {
-  const base = DATA_BASE ? `${DATA_BASE}/${path}` : path;
-  if (!GATED) return base;
-  const t = token();
-  return t ? `${base}${base.includes("?") ? "&" : "?"}t=${encodeURIComponent(t)}` : base;
-}
+function durl(path) { return DATA_BASE ? `${DATA_BASE}/${path}` : path; }
 async function getJSON(path) {
   // no-cache: always revalidate with the origin (conditional request) so a data update after a
   // deploy is picked up without a manual hard-refresh (data files carry no cache-control header).
@@ -141,26 +134,7 @@ function legacyCopy(text, done) {
   if (done) done();
 }
 
-function showGate(msg) {
-  const g = $("gate");
-  g.classList.remove("hidden");
-  $("gate-msg").textContent = msg || "";
-  const inp = $("gate-input");
-  inp.value = "";
-  inp.focus();
-  const submit = () => {
-    const v = inp.value.trim();
-    if (!v) return;
-    localStorage.setItem("atlas_token", v);
-    g.classList.add("hidden");
-    boot();
-  };
-  $("gate-go").onclick = submit;
-  inp.onkeydown = (e) => { if (e.key === "Enter") submit(); };
-}
-
 async function boot() {
-  if (GATED && !token()) return showGate();
   buildSourcePanel();
   wireSourceUI();
   wireStatic();
@@ -268,13 +242,7 @@ async function loadSources() {
   const onLetters = new Set([...(Array.isArray(st.lf) ? st.lf : []), ...checkedLetters()]);
   const compLoad = comps.filter((c) => (c.letters || []).some((l) => onLetters.has(l))).map((c) => c.id);
   const toLoad = [...active, ...compLoad];
-  try {
-    for (const id of toLoad) await ensureLoaded(id);
-  } catch (e) {
-    if (GATED && e.status === 403) { localStorage.removeItem("atlas_token"); return showGate("Incorrect passcode — try again."); }
-    if (GATED) return showGate("Could not load data (" + (e.status || "network") + ").");
-    throw e;
-  }
+  for (const id of toLoad) await ensureLoaded(id);
   FOLDS = []; MOTIFS_BY_DS = {}; PAIRING_BY_DS = {}; TSPANS_BY_DS = {}; FBYK = {};
   for (const id of toLoad) {
     const L = LOADED[id]; if (!L) continue;

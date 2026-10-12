@@ -52,7 +52,7 @@ deploy_shell() {
   # There is NO Anthropic key here, shared or otherwise — each user sets their own key in their
   # own browser (web/agent.js). A shared client-side key (window.CLAUDE_KEY) leaked in 2026-07;
   # see docs/incident_2026-07_claude_key_leak.md. Do not add one back, client or server-side.
-  CFG=$(printf 'window.DATA_BASE = "%s";\nwindow.GATED = true;\n' "$db")
+  CFG=$(printf 'window.DATA_BASE = "%s";\n' "$db")
   [ -f .infer_api ] && CFG="$CFG"$'\n'"window.INFER_API = \"$(tr -d '\n' < .infer_api)\";"
   assert_safe_config "$CFG"
   printf '%s\n' "$CFG" \
@@ -126,7 +126,7 @@ case "${1:-prod}" in
              apple-touch-icon.png android-chrome-192x192.png android-chrome-512x512.png site.webmanifest; do
       aws --profile $P s3 cp "$B/dev/$f" "$B/$f" --only-show-errors && echo "  $f"
     done
-    CFG=$(printf 'window.DATA_BASE = "";\nwindow.GATED = true;\n')
+    CFG=$(printf 'window.DATA_BASE = "";\n')
     [ -f .infer_api ] && CFG="$CFG"$'\n'"window.INFER_API = \"$(tr -d '\n' < .infer_api)\";"
     assert_safe_config "$CFG"
     printf '%s\n' "$CFG" \

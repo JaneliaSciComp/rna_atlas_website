@@ -87,7 +87,7 @@ put_json_gz() {
 
 push_data() {
   echo "data ..."
-  for f in folds motifs pairing; do
+  for f in folds motifs pairing tertiary_spans; do
     [ -f "data/$f.json" ] && aws --profile $P s3 cp "data/$f.json" "$B/data/$f.json" \
         --content-type application/json --only-show-errors && echo "  data/$f.json"
   done

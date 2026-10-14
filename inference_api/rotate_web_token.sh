@@ -94,8 +94,7 @@ if n != 1:
 with open(path, "w") as f:
     f.write(new_text)
 PY
-echo "   updated (value not printed)"
+chmod 600 "$DEPLOYED_MD"
 
 echo
-echo "Done. WEB_TOKEN rotated on $FN and DEPLOYED.local.md updated. Nothing above printed the"
-echo "token value. Run verify_web_token.sh to confirm end-to-end without needing the old value."
+echo "rotated, new token length ${#NEW_TOKEN}, stored in DEPLOYED.local.md"

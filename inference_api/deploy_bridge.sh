@@ -6,8 +6,11 @@
 #   ./deploy_bridge.sh              # -> shared CASP prod stack (FN casp-web),   print INFER_API url
 #   STAGE=atlas ./deploy_bridge.sh  # -> isolated atlas fork (FN casp-web-atlas), print INFER_API url
 #
-# WEB_TOKEN (the gate passcode) is read from DEPLOYED.local.md (gitignored) —
-# it must equal the atlas passcode so the front-end's ?t=/token matches.
+# WEB_TOKEN is read from DEPLOYED.local.md (gitignored). STAGE=prod reads the shared
+# "- Passcode:" line (unchanged, untouched by T-0153's rotation). Any other STAGE reads its
+# OWN "Atlas-stage WEB_TOKEN:" line instead -- see T-0153: casp-web and casp-web-atlas used to
+# share one token, and rotating just the atlas one without this split would have meant the next
+# plain `./deploy_bridge.sh` (prod) silently pushed the rotated atlas token onto CASP production.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -27,8 +30,13 @@ AWS="aws --profile $PROFILE --region $REGION"
 LAMBDA_ARN="arn:aws:lambda:$REGION:$ACCOUNT:function:$FN"
 echo "STAGE=$STAGE  ->  FN=$FN  ARTIFACTS_BUCKET=$ARTIFACTS_BUCKET"
 
-WEB_TOKEN="$(grep -ioE 'atlas-[a-f0-9]{12}' ../DEPLOYED.local.md | head -1)"
-[ -n "$WEB_TOKEN" ] || { echo "ERROR: could not read passcode from ../DEPLOYED.local.md"; exit 1; }
+if [ "$STAGE" = "prod" ]; then
+  WEB_TOKEN="$(grep -ioE 'atlas-[a-f0-9]{12}' ../DEPLOYED.local.md | head -1)"
+  [ -n "$WEB_TOKEN" ] || { echo "ERROR: could not read passcode from ../DEPLOYED.local.md"; exit 1; }
+else
+  WEB_TOKEN="$(grep -ioE 'Atlas-stage WEB_TOKEN:[[:space:]]*atlas-[a-f0-9]{12}' ../DEPLOYED.local.md | grep -oiE 'atlas-[a-f0-9]{12}' | head -1)"
+  [ -n "$WEB_TOKEN" ] || { echo "ERROR: could not read an 'Atlas-stage WEB_TOKEN:' line from ../DEPLOYED.local.md for STAGE=$STAGE"; exit 1; }
+fi
 
 echo "== 1/5 IAM role =="
 cat > /tmp/casp-web-trust.json <<'JSON'

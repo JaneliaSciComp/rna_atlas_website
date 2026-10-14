@@ -13,6 +13,13 @@
 # This is a human-run admin script (needs ADMIN/SSO creds, same as deploy_bridge.sh) -- it is
 # not meant to be invoked unattended, and it asks for confirmation before mutating anything.
 #
+# RUN THIS FROM THE MAIN CHECKOUT (/groups/das/home/zouinkhim/atlas_explorer/inference_api/),
+# never from a git worktree copy. ../DEPLOYED.local.md resolves relative to wherever this file
+# physically is; DEPLOYED.local.md is gitignored and local-only, so it does not exist in a
+# worktree at all -- run from the wrong place and this script just refuses (DEPLOYED_MD not
+# found), it will not silently edit the wrong copy, but don't rely on that: run it from the
+# main checkout.
+#
 # Safety properties:
 #   - refuses to run unless the caller's AWS account is exactly the expected one.
 #   - reads the CURRENT Lambda environment and replaces ONLY the WEB_TOKEN key -- every other
@@ -55,7 +62,11 @@ ACCOUNT_EXPECTED="481088927481"
 [ "$FN" = "casp-web-atlas" ] && [ "$FN" != "casp-web" ]   # redundant on purpose; see header
 AWS=(aws --profile "$PROFILE" --region "$REGION")         # array: PROFILE never word-splits
 DEPLOYED_MD="../DEPLOYED.local.md"
-ATLAS_LABEL="Atlas-stage WEB_TOKEN:"
+# Exact same shape the python step below matches (S2 review fix) -- a precheck that only looked
+# for the bare label text would pass a placeholder like "Atlas-stage WEB_TOKEN: TBD", let the
+# Lambda get updated, and then have python (whose regex requires a real atlas-<12hex> value)
+# insert a SECOND line instead of recognizing the placeholder as the one existing line.
+ATLAS_LINE_RE='Atlas-stage WEB_TOKEN:[[:space:]]*atlas-[a-f0-9]{12}'
 
 command -v jq >/dev/null || { echo "ERROR: jq is required." >&2; exit 1; }
 command -v python3 >/dev/null || { echo "ERROR: python3 is required." >&2; exit 1; }
@@ -70,9 +81,9 @@ CALLER_ACCOUNT="$("${AWS[@]}" sts get-caller-identity --query Account --output t
 }
 
 echo "== checking $DEPLOYED_MD's current shape (before touching anything live) =="
-EXISTING_COUNT="$(grep -icF "$ATLAS_LABEL" "$DEPLOYED_MD" || true)"
+EXISTING_COUNT="$(grep -icE "$ATLAS_LINE_RE" "$DEPLOYED_MD" || true)"
 if [ "$EXISTING_COUNT" -gt 1 ]; then
-  echo "ERROR: $DEPLOYED_MD has $EXISTING_COUNT '$ATLAS_LABEL' lines -- ambiguous, fix by hand first." >&2
+  echo "ERROR: $DEPLOYED_MD has $EXISTING_COUNT 'Atlas-stage WEB_TOKEN:' lines -- ambiguous, fix by hand first." >&2
   exit 1
 fi
 if [ "$EXISTING_COUNT" -eq 0 ]; then
@@ -108,14 +119,20 @@ read -r -p "Continue? [y/N] " CONFIRM
 [ "$CONFIRM" = "y" ] || [ "$CONFIRM" = "Y" ] || { echo "Aborted, nothing changed."; exit 1; }
 
 echo "== 1/5: fetching current environment for $FN =="
-CUR_ENV_JSON="$("${AWS[@]}" lambda get-function-configuration --function-name "$FN" --query 'Environment.Variables' --output json)"
-[ -n "$CUR_ENV_JSON" ] && [ "$CUR_ENV_JSON" != "null" ] || { echo "ERROR: could not read current environment for $FN." >&2; exit 1; }
+CUR_JSON="$("${AWS[@]}" lambda get-function-configuration --function-name "$FN" --query '{Variables: Environment.Variables, RevisionId: RevisionId}' --output json)"
+[ -n "$CUR_JSON" ] && [ "$CUR_JSON" != "null" ] || { echo "ERROR: could not read current configuration for $FN." >&2; exit 1; }
+CUR_ENV_JSON="$(printf '%s' "$CUR_JSON" | jq -c '.Variables')"
+CUR_REVISION="$(printf '%s' "$CUR_JSON" | jq -r '.RevisionId')"
+[ -n "$CUR_REVISION" ] && [ "$CUR_REVISION" != "null" ] || { echo "ERROR: could not read RevisionId for $FN." >&2; exit 1; }
 printf '%s' "$CUR_ENV_JSON" | jq -e 'has("WEB_TOKEN")' >/dev/null || {
   echo "ERROR: $FN's current environment has no WEB_TOKEN key -- refusing to guess; check the function by hand." >&2
   exit 1
 }
 
 echo "== 2/5: generating the new token =="
+# 48 bits of entropy (openssl rand -hex 6) -- same as the value this replaces. Noted as a known
+# limit, not fixed here: raising it would mean widening the atlas-[a-f0-9]{12} shape everywhere
+# that reads it (deploy_bridge.sh, this script, verify_web_token.sh, casp_web.py's own docs).
 export NEW_TOKEN="atlas-$(openssl rand -hex 6)"   # same shape deploy_bridge.sh's prod reader expects
 
 echo "== 3/5: writing the updated environment (WEB_TOKEN replaced, everything else unchanged) =="
@@ -125,8 +142,14 @@ chmod 600 "$TMP_ENV_FILE"
 # jq's `env.NEW_TOKEN`, reading the exported env var -- neither ever appears in this process's
 # command line.
 printf '%s' "$CUR_ENV_JSON" | jq '{Variables: (. + {WEB_TOKEN: env.NEW_TOKEN})}' > "$TMP_ENV_FILE"
-"${AWS[@]}" lambda update-function-configuration --function-name "$FN" --environment "file://$TMP_ENV_FILE" >/dev/null
+# Set BEFORE the call, not after: if the call itself times out or the connection drops after AWS
+# already applied it but before we get a response back, the exit trap must still assume the
+# Lambda might be updated -- never assume it wasn't just because we never saw success returned.
 LAMBDA_UPDATE_CALLED=1
+# --revision-id: refuse if the function's config changed since we fetched it just above (e.g. a
+# concurrent deploy_bridge.sh run) instead of silently clobbering whatever that other write did.
+"${AWS[@]}" lambda update-function-configuration --function-name "$FN" \
+  --environment "file://$TMP_ENV_FILE" --revision-id "$CUR_REVISION" >/dev/null
 
 echo "== 4/5: waiting for LastUpdateStatus=Successful =="
 STATUS=""

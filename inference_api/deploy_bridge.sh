@@ -66,21 +66,30 @@ rm -f /tmp/casp-web.zip
 ( cd "$(dirname casp_web.py)" && zip -q /tmp/casp-web.zip casp_web.py )
 
 echo "== 3/5 Lambda =="
-ENV="Variables={WEB_TOKEN=$WEB_TOKEN,ARTIFACTS_BUCKET=$ARTIFACTS_BUCKET,ACCOUNT=$ACCOUNT,REGION=$REGION,STAGE=$STAGE}"
+# WEB_TOKEN never goes on argv (T-0153 S3): the env map is written to a 0600 file that
+# --environment file://... reads, built from exported vars via jq's env.* (not --arg), so the
+# token never appears in this process's command line either.
+ENV_FILE="$(mktemp)"
+chmod 600 "$ENV_FILE"
+trap 'rm -f "$ENV_FILE"' EXIT   # a failed aws call must not leave the token sitting in /tmp
+export WEB_TOKEN ARTIFACTS_BUCKET ACCOUNT REGION STAGE
+jq -n '{Variables: {WEB_TOKEN: env.WEB_TOKEN, ARTIFACTS_BUCKET: env.ARTIFACTS_BUCKET,
+                     ACCOUNT: env.ACCOUNT, REGION: env.REGION, STAGE: env.STAGE}}' > "$ENV_FILE"
 if $AWS lambda get-function --function-name "$FN" >/dev/null 2>&1; then
   $AWS lambda update-function-code --function-name "$FN" --zip-file fileb:///tmp/casp-web.zip >/dev/null
   sleep 3
   $AWS lambda update-function-configuration --function-name "$FN" \
     --handler casp_web.lambda_handler --runtime python3.12 --timeout 30 --memory-size 256 \
-    --environment "$ENV" >/dev/null
+    --environment "file://$ENV_FILE" >/dev/null
 else
   # give IAM a moment to propagate the new role before Lambda validates it
   sleep 8
   $AWS lambda create-function --function-name "$FN" \
     --runtime python3.12 --role "$ROLE_ARN" --handler casp_web.lambda_handler \
-    --timeout 30 --memory-size 256 --environment "$ENV" \
+    --timeout 30 --memory-size 256 --environment "file://$ENV_FILE" \
     --zip-file fileb:///tmp/casp-web.zip >/dev/null
 fi
+rm -f "$ENV_FILE"
 echo "   fn: $LAMBDA_ARN"
 
 echo "== 4/5 HTTP API =="

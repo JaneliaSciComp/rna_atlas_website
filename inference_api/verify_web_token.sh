@@ -39,7 +39,7 @@ else
 fi
 
 echo "== 3/6: deployed token shape =="
-export LIVE_TOKEN="$("${AWS[@]}" lambda get-function-configuration --function-name "$FN" --query 'Environment.Variables.WEB_TOKEN' --output text)"
+LIVE_TOKEN="$("${AWS[@]}" lambda get-function-configuration --function-name "$FN" --query 'Environment.Variables.WEB_TOKEN' --output text)"
 if echo "$LIVE_TOKEN" | grep -qiE '^atlas-[a-f0-9]{12}$'; then
   echo "   shape OK (value not printed)"
 else
@@ -56,7 +56,7 @@ fi
 
 echo "== 5/6: end-to-end, read-only (POST /jobs, token in body) =="
 CODE="$(printf '{"token":"%s"}' "$LIVE_TOKEN" | curl -s -o /dev/null -w '%{http_code}' \
-  -X POST -H 'content-type: application/json' --data-binary @- "$INFER_API/jobs")"
+  -X POST -H 'content-type: application/json' --data-binary @- "$INFER_API/jobs" || echo 000)"
 if [ "$CODE" = "200" ]; then
   echo "   POST /jobs (correct token) -> 200"
 else
@@ -65,7 +65,7 @@ fi
 
 echo "== 6/6: no-token request is still refused =="
 CODE_NOTOKEN="$(printf '{}' | curl -s -o /dev/null -w '%{http_code}' \
-  -X POST -H 'content-type: application/json' --data-binary @- "$INFER_API/jobs")"
+  -X POST -H 'content-type: application/json' --data-binary @- "$INFER_API/jobs" || echo 000)"
 if [ "$CODE_NOTOKEN" = "403" ]; then
   echo "   POST /jobs (no token) -> 403, as expected"
 else

@@ -1,27 +1,24 @@
 #!/usr/bin/env bash
-# Deploy the casp-web bridge: IAM role + Lambda + HTTP API (us-east-2).
-# Needs ADMIN creds (default profile / SSO AdministratorAccess) — the scoped
+# Deploy the casp-web bridge (CASP-competition production only): IAM role + Lambda + HTTP API
+# (us-east-2). Needs ADMIN creds (default profile / SSO AdministratorAccess) — the scoped
 # atlas-inference user cannot create IAM/Lambda/API-Gateway.
 #
-#   ./deploy_bridge.sh              # -> shared CASP prod stack (FN casp-web),   print INFER_API url
-#   STAGE=atlas ./deploy_bridge.sh  # -> isolated atlas fork (FN casp-web-atlas), print INFER_API url
+#   ./deploy_bridge.sh   # -> shared CASP prod stack (FN casp-web), print INFER_API url
 #
-# WEB_TOKEN (the gate passcode) is read from DEPLOYED.local.md (gitignored) —
-# it must equal the atlas passcode so the front-end's ?t=/token matches.
+# The Atlas bridge (casp-web-atlas) this script used to also deploy (STAGE=atlas) has been
+# retired (T-0153) -- it is gone, not just unreachable. This script now only ever drives the
+# CASP-competition production bridge; the WEB_TOKEN it reads is CASP prod's own, read from the
+# "- Passcode:" line of DEPLOYED.local.md (gitignored), unrelated to anything Atlas-side.
 set -euo pipefail
 cd "$(dirname "$0")"
 
 PROFILE="${PROFILE:-default}"
 REGION="us-east-2"
 ACCOUNT="481088927481"
-# STAGE picks which CASP pipeline stack the bridge drives: "prod" = the shared CASP production
-# pipeline; "atlas" (or any non-prod) = the isolated atlas fork. Non-prod stages get a "-<stage>"
-# suffix on the bridge Lambda/role/API so they never collide with the prod bridge.
-STAGE="${STAGE:-prod}"
-SUF=""; [ "$STAGE" = "prod" ] || SUF="-$STAGE"
-FN="casp-web$SUF"
-ROLE="casp-web-role$SUF"
-API="casp-web-api$SUF"
+STAGE="prod"
+FN="casp-web"
+ROLE="casp-web-role"
+API="casp-web-api"
 ARTIFACTS_BUCKET="janelia-das-casp-artifacts-$STAGE"
 AWS="aws --profile $PROFILE --region $REGION"
 LAMBDA_ARN="arn:aws:lambda:$REGION:$ACCOUNT:function:$FN"
@@ -58,21 +55,30 @@ rm -f /tmp/casp-web.zip
 ( cd "$(dirname casp_web.py)" && zip -q /tmp/casp-web.zip casp_web.py )
 
 echo "== 3/5 Lambda =="
-ENV="Variables={WEB_TOKEN=$WEB_TOKEN,ARTIFACTS_BUCKET=$ARTIFACTS_BUCKET,ACCOUNT=$ACCOUNT,REGION=$REGION,STAGE=$STAGE}"
+# WEB_TOKEN never goes on argv: the env map is written to a 0600 file that --environment
+# file://... reads, built from exported vars via jq's env.* (not --arg), so the token never
+# appears in this process's command line either.
+ENV_FILE="$(mktemp)"
+chmod 600 "$ENV_FILE"
+trap 'rm -f "$ENV_FILE"' EXIT
+export WEB_TOKEN ARTIFACTS_BUCKET ACCOUNT REGION STAGE
+jq -n '{Variables: {WEB_TOKEN: env.WEB_TOKEN, ARTIFACTS_BUCKET: env.ARTIFACTS_BUCKET,
+                     ACCOUNT: env.ACCOUNT, REGION: env.REGION, STAGE: env.STAGE}}' > "$ENV_FILE"
 if $AWS lambda get-function --function-name "$FN" >/dev/null 2>&1; then
   $AWS lambda update-function-code --function-name "$FN" --zip-file fileb:///tmp/casp-web.zip >/dev/null
   sleep 3
   $AWS lambda update-function-configuration --function-name "$FN" \
     --handler casp_web.lambda_handler --runtime python3.12 --timeout 30 --memory-size 256 \
-    --environment "$ENV" >/dev/null
+    --environment "file://$ENV_FILE" >/dev/null
 else
   # give IAM a moment to propagate the new role before Lambda validates it
   sleep 8
   $AWS lambda create-function --function-name "$FN" \
     --runtime python3.12 --role "$ROLE_ARN" --handler casp_web.lambda_handler \
-    --timeout 30 --memory-size 256 --environment "$ENV" \
+    --timeout 30 --memory-size 256 --environment "file://$ENV_FILE" \
     --zip-file fileb:///tmp/casp-web.zip >/dev/null
 fi
+rm -f "$ENV_FILE"
 echo "   fn: $LAMBDA_ARN"
 
 echo "== 4/5 HTTP API =="

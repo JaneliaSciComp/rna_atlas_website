@@ -53,11 +53,10 @@ deploy_shell() {
   # own browser (web/agent.js). A shared client-side key (window.CLAUDE_KEY) leaked in 2026-07;
   # see docs/incident_2026-07_claude_key_leak.md. Do not add one back, client or server-side.
   CFG=$(printf 'window.DATA_BASE = "%s";\n' "$db")
-  [ -f .infer_api ] && CFG="$CFG"$'\n'"window.INFER_API = \"$(tr -d '\n' < .infer_api)\";"
   assert_safe_config "$CFG"
   printf '%s\n' "$CFG" \
     | aws --profile $P s3 cp - "$B/${pfx}config.js" --content-type application/javascript --only-show-errors \
-    && echo "  ${pfx}config.js  (DATA_BASE=\"$db\"$([ -f .infer_api ] && echo ' +INFER_API'))"
+    && echo "  ${pfx}config.js  (DATA_BASE=\"$db\")"
   verify_published_config "$pfx"
   for lf in web/lib/*.js; do bn=$(basename "$lf"); aws --profile $P s3 cp "$lf" "$B/${pfx}lib/$bn" --only-show-errors && echo "  ${pfx}lib/$bn"; done
   # /inference subpage -- NEVER written here, under ANY prefix. Root inference/ is the live
@@ -126,11 +125,10 @@ case "${1:-prod}" in
       aws --profile $P s3 cp "$B/dev/$f" "$B/$f" --only-show-errors && echo "  $f"
     done
     CFG=$(printf 'window.DATA_BASE = "";\n')
-    [ -f .infer_api ] && CFG="$CFG"$'\n'"window.INFER_API = \"$(tr -d '\n' < .infer_api)\";"
     assert_safe_config "$CFG"
     printf '%s\n' "$CFG" \
       | aws --profile $P s3 cp - "$B/config.js" --content-type application/javascript --only-show-errors \
-      && echo "  config.js  (prod$([ -f .infer_api ] && echo ' +INFER_API'))"
+      && echo "  config.js  (prod)"
     verify_published_config ""
     echo "invalidating /* ..."; invalidate "/*"
     echo "done — promoted to https://rna-atlas.org/"

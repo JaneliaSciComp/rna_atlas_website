@@ -3,122 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- Fathom - beautiful, simple website analytics -->
-<script src="https://cdn.usefathom.com/script.js" data-site="RSXPYHRE" data-spa="auto" defer></script>
-<!-- / Fathom -->
-<title>RNAnix — predict a structure</title>
+<title>RNAnix — moved</title>
 <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32x32.png">
 <link rel="shortcut icon" href="../favicon.ico">
-<link rel="stylesheet" href="../style.css">
-<link rel="stylesheet" href="inference.css">
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 32rem; margin: 15vh auto; padding: 0 1.5rem;
+         text-align: center; color: #222; }
+  a { color: #1a5fb4; }
+</style>
 </head>
 <body>
-
-<header>
-  <img class="hdr-logo" src="../icon.png" alt="">
-  <h1>RNAnix · predict a structure</h1>
-  <a id="back-link" href="../">&larr; Atlas Explorer</a>
-  <a id="model-help-link" href="https://github.com/JaneliaSciComp/rna_atlas_website/tree/main/add_model_instructions" target="_blank" rel="noopener">Adding a new model instructions</a>
-  <span id="infer-status" class="count"></span>
-</header>
-
-<div id="ilayout">
-  <aside id="ipanel">
-    <h2>Input</h2>
-    <label class="ilbl">Entities <span class="lbl-sub">RNA · protein · DNA · ligand</span></label>
-    <div id="entities"></div>
-    <div class="ent-actions"><button id="add-entity" class="linkbtn" type="button">+ Add entity</button></div>
-    <div class="seqinfo"><span id="seqlen">0 residues</span><button id="example-btn" class="linkbtn" type="button">load example</button></div>
-    <label class="ilbl" for="jobname">Name (optional)</label>
-    <input id="jobname" type="text" placeholder="my RNA">
-    <label class="ilbl" for="model">Model</label>
-    <select id="model"><option value="">default</option></select>
-    <fieldset>
-      <legend>Options</legend>
-      <label class="ilbl" for="msa_mode">Alignments</label>
-      <select id="msa_mode">
-        <option value="none" selected>Use None (single-sequence, fastest)</option>
-        <option value="protenix-mt">Use MSA</option>
-        <option value="rmsa">Use rMSA</option>
-        <option value="both">Use MSA + rMSA (slower, thorough)</option>
-      </select>
-      <div class="ihint" id="msa_hint">None = single-sequence (fastest). MSA / rMSA condition on alignments (slower, usually more accurate).</div>
-      <div class="optrow">
-        <span><label class="ilbl" for="opt_seeds">Seeds</label><input id="opt_seeds" class="numopt" type="number" min="1" max="5" step="1" value="3"></span>
-        <span><label class="ilbl" for="opt_samples">Samples / seed</label><input id="opt_samples" class="numopt" type="number" min="1" max="5" step="1" value="5"></span>
-      </div>
-      <div class="ihint" id="fleet_hint"></div>
-      <div class="optrow">
-        <span><label class="ilbl" for="opt_relax"><input id="opt_relax" type="checkbox" checked> Relax structures (OpenMM)</label></span>
-      </div>
-      <div class="ihint" id="relax_hint">Post-process each pick with energy minimization and keep whichever of raw/relaxed has fewer clashes. Recommended; adds some time per prediction.</div>
-      <div class="optrow">
-        <span><label class="ilbl" for="opt_expert"><input id="opt_expert" type="checkbox"> Expert mode — literature-informed templates</label></span>
-      </div>
-      <div class="ihint" id="expert_hint">Claude researches this RNA's family and curates a 3D template from homologous PDB structures before folding. Slower (adds real minutes of research time) and more thorough.</div>
-      <textarea id="opt_description" hidden rows="2" placeholder="What is this RNA? (used for research — e.g. &quot;a glycine riboswitch aptamer&quot;, &quot;a de-novo Eterna design&quot;, &quot;a group II intron&quot;)"></textarea>
-      <div class="optrow" id="live_thinking_row" hidden>
-        <span><label class="ilbl" for="opt_live_thinking"><input id="opt_live_thinking" type="checkbox"> Show live reasoning</label></span>
-      </div>
-    </fieldset>
-    <button id="predict-btn">Predict</button>
-    <p id="predict-note" class="muted"></p>
-    <div class="openid-row">
-      <input id="openid" type="text" placeholder="search jobs… (or paste an id)" spellcheck="false" autocomplete="off">
-      <button id="openid-go" class="linkbtn" type="button">Open</button>
-    </div>
-    <div id="jobs" class="jobs"></div>
-  </aside>
-
-  <main id="iresult">
-    <div id="iloading" class="iloading" hidden>Loading…</div>
-    <div id="stages"></div>
-    <div id="iview">
-      <div class="vtoggle" id="vtoggle">
-        <button type="button" data-v="molstar">Mol*</button>
-        <button type="button" data-v="3dmol">3Dmol</button>
-      </div>
-      <div id="iviewer"></div>
-      <div id="ibadges"></div>
-      <div id="models" class="models mpanel"></div>
-    </div>
-    <div id="issblock" class="ssblock" hidden>
-      <div class="ss-head">
-        <span class="ss-title">Secondary structure</span>
-        <span class="ss-info" id="ss-info"></span>
-        <span class="ss-mode" id="ss-mode">
-          <button type="button" data-m="forna">2D</button>
-          <button type="button" data-m="arc">Arc</button>
-        </span>
-        <span class="ss-dl">
-          <button type="button" id="ss-dbn" title="download dot-bracket (.dbn)">&#10515; .dbn</button>
-          <button type="button" id="ss-png" title="download the 2D as PNG">&#10515; PNG</button>
-        </span>
-      </div>
-      <div id="ss-svg" class="ss-svg"></div>
-      <div class="ss-note">Derived client-side from the predicted 3D (canonical WC/wobble pairs only). <span style="color:#c1440e">orange = pseudoknot</span>.</div>
-    </div>
-    <div id="why-picks" class="why-picks" hidden>
-      <div class="why-head">
-        <span class="why-title">Why these picks</span>
-        <span class="why-gate" id="why-gate"></span>
-      </div>
-      <div class="why-family" id="why-family"></div>
-      <div class="why-brief" id="why-brief"></div>
-      <div class="why-rationale" id="why-rationale"></div>
-      <details class="why-thinking-wrap" id="why-thinking-wrap" hidden>
-        <summary>Claude's reasoning</summary>
-        <div class="why-thinking" id="why-thinking"></div>
-      </details>
-    </div>
-    <div id="iplaceholder">Submit a sequence to predict its 3D structure. Runs single-sequence by default (fast); tick “compute MSA” for a slower, usually more accurate model.</div>
-  </main>
-</div>
-
-<script src="../lib/3Dmol-min.js"></script>
-<script src="../config.js"></script>
-<script src="../viz_style.js"></script>
-<script src="../ss.js"></script>
-<script src="inference.js"></script>
+<p>This page has moved. The /inference feature now lives at the main site — sign in with your
+Atlas account to use it.</p>
+<p><a href="https://rna-atlas.org/inference/">rna-atlas.org/inference/</a></p>
 </body>
 </html>

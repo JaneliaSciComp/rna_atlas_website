@@ -84,7 +84,10 @@ the old setup is on record:
 ```bash
 cd /groups/das/home/zouinkhim/atlas_explorer/inference_api
 python3 -m py_compile casp_web.py                       # sanity
-STAGE=atlas ./deploy_bridge.sh                          # now refuses: "Atlas bridge ... was retired"
+STAGE=atlas ./deploy_bridge.sh
+# now refuses, verbatim:
+#   ERROR: STAGE=atlas is not supported -- the Atlas bridge (STAGE=atlas) was retired in
+#   T-0153. This script only ever deploys CASP production (STAGE=prod, the default).
 ```
 
 It used to create `casp-web-atlas` Lambda + `casp-web-role-atlas` + `casp-web-api-atlas` HTTP API,

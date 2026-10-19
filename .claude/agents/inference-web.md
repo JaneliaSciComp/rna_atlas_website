@@ -23,8 +23,10 @@ retirement notice for the full history.
 **What's still live in THIS repo and must not be confused with the above**: `inference_api/casp_web.py`
 and `inference_api/deploy_bridge.sh` still serve `casp-web` -- the real **CASP-competition
 production** bridge (`janelia-das-casp-daslab-*-prod`). That is a different, still-functioning
-system with its own `WEB_TOKEN` (read from `DEPLOYED.local.md`'s `- Passcode:` line). Don't touch
-its token-checking logic or its deploy path on the assumption that "/inference is retired" --
-CASP production is a separate concern that was never part of the retirement.
+system with its own `WEB_TOKEN` (read from `DEPLOYED.local.md`'s `- Passcode:` line) -- currently
+the *same, burned* value as the retired Atlas passcode (see `deploy_bridge.sh`'s header comment;
+the two were never rotated independently before T-0153), not a distinct secret. Don't touch its
+token-checking logic or its deploy path on the assumption that "/inference is retired" -- CASP
+production is a separate concern that was never part of the retirement.
 
 See the project `CLAUDE.md` for wider atlas context (hosting, deploy, data model).

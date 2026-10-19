@@ -1,5 +1,6 @@
-// Shared RNA secondary-structure module — loaded (as a plain global script) by BOTH the
-// main atlas (app.js) and the /inference page (inference.js) so the two never drift.
+// RNA secondary-structure module — loaded (as a plain global script) by the main atlas app
+// (app.js). Used to also be shared with web/inference/inference.js so the two never drifted;
+// that client is retired (T-0153), this module now has one consumer.
 //
 // Provides:
 //   ssPairs(dbn)                         multi-level dot-bracket -> [{i,j,pk}]

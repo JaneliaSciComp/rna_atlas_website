@@ -6,15 +6,24 @@
 #   ./deploy_bridge.sh   # -> shared CASP prod stack (FN casp-web), print INFER_API url
 #
 # The Atlas bridge (casp-web-atlas) this script used to also deploy (STAGE=atlas) has been
-# retired (T-0153) -- it is gone, not just unreachable. This script now only ever drives the
-# CASP-competition production bridge; the WEB_TOKEN it reads is CASP prod's own, read from the
-# "- Passcode:" line of DEPLOYED.local.md (gitignored), unrelated to anything Atlas-side.
+# retired (T-0153) -- it is gone, not just unreachable, and STAGE is no longer a parameter:
+# setting it to anything but "prod" is refused outright, not silently ignored. The WEB_TOKEN
+# this script reads (from DEPLOYED.local.md's "- Passcode:" line) is CASP production's own --
+# as of T-0153 it happens to equal the retired, exposed Atlas passcode (the two were never
+# rotated independently before the retirement), which is exactly why that value must still be
+# treated as burned; this script does not change that fact, it just reads whatever that line
+# currently says.
 set -euo pipefail
 cd "$(dirname "$0")"
 
 PROFILE="${PROFILE:-default}"
 REGION="us-east-2"
 ACCOUNT="481088927481"
+[ "${STAGE:-prod}" = "prod" ] || {
+  echo "ERROR: STAGE=$STAGE is not supported -- the Atlas bridge (STAGE=atlas) was retired in" >&2
+  echo "T-0153. This script only ever deploys CASP production (STAGE=prod, the default)." >&2
+  exit 1
+}
 STAGE="prod"
 FN="casp-web"
 ROLE="casp-web-role"
@@ -24,7 +33,7 @@ AWS="aws --profile $PROFILE --region $REGION"
 LAMBDA_ARN="arn:aws:lambda:$REGION:$ACCOUNT:function:$FN"
 echo "STAGE=$STAGE  ->  FN=$FN  ARTIFACTS_BUCKET=$ARTIFACTS_BUCKET"
 
-WEB_TOKEN="$(grep -ioE 'atlas-[a-f0-9]{12}' ../DEPLOYED.local.md | head -1)"
+WEB_TOKEN="$(grep -ioE '^- Passcode:[[:space:]]*atlas-[a-f0-9]{12}' ../DEPLOYED.local.md | grep -oiE 'atlas-[a-f0-9]{12}' | head -1)"
 [ -n "$WEB_TOKEN" ] || { echo "ERROR: could not read passcode from ../DEPLOYED.local.md"; exit 1; }
 
 echo "== 1/5 IAM role =="

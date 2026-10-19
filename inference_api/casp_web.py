@@ -175,8 +175,9 @@ def _pipeline_arn(model):
 def _inference_result_pdb(target_id, model):
     """Read finalize_inference.py's ranked picks (inference/<target>/<model>/manifest.json +
     rank_NN.{pdb,cif} — whichever format the model actually wrote) and return the top-ranked
-    structure. inference.js content-sniffs format (fmtOf(): 'data_'/'_atom_site' -> cif, else
-    pdb), so raw text of either format is fine — but MODEL/ENDMDL bracketing (which the old
+    structure. The retired Atlas bridge's web/inference/inference.js (T-0153) content-sniffed
+    format (fmtOf(): 'data_'/'_atom_site' -> cif, else pdb), so raw text of either format is
+    fine here regardless of what reads it — but MODEL/ENDMDL bracketing (which the old
     submissions/ PFRMAT-TS path used to show all 5 in one blob) is PDB-only syntax and would
     corrupt real mmCIF, so only PDB-format results get concatenated; CIF returns just the best
     pick. Returns None if no result is there yet."""

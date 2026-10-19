@@ -52,8 +52,8 @@ web app over the Ribonanza-2 (+ add-on) RNA prediction atlases: filter/rank fold
 - **ALWAYS `node --check web/<file>.js` before deploying.** A duplicate `const` once broke all of
   `agent.js` silently; brace-counting misses it (and gives false positives on `{`/`}` inside strings).
   `node` is at `/usr/bin/node`.
-- `config.js` is generated per-target by deploy (never upload `web/config.js`): sets `DATA_BASE`,
-  optionally `INFER_API`. There is **no Anthropic key in it, shared or otherwise** —
+- `config.js` is generated per-target by deploy (never upload `web/config.js`): sets `DATA_BASE`.
+  There is **no Anthropic key in it, shared or otherwise** —
   `deploy.sh` refuses to upload/publish a `config.js` containing anything credential-shaped
   (`assert_safe_config`/`verify_published_config`). A shared client-side key (`window.CLAUDE_KEY`)
   leaked in 2026-07 and was removed; see `docs/incident_2026-07_claude_key_leak.md`. Each user
@@ -105,7 +105,9 @@ web app over the Ribonanza-2 (+ add-on) RNA prediction atlases: filter/rank fold
 - **Map** view (Table/Map toggle): canvas scatter of the t-SNE embedding, color-by, zoom (clamped) / pan / double-click reset, hover, click→deep view, t-SNE axes.
 - **Deep view**: 3D (3Dmol) with a **Color by** selector (2A3/DMS/pLDDT/pairing/nucleotide/spectrum) + motif sticks; sequence/DMS/2A3/pairing tracks; **secondary structure** (forna-style 2D default, arc-diagram toggle); RNAcentral/Rfam/cluster metadata; **Export** zip (cif+pdb+png+txt).
 - **Claude assistant** (`agent.js`, ✦ logo button): drives `window.AtlasAPI` (filters/search/map/select) + analysis (get_results/field_stats) + charts (2D expand+PNG, interactive 3D three.js downloadable as HTML). Model selector, welcome+examples, live status, markdown tables, localStorage conversation cache. **Per-user key only**: prompts each user for their own Anthropic API key on first use (stored in that browser's `localStorage`, never sent anywhere but `api.anthropic.com`) and calls the Messages API directly. There is no shared/org key anywhere, client or server-side — see Gotchas.
-- **/inference** (`web/inference/`): paste a sequence → staged **no-MSA draft → MSA-refined** result. **Front-end scaffold only**; set `window.INFER_API` and implement `POST /predict` + `GET /status` (see the adapter comment in `inference.js`).
+- **/inference**: retired here (T-0153) — `web/inference/` is now a static "moved" notice. The real,
+  live `/inference` feature is a separate system (`rna-atlas-inference` / `rnanix_server_frontend`),
+  Cognito-gated, served from the site root; this repo's deploy pipeline no longer touches it at all.
 
 ## Gotchas
 
@@ -128,6 +130,7 @@ web app over the Ribonanza-2 (+ add-on) RNA prediction atlases: filter/rank fold
 
 ## Open / TODO
 
-- `/inference` backend: wire `INFER_API` to the AWS CASP inference pipeline (trigger + output S3 convention).
+- `/inference` backend: retired here (T-0153) — not applicable any more; the live feature lives in
+  `rna-atlas-inference`/`rnanix_server_frontend` now.
 - Short-sequence (≤30 nt) chemmap: optional "no signal" note; confirm with the data team if a source exists.
 - forna 2D falls back to the arc diagram for >900 nt RNAs (perf).

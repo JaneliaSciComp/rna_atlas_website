@@ -1,71 +1,30 @@
 ---
 name: inference-web
 description: >-
-  Use for ANY task on the RNA Atlas Explorer /inference feature — the client page
-  (web/inference/*), its casp-web bridge Lambda (inference_api/casp_web.py +
-  deploy_bridge.sh), and the CASP Step-Functions/SageMaker pipeline it calls. Triggers:
-  editing the inference UI/staged flow/jobs panel, adding or changing bridge API routes,
-  the INFER_API adapter, the S3 artifacts wiring, or deploying either the /inference
-  frontend or the bridge. Not for the main atlas table/map/deep-view or data builders.
+  Historical/retired scope notice for the RNA Atlas Explorer /inference feature. The
+  casp-web-atlas bridge this agent used to own was retired in T-0153 (2026-10) -- there is no
+  live /inference work left to do in this repo. The real, live /inference feature now lives in
+  separate repos (rna-atlas-inference, rnanix_server_frontend), Cognito-gated. If you were
+  routed here for /inference work, redirect to those repos instead -- do not resurrect
+  web/inference/* or the casp-web-atlas bridge.
 ---
 
-You own the RNA Atlas Explorer **/inference** feature end-to-end. Repo: `/groups/das/home/zouinkhim/atlas_explorer`.
+**This agent's original scope is retired.** `web/inference/` in this repo is now a static
+"moved" notice (no JS, no bridge calls); `deploy.sh` no longer injects `INFER_API`/`.infer_api`
+into `config.js` at all; `inference_api/deploy_bridge.sh` hard-refuses `STAGE=atlas`; the
+`casp-web-atlas` Lambda/API/role are gone or being torn down
+(`inference_api/teardown_atlas_bridge.sh`). See T-0153 and `docs/atlas_inference_deploy.md`'s
+retirement notice for the full history.
 
-## What you own
-- **Frontend** `web/inference/`: `index.html`, `inference.js` (staged no-MSA→MSA flow, model selector,
-  jobs panel with kill, cache-aware submit, export zip + "Download all predictions" pool), `inference.css`,
-  `molstar.js`/`molstar.css` (3D viewer). Calls `window.INFER_API`, injected into the deploy-generated
-  `config.js` from the gitignored `.infer_api`.
-- **Bridge** `inference_api/`: `casp_web.py` = the `casp-web` Lambda (thin JSON API); `deploy_bridge.sh`
-  = deploys the Lambda + IAM role + HTTP API (us-east-2, account 481088927481).
-- **Pipeline**: reuses per-model handler Lambdas `janelia-das-casp-daslab-<model>-prod` with **submit=false**
-  (runs the CASP engine but does NOT submit to CASP); reads results from the private S3 bucket
-  `janelia-das-casp-artifacts-prod`.
+**Where the real work is now**: `rna-atlas-inference` (AWS backend) and `rnanix_server_frontend`
+(the live `/inference` page), both separate repos, both Cognito-gated via the site's edge auth
+(T-0139/T-0140). Route any actual `/inference` feature work there, not here.
 
-## API (casp_web.py)
-`GET /models` · `POST /predict {sequence,model,options,token}` · `GET /status?job&t` · `GET /msa` ·
-`GET /template` · `GET /pool` · `GET /poolfile?job&key&t` · `GET /jobs?t` · `POST /cancel`.
-Models: `daslab-ptnx1` (Protenix), `daslab-base`, `daslab-v0`. `job_id` is compound
-`"<model>:<target_id>:<executionName>"` (cached jobs have empty executionName);
-`target_id = "web"+sha256(model|mode|seq)[:12]`.
-
-## S3 artifacts (`janelia-das-casp-artifacts-prod`)
-- `submissions/<target>/<model>/<ts>.pdb` — finalized top-5 (what `/status` returns).
-- `predictions/<target>/<model>/<branch>-<ts>/…/seed_N/predictions/<t>_sample_i.cif` + `…_summary_confidence_sample_i.json` — the full sample pool (`/pool`, `/poolfile`).
-- `cache/{msa,rmsa,templates}/<tool_version>/<sha>/` — alignments/templates.
-
-## Deploy
-- **Frontend**: `node --check web/inference/inference.js` → `./deploy.sh dev` → verify at `/dev/inference/`
-  → `./deploy.sh promote`. Uses the **`atlas-deployer`** profile (non-expiring, S3/CloudFront only).
-  `deploy.sh` regenerates `config.js` and injects `INFER_API` from `.infer_api`.
-- **Bridge**: `cd inference_api && ./deploy_bridge.sh` (PROFILE defaults to `default`). Needs **ADMIN**
-  creds (SSO AdministratorAccess) — scoped users can't create IAM/Lambda/API-Gateway. On `ExpiredToken`,
-  ask the user to refresh SSO creds. `deploy_bridge.sh` reads WEB_TOKEN from `../DEPLOYED.local.md` and
-  prints the INFER_API url.
-
-## AWS profiles
-- `atlas-deployer` — website S3 + CloudFront invalidation (non-expiring). CANNOT touch Lambda/IAM or read the artifacts bucket.
-- `default` — admin SSO (AdministratorAccess, temporary/expiring). Needed for the bridge Lambda/IAM + reading `janelia-das-casp-artifacts-prod`.
-
-## Hard rules
-- **Secrets**: `DEPLOYED.local.md`, `.infer_api`, `.claude_key`, `config.json`, `dist/` are gitignored —
-  NEVER commit or print them. The web token matches `atlas-[a-f0-9]{12}` — never echo it.
-- **No presigned "anyone-with-link" S3 URLs** (data-exfiltration risk) — serve artifact bytes through the
-  gated `/poolfile` proxy. Keep its path guard: reject keys not under the job's prefix or containing "..".
-- **`node --check`** every JS edit before deploy (`node` = `/usr/bin/node`).
-- **Smoke-to-production flag parity**: before an official run, diff the exact runner/deploy invocation
-  against the passing smoke — a dropped flag silently ships the wrong output.
-- Response size: API Gateway/Lambda ~6 MB cap → large pools (30 MB+) MUST use the per-file `/poolfile`
-  proxy with client-side concurrency, never one big response.
-- Edit → dev → verify → promote; never promote unverified. Commit/push only when asked.
-- After making changes, run `graphify update /groups/das/home/zouinkhim/atlas_explorer` to keep the graph current.
-
-## Verify
-- Bridge: `curl "$(cat .infer_api)/models"`; `curl "$(cat .infer_api)/status?job=<id>&t=<token>"`.
-- Frontend: `web/inference/` is no longer deployed anywhere by `deploy.sh` (T-0071/T-0140 — the live
-  `/inference` app is owned by `rna-atlas-inference`/`rnanix_server_frontend` now). NOTE: most of this
-  file describes that retired architecture (web/inference/ as the live frontend, inference_api/casp_web.py
-  as the live bridge, janelia-das-casp-daslab-*-prod as the live pipeline) — it needs a real rewrite or
-  retirement decision, not just this one line; flagged, not fixed, as part of T-0140.
+**What's still live in THIS repo and must not be confused with the above**: `inference_api/casp_web.py`
+and `inference_api/deploy_bridge.sh` still serve `casp-web` -- the real **CASP-competition
+production** bridge (`janelia-das-casp-daslab-*-prod`). That is a different, still-functioning
+system with its own `WEB_TOKEN` (read from `DEPLOYED.local.md`'s `- Passcode:` line). Don't touch
+its token-checking logic or its deploy path on the assumption that "/inference is retired" --
+CASP production is a separate concern that was never part of the retirement.
 
 See the project `CLAUDE.md` for wider atlas context (hosting, deploy, data model).

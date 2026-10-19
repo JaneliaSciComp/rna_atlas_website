@@ -4,6 +4,15 @@ End-to-end, reproducible steps to stand up and update the **Atlas inference back
 `atlas` fork of the CASP prediction pipeline + the `casp-web-atlas` bridge + wiring the website to it.
 Every step is a saved command (script/Make target) — nothing here is ad-hoc.
 
+> **The `casp-web-atlas` bridge (Steps 2-3) is retired (T-0153).** It is not just unreachable --
+> the Lambda/API/role are gone or slated for teardown (`inference_api/teardown_atlas_bridge.sh`),
+> `deploy_bridge.sh` now refuses `STAGE=atlas` outright, and `deploy.sh` no longer injects an
+> `INFER_API`/`.infer_api` value into `config.js` at all. Steps 2-3 below are kept as historical
+> record of how it used to be stood up, not as a procedure to follow. The live `/inference`
+> feature is a separate system (`rna-atlas-inference` / `rnanix_server_frontend`), Cognito-gated,
+> unaffected by any of this. Steps 1/4/5 describe the `atlas` OpenTofu pipeline stage in the
+> separate `rna-atlas-aws-server` repo, which T-0153 does not touch -- not verified current here.
+
 ## Why a fork
 
 The `/inference` page used to submit to the **shared CASP production** pipeline
@@ -66,50 +75,34 @@ aws --profile default --region us-east-2 lambda get-function \
 aws --profile default --region us-east-2 s3 ls s3://janelia-das-casp-artifacts-atlas/ || true
 ```
 
-## Step 2 — Deploy the atlas bridge (`casp-web-atlas`)
+## Step 2 — Deploy the atlas bridge (`casp-web-atlas`) — RETIRED, historical only
 
-The bridge Lambda is fully `STAGE`-parameterized; `deploy_bridge.sh` derives all names + IAM ARNs from
-`STAGE`. Non-prod stages get a `-<stage>` suffix so the atlas bridge never touches the prod bridge.
+This step no longer applies. `deploy_bridge.sh` hard-refuses `STAGE=atlas` now (T-0153) -- running
+the command below will print an error and exit, not deploy anything. Kept verbatim so the shape of
+the old setup is on record:
 
 ```bash
 cd /groups/das/home/zouinkhim/atlas_explorer/inference_api
 python3 -m py_compile casp_web.py                       # sanity
-STAGE=atlas ./deploy_bridge.sh                          # admin SSO; prints "INFER_API = https://<id>.execute-api..."
+STAGE=atlas ./deploy_bridge.sh                          # now refuses: "Atlas bridge ... was retired"
 ```
 
-Creates `casp-web-atlas` Lambda + `casp-web-role-atlas` + `casp-web-api-atlas` HTTP API, scoped to the
-`-atlas` state machines / handlers / `janelia-das-casp-artifacts-atlas`.
+It used to create `casp-web-atlas` Lambda + `casp-web-role-atlas` + `casp-web-api-atlas` HTTP API,
+scoped to the `-atlas` state machines / handlers / `janelia-das-casp-artifacts-atlas`. Those
+resources are being (or have been) deleted via `inference_api/teardown_atlas_bridge.sh`.
 
-Smoke test:
-```bash
-ATLAS_API="https://<id>.execute-api.us-east-2.amazonaws.com"   # from the deploy output
-curl -s "$ATLAS_API/models"
-# single-RNA:
-curl -s -X POST "$ATLAS_API/predict" -H 'content-type: application/json' \
-  -d '{"sequence":"GGGAACGACUCGAGUAGAGUCG","model":"daslab-ptnx1","options":{"mode":"none"},"token":"<passcode>"}'
-```
+## Step 3 — Point the website at the atlas bridge — RETIRED, historical only
 
-## Step 3 — Point the website at the atlas bridge
+This step no longer applies either. `deploy.sh` no longer reads `.infer_api` or injects
+`window.INFER_API` into `config.js` at all (T-0153) -- there is nothing left for the website to
+point at. `web/inference/` is now a static "moved" notice, not the old bridge-calling client.
 
-`INFER_API` is injected into the generated `config.js` from the gitignored `.infer_api`. Move the website
-DEV-first, verify, then promote.
+## Step 4 — End-to-end verification — RETIRED, historical only
 
-```bash
-cd /groups/das/home/zouinkhim/atlas_explorer
-# write the atlas bridge URL (do NOT paste secrets in chat; the passcode is separate)
-printf '%s' "$ATLAS_API" > .infer_api      # or: ! printf ... > .infer_api  (run it yourself)
+This tested the now-retired bridge via the old `web/inference/` client; `dev/inference/` belongs
+to the separate, still-live `rnanix_server_frontend` deployment now, not this repo's testing.
 
-node --check web/inference/inference.js
-./deploy.sh dev                            # -> /dev only  (atlas-deployer profile)
-# verify at https://rna-atlas.org/dev/inference/  (see Step 4)
-./deploy.sh promote                        # ship the tested bytes to prod  (only when ready)
-```
-
-Rollback = point `.infer_api` back at the CASP-prod bridge URL and re-deploy.
-
-## Step 4 — End-to-end verification (behind Cognito group app:atlas)
-
-At `https://rna-atlas.org/dev/inference/`:
+At `https://rna-atlas.org/dev/inference/` (historical):
 1. **Single RNA** (mode None) → structure returns.
 2. **Homodimer** — one RNA entity, copies = 2 → two-chain structure; `msa` mode builds per-chain MSA.
 3. **Heterodimer** — two RNA entities → two distinct chains.
@@ -146,7 +139,7 @@ is never touched.
 | Task | Command |
 |---|---|
 | Update atlas pipeline config/code | `make apply ENV=atlas ARGS=-auto-approve` (in the tofu repo) |
-| Update the atlas bridge Lambda | `STAGE=atlas ./deploy_bridge.sh` (in `inference_api/`) |
+| Update the atlas bridge Lambda | **retired (T-0153)** -- `deploy_bridge.sh` refuses `STAGE=atlas` |
 | Update website shell | `./deploy.sh dev` → verify → `./deploy.sh promote` |
 | Tear down the whole atlas stack | `make destroy ENV=atlas ARGS=-auto-approve` (leaves prod/dev + shared DBs intact) |
 | Which workspace am I in? | `make show` |

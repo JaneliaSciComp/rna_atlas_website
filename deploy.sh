@@ -58,7 +58,7 @@ deploy_shell() {
     | aws --profile $P s3 cp - "$B/${pfx}config.js" --content-type application/javascript --only-show-errors \
     && echo "  ${pfx}config.js  (DATA_BASE=\"$db\")"
   verify_published_config "$pfx"
-  for lf in web/lib/*.js; do bn=$(basename "$lf"); aws --profile $P s3 cp "$lf" "$B/${pfx}lib/$bn" --only-show-errors && echo "  ${pfx}lib/$bn"; done
+  for lf in web/lib/*.js web/lib/*.css; do [ -f "$lf" ] && bn=$(basename "$lf") && aws --profile $P s3 cp "$lf" "$B/${pfx}lib/$bn" --only-show-errors && echo "  ${pfx}lib/$bn"; done
   # /inference subpage -- NEVER written here, under ANY prefix. Root inference/ is the live
   # RNAnix inference app (Cognito-backed), deployed by rna-atlas-inference/scripts/deploy_frontend.sh
   # (T-0071). dev/inference/ is NOT a legacy holding area either -- it's reserved for that same
@@ -119,7 +119,7 @@ case "${1:-prod}" in
     echo "promote dev/ shell -> root (server-side copy of the tested bytes)"
     # inference/* deliberately excluded (T-0071): both dev/inference/ and root inference/ belong
     # to rna-atlas-inference/scripts/deploy_frontend.sh now, not this repo -- nothing to copy.
-    for f in $SHELL_FILES lib/3Dmol-min.js lib/three.min.js lib/OrbitControls.js claude.png \
+    for f in $SHELL_FILES lib/3Dmol-min.js lib/three.min.js lib/OrbitControls.js lib/molstar.js lib/molstar.css claude.png \
              icon.png logo_exp.png favicon.ico favicon-16x16.png favicon-32x32.png \
              apple-touch-icon.png android-chrome-192x192.png android-chrome-512x512.png site.webmanifest; do
       aws --profile $P s3 cp "$B/dev/$f" "$B/$f" --only-show-errors && echo "  $f"

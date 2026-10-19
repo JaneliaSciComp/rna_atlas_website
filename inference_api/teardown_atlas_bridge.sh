@@ -20,6 +20,7 @@ ACCOUNT_EXPECTED="481088927481"
 FN="casp-web-atlas"
 ROLE="casp-web-role-atlas"
 API_NAME="casp-web-api-atlas"
+API_ID_EXPECTED="4noypwoqq4"   # pinned from T-0153's own investigation; see the assertion below
 LOG_GROUP="/aws/lambda/$FN"
 AWS=(aws --profile "$PROFILE" --region "$REGION")
 
@@ -29,6 +30,10 @@ if [[ "$FN" != *-atlas ]] || [[ "$ROLE" != *-atlas ]] || [[ "$API_NAME" != *-atl
 fi
 
 MODE="dry-run"
+if [ "$#" -gt 1 ]; then
+  echo "ERROR: too many arguments ('$*') -- use --apply, or nothing for a dry run." >&2
+  exit 1
+fi
 case "${1:-}" in
   "") ;;
   --apply) MODE="apply" ;;
@@ -44,8 +49,15 @@ CALLER_ACCOUNT="$("${AWS[@]}" sts get-caller-identity --query Account --output t
 echo "Mode: $MODE  (account $CALLER_ACCOUNT, region $REGION)"
 echo
 
-API_ID="$("${AWS[@]}" apigatewayv2 get-apis --query "Items[?Name=='$API_NAME'].ApiId" --output text 2>/dev/null || true)"
+# No `|| true` here: a failed lookup must stop the script, not be silently read as "not found"
+# and let it proceed to delete the Lambda/role while the API is still actually there.
+API_ID="$("${AWS[@]}" apigatewayv2 get-apis --query "Items[?Name=='$API_NAME'].ApiId" --output text)"
 [ "$API_ID" = "None" ] && API_ID=""
+if [ -n "$API_ID" ] && [ "$API_ID" != "$API_ID_EXPECTED" ]; then
+  echo "ERROR: found API '$API_NAME' with id $API_ID, expected $API_ID_EXPECTED (or none). Refusing" >&2
+  echo "to delete an API that isn't the one T-0153 investigated -- check by hand." >&2
+  exit 1
+fi
 
 echo "== Targets =="
 echo "  HTTP API:      $API_NAME ${API_ID:+(id: $API_ID)}"

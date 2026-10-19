@@ -866,12 +866,12 @@ function drawReactChart(f, react) {
 
 let viewer = null, viewerModel = null, mstar = null, molstarLoading = null;
 let deepEngine = (() => { try { return localStorage.getItem("deep_viewer") || "3dmol"; } catch (e) { return "3dmol"; } })();
-function loadMolstarLib() {                          // reuse the bundle already vendored for /inference
+function loadMolstarLib() {                          // vendored bundle, shared with web/lib/*
   if (window.molstar) return Promise.resolve();
   if (molstarLoading) return molstarLoading;
   molstarLoading = new Promise((res, rej) => {
-    const css = document.createElement("link"); css.rel = "stylesheet"; css.href = "inference/molstar.css"; document.head.appendChild(css);
-    const s = document.createElement("script"); s.src = "inference/molstar.js"; s.onload = () => res(); s.onerror = () => rej(new Error("molstar")); document.head.appendChild(s);
+    const css = document.createElement("link"); css.rel = "stylesheet"; css.href = "lib/molstar.css"; document.head.appendChild(css);
+    const s = document.createElement("script"); s.src = "lib/molstar.js"; s.onload = () => res(); s.onerror = () => rej(new Error("molstar")); document.head.appendChild(s);
   });
   return molstarLoading;
 }

@@ -32,7 +32,8 @@ window.DATASETS = [
   // viewer a record carries several structures: structs/<key>__<method>__s<k>.pdb (k 0..samples-1), a lazy
   // data/samples/<key>.json with the per-sample fields, and a react/<key>.json over the whole 311-nt construct
   // that a "design240" frame slices to the design window ("construct311" = the whole thing, RNet-Diffusion).
-  // Per-record `methods` holds a best-by summary, `default` the first structure to show. No pairing.json (the
+  // Per-record `methods` holds a best-by summary, `default.method` the method shown first (the sample follows the
+  // viewer's Best-by rule, which coincides with `default.sample` under the default rule). No pairing.json (the
   // dot-bracket comes from the shown sample) and no tertiary-motif scan, hence motifs:false.
   { id: "openknot_r9", label: "OpenKnot Round 9 (44,003)", base: "data/datasets/openknot_r9", ext: "pdb", react: true, motifs: false, cond: [],
     multi: { samples: 5, methods: [

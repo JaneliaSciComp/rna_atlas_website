@@ -70,6 +70,8 @@ function multiCurrent(f, method, sample) {
   else r = { k: Math.max(0, Math.min(nS - 1, sel | 0)), by: null, note: "" };
   return { multi, mdef, method: mid, k: r.k, by: r.by, note: r.note, frame: mdef.frame === "construct311" ? "construct311" : "design240", nS };
 }
+// cif vs pdb from the text itself (the fetch carries no usable type)
+function structFmt(text) { return (text.startsWith("data_") || text.includes("_atom_site")) ? "cif" : "pdb"; }
 function multiStructPath(f, ds, method, k) { return prefix(ds) + "structs/" + fileStem(f, ds) + "__" + method + "__s" + k + "." + (ds.ext || "pdb"); }
 function structPath(f, ds) {
   const cur = multiCurrent(f);
@@ -85,8 +87,8 @@ function reactForFrame(raw, frame) {
   if (frame !== "construct311" && raw.design_start != null && raw.design_end != null) { s = Math.max(0, raw.design_start | 0); e = Math.min(n, raw.design_end | 0); }
   const cut = (a) => (Array.isArray(a) ? a.slice(s, e) : null);
   const sn = Array.isArray(raw.sn) ? raw.sn : (raw.sn ? [raw.sn.dms == null ? null : raw.sn.dms, raw.sn.a23 == null ? null : raw.sn.a23] : null);
-  return { seq: full.slice(s, e), a23: cut(raw.a23), dms: cut(raw.dms), a23_err: cut(raw.a23_err), dms_err: cut(raw.dms_err), sn,
-    reads: raw.reads || null, frame: frame === "construct311" ? "construct311" : "design240", design_start: raw.design_start, design_end: raw.design_end, construct_length: n };
+  // `frame` records which window this is; everything else is the legacy shape the drawing code reads
+  return { seq: full.slice(s, e), a23: cut(raw.a23), dms: cut(raw.dms), a23_err: cut(raw.a23_err), dms_err: cut(raw.dms_err), sn, frame: frame === "construct311" ? "construct311" : "design240" };
 }
 // the per-sample record (from the lazy samples file) of the OPEN fold; null until that file is in
 function sampleOf(f, method, k) {
@@ -281,7 +283,7 @@ async function enterState(initial) {
   if (initial && initial.mapT) mapT = initial.mapT;
   setView((initial && initial.view) || "table");
   if (initial && initial.multi) applyMultiState(initial.multi);          // T-0367: before openDeep, which reads it
-  if (initial && initial.deep) await openDeep(initial.deep, { keepSample: !!initial.multi });
+  if (initial && initial.deep) await openDeep(initial.deep, { keepSample: !!(initial.multi && (initial.multi.sample === "best" || Number.isInteger(initial.multi.sample))) });
   else if (currentDeep) closeDeep();
   updateShareUI();   // normalize the address bar to whatever we actually ended up showing
 }
@@ -703,6 +705,7 @@ function closeDeep() {
   loseGL($("viewer3d"));                                            // release WebGL contexts on close
   viewer = null;
   currentDeep = null;
+  _openSeq++; _load3DSeq++;                                         // T-0367: an in-flight openDeep/load3D must not repopulate a closed view
   saveState();
 }
 
@@ -1039,7 +1042,9 @@ function loseGL(container) {
     try { const gl = cv.getContext("webgl") || cv.getContext("webgl2"); const ext = gl && gl.getExtension("WEBGL_lose_context"); if (ext) ext.loseContext(); } catch (e) {}
   });
 }
+let _load3DSeq = 0;                                                 // T-0367: the pickers reload the SAME fold rapidly; only the newest load may render
 async function load3D(f, react) {
+  const my = ++_load3DSeq;
   const el = $("viewer3d");
   disposePano();
   loseGL(el);                     // free any live WebGL contexts before we drop the canvases
@@ -1049,19 +1054,21 @@ async function load3D(f, react) {
   ensureViewerResizeObserver(el);
   try { if (mstar && mstar.dispose) mstar.dispose(); } catch (e) {}
   mstar = null;
-  const id = f.id;
   const ds = dsFor(f);
   let data;
   viewerModel = null; if (currentDeep) { currentDeep.structText = null; currentDeep.structFmt = null; }
   const cur = multiCurrent(f);                                   // T-0367: which of the record's structures
-  if (cur && multiSel.compare) { currentDeep.structSel = null; await renderCompare(f, cur); return; }
+  if (cur && multiSel.compare) { currentDeep.structSel = null; await renderCompare(f, cur, my); return; }
   try { data = await (await fetch(durl(structPath(f, ds)))).text(); }
-  catch (e) { if (currentDeep && currentDeep.f === f) el.innerHTML = '<p style="color:#fff;padding:8px">structure unavailable</p>'; return; }
-  // a newer fold may have opened while this fetch was in flight — don't clobber it
-  if (!currentDeep || currentDeep.f !== f) return;
-  const fmt = data.startsWith("data_") || data.includes("_atom_site") ? "cif" : "pdb";
+  catch (e) { if (currentDeep && currentDeep.f === f && my === _load3DSeq) el.innerHTML = '<p style="color:#fff;padding:8px">structure unavailable</p>'; return; }
+  // a newer fold may have opened, or a newer load of this fold started, while this fetch was in flight — don't clobber it
+  if (!currentDeep || currentDeep.f !== f || my !== _load3DSeq) return;
+  const fmt = structFmt(data);
   currentDeep.structText = data; currentDeep.structFmt = fmt; currentDeep._proj = null;
   currentDeep.structSel = cur ? { method: cur.method, k: cur.k } : null;
+  // T-0367: the shown sample's dot-bracket (possibly derived from this very structure) must reach the tracks in
+  // every 2D mode, not only in "3D projection" (which redraws below once the camera exists)
+  if (cur) drawTracks(f, react);
   if ($("deep_color_by") && $("color_by")) $("deep_color_by").value = $("color_by").value;
   if ($("deep_ss_view") && $("ss_view")) $("deep_ss_view").value = $("ss_view").value;
   // panoramic always uses the 3Dmol channel gallery (before the Mol* branch, so Mol* + panoramic
@@ -1288,9 +1295,12 @@ function setMulti(patch) {
   currentDeep.react = reactForFrame(currentDeep.reactRaw, cur.frame);
   renderMultiBar(f);
   drawProps(f);
-  const structChanged = before.method !== cur.method || before.k !== cur.k || ("compare" in patch) || (("cmpMode" in patch) && multiSel.compare);
+  // the 3D is rebuilt when the shown structure changes, when compare is toggled, and in compare when its layout or
+  // the Best-by rule changes (the other methods' cells follow that rule even if the selected method's sample does not)
+  const structChanged = before.method !== cur.method || before.k !== cur.k || ("compare" in patch)
+    || (multiSel.compare && (("cmpMode" in patch) || ("bestBy" in patch)));
   if (structChanged) load3D(f, currentDeep.react);
-  else drawTracks(f, currentDeep.react);
+  drawTracks(f, currentDeep.react);                              // always: the pairing track / 2D follow the selection in every 2D mode
   drawReactChart(f, currentDeep.react);
   saveState();
 }
@@ -1307,7 +1317,8 @@ function multiPropRows(f) {
     s.shape_agr != null && "2A3 agreement " + num(s.shape_agr, 3), s.rdms != null && "DMS r " + num(s.rdms, 3),
     s.ss_class && esc(s.ss_class), s.bp_fraction != null && "paired " + num(s.bp_fraction, 2)].filter(Boolean).join(" · ") || "n/a"]);
   else if (currentDeep && currentDeep.f === f && currentDeep.samples === null) rows.push(["This sample", "per-sample details unavailable (no samples file for this record)"]);
-  const per = cur.multi.methods.map((m) => { const b = (f.methods || {})[m.id]; return b ? `${esc(m.label)}: pLDDT ${num(b.plddt)} · ranking ${num(b.ranking_score, 3)} · agreement ${num(b.shape_agr, 3)}` : null; }).filter(Boolean);
+  const na = (x, d) => (x == null ? "n/a" : num(x, d));
+  const per = cur.multi.methods.map((m) => { const b = (f.methods || {})[m.id]; return b ? `${esc(m.label)}: pLDDT ${na(b.plddt)} · ranking ${na(b.ranking_score, 3)} · agreement ${na(b.shape_agr, 3)}` : null; }).filter(Boolean);
   if (per.length) rows.push(["Methods (best-by-reactivity sample)", per.join("<br>")]);
   if (f.replicate_of) rows.push(["Replicate", `same design sequence as ${esc(f.replicate_of)}${f.n_replicates ? ` (${f.n_replicates} constructs)` : ""}`]);
   else if (f.n_replicates > 1) rows.push(["Replicate", `${f.n_replicates} constructs share this design sequence`]);
@@ -1345,17 +1356,14 @@ function linkPanoCameras() {
 // ---- T-0367 compare: every method of a multi record for one design. Side by side = linked-camera viewers
 // (the gallery's mechanics); overlay = one viewer, the others superposed on the selected method by a C1'
 // Kabsch fit over the design window. The selected method keeps its sample, the others show their Best-by one.
-let _compareSeq = 0;
 const OVERLAY_COLORS = ["#f2a93b", "#4aa3df", "#e4572e", "#8ac926", "#c77dff"];
-async function renderCompare(f, cur) {
+async function renderCompare(f, cur, my) {                          // my: load3D's sequence token for this load
   const el = $("viewer3d"), ds = dsFor(f);
   const cells = cur.multi.methods.map((m) => (m.id === cur.method ? cur : multiCurrent(f, m.id, "best")));
-  const my = ++_compareSeq;
   const texts = await Promise.all(cells.map((c) => fetch(durl(multiStructPath(f, ds, c.method, c.k))).then((r) => (r.ok ? r.text() : null)).catch(() => null)));
-  if (!currentDeep || currentDeep.f !== f || my !== _compareSeq || !multiSel.compare) return;
+  if (!currentDeep || currentDeep.f !== f || my !== _load3DSeq || !multiSel.compare) return;
   const prim = cells.findIndex((c) => c.method === cur.method);
-  const fmtOf = (t) => (t.startsWith("data_") || t.includes("_atom_site") ? "cif" : "pdb");
-  if (texts[prim]) { currentDeep.structText = texts[prim]; currentDeep.structFmt = fmtOf(texts[prim]); currentDeep.structSel = { method: cur.method, k: cur.k }; currentDeep._proj = null; }
+  if (texts[prim]) { currentDeep.structText = texts[prim]; currentDeep.structFmt = structFmt(texts[prim]); currentDeep.structSel = { method: cur.method, k: cur.k }; currentDeep._proj = null; }
   if (typeof $3Dmol === "undefined") { el.innerHTML = '<p style="color:#fff;padding:8px">3Dmol.js not loaded.</p>'; return; }
   disposePano(); loseGL(el); el.innerHTML = ""; viewer = null; viewerModel = null;
   const mode = ($("color_by") && $("color_by").value) || "a23";
@@ -1374,7 +1382,7 @@ async function renderCompare(f, cur) {
       if (!texts[i]) { vd.innerHTML = '<p style="color:#fff;padding:8px">structure unavailable</p>'; return; }
       try {
         const v = $3Dmol.createViewer(vd, { backgroundColor: "0x0d1117" });
-        const m = v.addModel(texts[i], fmtOf(texts[i]));
+        const m = v.addModel(texts[i], structFmt(texts[i]));
         paintViewer(v, f, reactForFrame(currentDeep.reactRaw, c.frame), mode, sampleDbn(f, c.method, c.k, texts[i]));
         panoViewers.push(v);
         if (i === prim) viewerModel = m;
@@ -1382,7 +1390,7 @@ async function renderCompare(f, cur) {
     });
     linkPanoCameras();
   }
-  if ($("ss_view") && $("ss_view").value === "proj" && currentDeep) drawTracks(f, currentDeep.react);
+  drawTracks(f, currentDeep.react);                              // the primary's dot-bracket / 2D, in every 2D mode
 }
 function renderOverlay(el, f, cur, cells, texts, prim, label) {
   el.classList.remove("pano-gallery"); el.style.gridTemplateColumns = "";
@@ -1394,15 +1402,21 @@ function renderOverlay(el, f, cur, cells, texts, prim, label) {
   cells.forEach((c, i) => {
     const txt = texts[i]; const col = OVERLAY_COLORS[i % OVERLAY_COLORS.length];
     if (!txt) { leg.push({ c, col, text: "unavailable" }); return; }
-    let t = txt, rmsd = null, n = 0, aligned = i === prim;
+    let t = txt, rmsd = null, n = 0, aligned = i === prim, why = "";
     if (i !== prim) {
-      const fit = superposeC1(c1Coords(txt), designWindow(c), refC1, refWin);
-      if (fit) { t = transformPDB(txt, fit.R, fit.t); rmsd = fit.rmsd; n = fit.n; aligned = true; }
+      const cWin = designWindow(c);
+      if (!canPairFrames(c.frame, cWin, cur.frame, refWin)) why = "not aligned (no design window)";
+      else {
+        const fit = superposeC1(c1Coords(txt), cWin, refC1, refWin);
+        const moved = fit ? transformPDB(txt, fit.R, fit.t) : null;
+        if (moved != null) { t = moved; rmsd = fit.rmsd; n = fit.n; aligned = true; }
+        else why = fit ? "not aligned (format)" : "not aligned (too few C1′ atoms)";
+      }
     }
-    const m = viewer.addModel(t, t.startsWith("data_") || t.includes("_atom_site") ? "cif" : "pdb");
+    const m = viewer.addModel(t, structFmt(t));
     viewer.setStyle({ model: m }, { cartoon: { color: hexCF(col), ringMode: 3 } });
     if (i === prim) viewerModel = m;
-    leg.push({ c, col, text: i === prim ? "reference" : (aligned ? `RMSD ${rmsd.toFixed(2)} Å over ${n} C1′` : "not aligned (no design window)") });
+    leg.push({ c, col, text: i === prim ? "reference" : (aligned ? `RMSD ${rmsd.toFixed(2)} Å over ${n} C1′` : why) });
   });
   viewer.zoomTo(); viewer.render();
   try { viewer.setViewChangeCallback(refreshProjIfActive); } catch (e) {}
@@ -1413,6 +1427,12 @@ function designWindow(c) {
   const raw = currentDeep && currentDeep.reactRaw;
   if (c.frame === "construct311" && raw && raw.design_start != null && raw.design_end != null) return [raw.design_start | 0, raw.design_end | 0];
   return null;
+}
+// two frames pair residue by residue when they are the same frame, or when every whole-construct side knows its
+// design window; otherwise an index pairing would silently offset the chains and print a meaningless RMSD
+function canPairFrames(aFrame, aWin, bFrame, bWin) {
+  if (aFrame === bFrame) return true;
+  return (aFrame !== "construct311" || !!aWin) && (bFrame !== "construct311" || !!bWin);
 }
 // one C1' coordinate per residue (null where missing), first chain / first model (ss.js parser)
 function c1Coords(text) { return (typeof ssParseResidues === "function" ? ssParseResidues(text) : []).map((r) => (r.atoms && r.atoms["C1'"]) || null); }
@@ -1448,9 +1468,9 @@ function kabsch(P, Q) {
   for (let i = 0; i < n; i++) { const p = P[i], q = Q[i]; const x = R[0][0] * p[0] + R[0][1] * p[1] + R[0][2] * p[2] + t[0], y = R[1][0] * p[0] + R[1][1] * p[1] + R[1][2] * p[2] + t[1], z = R[2][0] * p[0] + R[2][1] * p[1] + R[2][2] * p[2] + t[2]; ss += (x - q[0]) ** 2 + (y - q[1]) ** 2 + (z - q[2]) ** 2; }
   return { R, t, rmsd: Math.sqrt(ss / n), n };
 }
-// apply R·p + t to every ATOM/HETATM coordinate of a PDB text (fixed columns); other formats pass through
+// apply R·p + t to every ATOM/HETATM coordinate of a PDB text (fixed columns); null for other formats (no transform)
 function transformPDB(text, R, t) {
-  if (text.startsWith("data_") || text.includes("_atom_site")) return text;
+  if (structFmt(text) === "cif") return null;
   return text.split("\n").map((l) => {
     if (!(l.startsWith("ATOM") || l.startsWith("HETATM")) || l.length < 54) return l;
     const x = parseFloat(l.slice(30, 38)), y = parseFloat(l.slice(38, 46)), z = parseFloat(l.slice(46, 54));

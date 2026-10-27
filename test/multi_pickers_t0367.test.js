@@ -31,13 +31,13 @@ function fnText(name) {
   }
   return null;
 }
-function lineText(name) { const m = new RegExp('^(?:const|let) ' + name + ' = [^\\n]*;$', 'm').exec(APP); return m ? m[0] : null; }
+function lineText(name) { const m = new RegExp('^(?:const|let) ' + name + ' = [^\\n]*?;(?:\\s*//[^\\n]*)?$', 'm').exec(APP); return m ? m[0] : null; }
 function multiSelText() { const i = APP.search(/^let multiSel = \(\(\) => \{/m); if (i < 0) return null; const j = APP.indexOf('\n})();', i); return j < 0 ? null : APP.slice(i, j + 6); }
 const need = (name, t) => { assert.ok(t, name + ' not found in app.js'); return t; };
 
 const FNS = ['multiOf', 'saveMultiSel', 'bestByLabel', 'resolveBest', 'multiCurrent', 'multiStructPath', 'structPath', 'reactForFrame',
   'sampleOf', 'sampleDbn', 'dbnFor', 'multiShareState', 'applyMultiState', 'renderMultiBar', 'setMulti', 'multiPropRows', 'metricsLabel',
-  'designWindow', 'c1Coords', 'superposeC1', 'kabsch', 'transformPDB', 'dsFor', 'fileStem', 'prefix', 'hexCF'];
+  'designWindow', 'c1Coords', 'superposeC1', 'kabsch', 'transformPDB', 'dsFor', 'fileStem', 'prefix', 'hexCF', 'structFmt', 'canPairFrames'];
 
 // --- synthetic fixtures (made-up dataset, ids, dot-brackets and sequences) ---
 const DS_MULTI = { id: 'mx', label: 'Multi (2)', base: 'data/datasets/mx', ext: 'pdb', react: true, motifs: false, cond: [],
@@ -120,6 +120,28 @@ function sandbox(opts) {
   return sb;
 }
 const plain = (x) => JSON.parse(JSON.stringify(x));
+function deferred() { let resolve, reject; const p = new Promise((a, b) => { resolve = a; reject = b; }); return { p, resolve, reject }; }
+const ticks = async (n) => { for (let i = 0; i < (n || 20); i++) await new Promise((r) => setImmediate(r)); };
+// the async deep-view entry points (openDeep / load3D / closeDeep) with the DOM, 3Dmol and the fetches stubbed:
+// fetch returns a deferred per URL so a test can settle responses out of order
+function asyncSandbox() {
+  const sb = sandbox();
+  const pending = [];
+  Object.assign(sb, {
+    fetch: (url) => { const d = deferred(); pending.push({ url: String(url), d }); return d.p; },
+    durl: (p) => p, foldById: (key) => sb._fold, setDeepMode: () => {}, currentMode: () => 'modal', updateLayout: () => {},
+    _projRaf: 0, cancelAnimationFrame: () => {}, disposePano: () => {}, loseGL: () => {}, ensureViewerResizeObserver: () => {},
+    renderMultiBar: () => {}, renderChannelGallery: () => {}, renderMolstar: () => {}, refreshProjIfActive: () => {},
+    viewer: null, viewerModel: null, mstar: null, deepEngine: '3dmol', renderCompare: async () => { sb._calls.compare = (sb._calls.compare || 0) + 1; },
+  });
+  const parts = [need('openDeep', fnText('openDeep')), need('load3D', fnText('load3D')), need('closeDeep', fnText('closeDeep')),
+    need('_openSeq', lineText('_openSeq')), need('_load3DSeq', lineText('_load3DSeq'))];
+  vm.runInContext(parts.join('\n').replace(/^(?:let|const) (_openSeq|_load3DSeq) = /gm, 'var $1 = '), sb);
+  sb._pending = pending;
+  return sb;
+}
+const okJson = (v) => ({ ok: true, json: async () => v, text: async () => JSON.stringify(v) });
+const okText = (s) => ({ ok: true, json: async () => { throw new Error('not json'); }, text: async () => s });
 
 test('registry: every multi entry is well-formed and openknot_r9 declares the three methods in order', () => {
   const w = {}; vm.runInContext(DATASETS_JS, vm.createContext({ window: w }));
@@ -152,12 +174,12 @@ test('shell: the picker bar is in index.html, app.js wires it and every JS file 
   for (const id of ['multi-bar', 'mb-methods', 'mb-samples', 'mb-bestby', 'mb-cmpmode', 'mb-note']) assert.ok(INDEX.includes('id="' + id + '"'), 'index.html lacks #' + id);
   assert.ok(/data-cmp="side"/.test(INDEX) && /data-cmp="overlay"/.test(INDEX), 'compare layout toggle');
   assert.ok(/^\s+wireMultiBar\(\);/m.test(APP), 'wireStatic does not call wireMultiBar()');
-  assert.ok(/openDeep\(initial\.deep, \{ keepSample: !!initial\.multi \}\)/.test(APP), 'a shared link must keep its sample');
+  assert.ok(/openDeep\(initial\.deep, \{ keepSample: !!\(initial\.multi && \(initial\.multi\.sample === "best" \|\| Number\.isInteger\(initial\.multi\.sample\)\)\) \}\)/.test(APP), 'a shared link keeps its sample only when the link names a valid one');
   assert.ok(/applyMultiState\(initial\.multi\)/.test(APP), 'enterState does not apply the link state');
   assert.ok(/s\.multi = multiShareState\(\)/.test(APP), 'fullSnapshot does not record the pickers');
   assert.ok(!/PAIRING_BY_DS\[f\._dsid\] \|\| \{\}\)\[f\.id\] \|\| ""/.test(APP.replace(fnText('dbnFor'), '')), 'a dot-bracket site still bypasses dbnFor()');
   assert.ok(!/PAIRING_BY_DS\[fold\._dsid\]/.test(APP), 'refreshProjIfActive still bypasses dbnFor()');
-  for (const f of ['app.js', 'datasets.js', 'ss.js', 'agent.js', 'viz_style.js']) {
+  for (const f of ['app.js', 'datasets.js', 'ss.js', 'agent.js', 'viz_style.js', 'config.js']) {
     const r = spawnSync(process.execPath, ['--check', path.join(WEB, f)], { encoding: 'utf8' });
     assert.equal(r.status, 0, f + ': ' + r.stderr);
   }
@@ -216,8 +238,9 @@ test('reactForFrame: design window for design240, whole construct for construct3
   const d = sb.reactForFrame(raw, 'design240');
   assert.equal(d.seq, 'ACGU'.repeat(60)); assert.equal(d.a23.length, 240); assert.equal(d.dms.length, 240); assert.equal(d.a23_err.length, 240);
   assert.equal(d.a23[0], raw.a23[26]); assert.equal(d.a23[239], raw.a23[265]);
-  assert.deepEqual(plain(d.sn), [2.2, 3.1]); assert.deepEqual(plain(d.reads), { a23: 1000, dms: 900 });
-  assert.equal(d.frame, 'design240'); assert.equal(d.construct_length, 311);
+  assert.deepEqual(plain(d.sn), [2.2, 3.1]);
+  assert.equal(d.frame, 'design240');
+  assert.deepEqual(Object.keys(plain(d)).sort(), ['a23', 'a23_err', 'dms', 'dms_err', 'frame', 'seq', 'sn'], 'only what the drawing code reads, plus the frame tag');
   const c = sb.reactForFrame(raw, 'construct311');
   assert.equal(c.seq, SEQ311); assert.equal(c.a23.length, 311); assert.equal(c.frame, 'construct311');
   const legacy = { seq: 'ACGU', a23: [1, 2, 3, 4], dms: null, sn: [null, 2] };
@@ -305,14 +328,22 @@ test('superposeC1 + transformPDB: the construct frame aligns on its design windo
   const lines = moved.split('\n');
   assert.ok(lines[0].startsWith('ATOM  ') && lines[0].length === pdbOf(mob).split('\n')[0].length, 'fixed columns kept');
   assert.equal(lines[lines.length - 2], 'END');
-  assert.equal(sb.transformPDB('data_x\nloop_\n', fit.R, fit.t), 'data_x\nloop_\n', 'CIF passes through');
   assert.equal(sb.superposeC1(mob.slice(0, 2), null, ref.slice(0, 2), null), null);
   // designWindow reads the open fold's react file
   sb.currentDeep = { reactRaw: reactRaw() };
   assert.deepEqual(plain(sb.designWindow({ frame: 'construct311' })), [26, 266]);
   assert.equal(sb.designWindow({ frame: 'design240' }), null);
   sb.currentDeep = { reactRaw: null };
-  assert.equal(sb.designWindow({ frame: 'construct311' }), null, 'no react file: no window (not aligned, said in the legend)');
+  assert.equal(sb.designWindow({ frame: 'construct311' }), null, 'no react file: no window');
+  // without a window a whole-construct chain must not be index-paired with a design chain (26-nt offset -> bogus RMSD)
+  assert.equal(sb.canPairFrames('construct311', null, 'design240', null), false);
+  assert.equal(sb.canPairFrames('design240', null, 'construct311', null), false);
+  assert.equal(sb.canPairFrames('construct311', [26, 266], 'design240', null), true);
+  assert.equal(sb.canPairFrames('design240', null, 'construct311', [26, 266]), true);
+  assert.equal(sb.canPairFrames('construct311', null, 'construct311', null), true, 'same frame pairs by index');
+  assert.equal(sb.canPairFrames('design240', null, 'design240', null), true);
+  assert.equal(sb.transformPDB('data_x\nloop_\n', fit.R, fit.t), null, 'CIF: no transform, so the legend says not aligned');
+  assert.equal(sb.structFmt('data_x\nloop_\n'), 'cif'); assert.equal(sb.structFmt('ATOM      1'), 'pdb');
 });
 
 test('renderMultiBar: hidden for one-structure datasets; buttons, Best label, notes and tooltips for a multi record', () => {
@@ -365,9 +396,9 @@ test('setMulti: reloads the 3D only when the structure changes, re-slices the re
   sb.setMulti({ bestBy: 'react' });                                   // same structure (alpha s2)
   assert.deepEqual([sb._calls.load3D, sb._calls.drawTracks, sb._calls.drawProps, sb._calls.saveState], [0, 1, 1, 1]);
   sb.setMulti({ bestBy: 'ranking' });                                 // alpha s4: new structure
-  assert.equal(sb._calls.load3D, 1); assert.equal(sb._calls.drawTracks, 1, 'load3D redraws the tracks itself');
+  assert.equal(sb._calls.load3D, 1); assert.equal(sb._calls.drawTracks, 2, 'tracks follow the selection in every 2D mode, not only in "3D projection"');
   sb.setMulti({ method: 'gamma', compare: false });                   // frame changes -> 311-nt reactivity
-  assert.equal(sb._calls.load3D, 2);
+  assert.equal(sb._calls.load3D, 2); assert.equal(sb._calls.drawTracks, 3);
   assert.equal(sb.currentDeep.react.seq.length, 311); assert.equal(sb.currentDeep.react.frame, 'construct311');
   sb.setMulti({ method: 'beta', compare: false });
   assert.equal(sb.currentDeep.react.seq.length, 240);
@@ -375,10 +406,17 @@ test('setMulti: reloads the 3D only when the structure changes, re-slices the re
   assert.equal(sb._calls.load3D, 4);
   sb.setMulti({ cmpMode: 'overlay' });                                // layout change in compare: 3D rebuilt
   assert.equal(sb._calls.load3D, 5);
+  sb.setMulti({ bestBy: 'plddt' });                                   // beta's own sample is unchanged (ranking 3 -> plddt 3) but the OTHER cells follow the rule
+  assert.equal(sb.multiCurrent(f).k, 3);
+  assert.equal(sb._calls.load3D, 6, 'compare rebuilds on a Best-by change even when the selected method keeps its sample');
+  sb.setMulti({ compare: false });
+  assert.equal(sb._calls.load3D, 7);
+  sb.setMulti({ bestBy: 'ranking' });                                 // single view, same sample: no reload
+  assert.equal(sb._calls.load3D, 7);
   assert.equal(JSON.parse(sb._store.atlas_multi).method, 'beta', 'persisted');
   sb.currentDeep = null;
   sb.setMulti({ method: 'alpha' });
-  assert.equal(sb._calls.load3D, 5, 'nothing open: only the selection changes');
+  assert.equal(sb._calls.load3D, 7, 'nothing open: only the selection changes');
   assert.equal(sb.multiSel.method, 'alpha');
 });
 
@@ -390,7 +428,7 @@ test('multiPropRows: structure shown, frame, this sample, per-method summary, re
   let rows = Object.fromEntries(plain(sb.multiPropRows(f)));
   assert.match(rows['Structure shown'], /^Alpha · sample 3 of 5 \(best by reactivity agreement\)$/);
   assert.match(rows['This sample'], /pLDDT 70\.0 · pTM 0\.600 · gpde 0\.400 · ranking 0\.700 · no clash · 2A3 agreement 0\.320/);
-  assert.match(rows['Methods (best-by-reactivity sample)'], /Alpha: pLDDT 81\.2 · ranking 0\.830 · agreement 0\.410<br>Beta: .*<br>Gamma: pLDDT  · ranking  · agreement 0\.300/);
+  assert.match(rows['Methods (best-by-reactivity sample)'], /Alpha: pLDDT 81\.2 · ranking 0\.830 · agreement 0\.410<br>Beta: .*<br>Gamma: pLDDT n\/a · ranking n\/a · agreement 0\.300/);
   assert.match(rows['Design target'], /12 crossed base pairs/);
   assert.match(rows['Measured OpenKnot'], /overall 70\.1 · crossed 55\.0 · SNR 4\.20/);
   assert.equal(rows.Frame, undefined); assert.equal(rows.Replicate, undefined);
@@ -415,4 +453,59 @@ test('metricsLabel: the sample values, else the record summary only for the best
   assert.equal(sb.metricsLabel(f, { method: 'alpha', k: 2, by: 'react' }), ' · pLDDT 81.2 · rank 0.83 · agr 0.41');
   assert.equal(sb.metricsLabel(f, { method: 'alpha', k: 2, by: 'ranking' }), '', 'the summary describes another sample');
   assert.equal(sb.metricsLabel(f, { method: 'gamma', k: 1, by: 'react' }), ' · agr 0.30');
+});
+
+test('load3D: two loads of the same fold settle out of order -> only the newest renders (3D matches the pickers)', async () => {
+  const sb = asyncSandbox();
+  const f = record();
+  sb.currentDeep = { f, samples: samplesFile().methods, reactRaw: reactRaw(), react: null };
+  sb.multiSel.sample = 0;
+  const p0 = sb.load3D(f, null);                                      // fetches ...__alpha__s0.pdb
+  await ticks();
+  sb.multiSel.sample = 1;
+  const p1 = sb.load3D(f, null);                                      // fetches ...__alpha__s1.pdb
+  await ticks();
+  assert.equal(sb._pending.length, 2);
+  assert.match(sb._pending[0].url, /__alpha__s0\.pdb$/); assert.match(sb._pending[1].url, /__alpha__s1\.pdb$/);
+  sb._pending[1].d.resolve(okText('PDB-ONE'));                        // the newer request answers first ...
+  await p1; await ticks();
+  sb._pending[0].d.resolve(okText('PDB-ZERO'));                       // ... then the stale one
+  await p0; await ticks();
+  assert.equal(sb.currentDeep.structText, 'PDB-ONE', 'a stale load must not overwrite the newer structure');
+  assert.deepEqual(plain(sb.currentDeep.structSel), { method: 'alpha', k: 1 });
+  assert.equal(sb._calls.drawTracks, 1, 'tracks drawn once, for the structure that stayed');
+  // a compare load started after a single load wins the same way
+  sb.multiSel.compare = true;
+  const p2 = sb.load3D(f, null); await ticks(); await p2;
+  assert.equal(sb._calls.compare, 1);
+  sb.multiSel.compare = false; sb.multiSel.sample = 2;
+  const p3 = sb.load3D(f, null); await ticks();
+  sb._pending[2].d.resolve(okText('PDB-TWO')); await p3; await ticks();
+  assert.equal(sb.currentDeep.structText, 'PDB-TWO');
+});
+
+test('openDeep + closeDeep: closing the view while its fetches are in flight leaves nothing behind', async () => {
+  const sb = asyncSandbox();
+  const f = record(); sb._fold = f;
+  sb.$('deep').classList.add('hidden');
+  const p = sb.openDeep('mx|design-0001');
+  await ticks();
+  assert.equal(sb._pending.length, 2, 'react + samples requested in parallel');
+  assert.ok(!sb._els.deep._cls.has('hidden'));
+  sb.closeDeep();
+  assert.equal(sb.currentDeep, null); assert.ok(sb._els.deep._cls.has('hidden'));
+  const saves = sb._calls.saveState;
+  sb._pending[0].d.resolve(okJson(reactRaw())); sb._pending[1].d.resolve(okJson(samplesFile()));
+  await p; await ticks();
+  assert.equal(sb.currentDeep, null, 'the closed view must not be repopulated by late responses');
+  assert.equal(sb._pending.length, 2, 'no structure fetched into a hidden view (the real load3D runs in this sandbox)');
+  assert.equal(sb._calls.saveState, saves, 'the share link keeps the closed state');
+  // the normal path still works afterwards: open, answers arrive, the view fills
+  const p2 = sb.openDeep('mx|design-0001'); await ticks();
+  sb._pending[2].d.resolve(okJson(reactRaw())); sb._pending[3].d.resolve(okJson(samplesFile()));
+  await p2; await ticks();
+  assert.ok(sb.currentDeep && sb.currentDeep.f === f && sb.currentDeep.samples && sb.currentDeep.react.seq.length === 240);
+  assert.equal(sb._pending.length, 5, 'the structure of the record default (alpha, best by reactivity = sample 3) is fetched');
+  assert.match(sb._pending[4].url, /__alpha__s2\.pdb$/);
+  assert.equal(sb.multiSel.sample, 'best', 'opening a fold resets an explicit sample');
 });

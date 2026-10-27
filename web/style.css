@@ -423,6 +423,7 @@ tbody tr:hover { background: var(--row-hover); }
 #deep.cmp-on:not(.mode-panoramic) .deep-body { grid-template-columns: 1fr 1fr; }
 #deep.cmp-on:not(.mode-panoramic) #viewer3d { grid-column: 1 / -1; grid-row: auto; }
 #deep.cmp-on #viewer3d.pano-gallery .chan-cell { aspect-ratio: 4 / 3; }
+#deep.cmp-on.mode-right #viewer3d.pano-gallery, #deep.cmp-on.mode-bottom #viewer3d.pano-gallery { height: auto; }   /* the docks pin #viewer3d to 300px; stacked cells need room */
 .mb-note { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 3px 12px; font-size: 10.5px; color: var(--text-faint); }
 .mb-note:empty { display: none; }
 .mb-n::before { content: "\2022"; margin-right: 4px; color: var(--accent); }

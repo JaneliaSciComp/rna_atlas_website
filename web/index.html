@@ -276,6 +276,7 @@
     <dl>
       <dt>3D structure</dt><dd>Interactive cartoon; tertiary-motif residues shown as colored sticks. The <b>3D structure coloring</b> dropdown (Display panel) selects how the cartoon is colored: <b>2A3 / DMS reactivity</b> (blue = protected → red = reactive), <b>pLDDT confidence</b> (blue high → orange low), <b>base pairing</b> (white = paired, light red = unpaired), <b>nucleotide</b> (A/C/G/U palette), or <b>spectrum</b> (5′→3′). Reactivity falls back to spectrum when a fold has no chemical-mapping data. Dock it centered / right / bottom via the header layout buttons.</dd>
       <dt>Tracks</dt><dd>Motif lanes · sequence · DMS · 2A3 reactivity, aligned on the design-sequence position axis.</dd>
+      <dt>Method · Sample · Best by</dt><dd>Shown only for datasets that carry several predictions per design (OpenKnot Round 9: three methods × five samples). <b>Method</b> picks the predictor; <b>Compare</b> shows every method for the same design, side by side with linked cameras or superposed on the design window (<b>overlay</b>, with the C1′ RMSD to the selected method). <b>Sample</b> picks one of the five, or <b>Best</b> by the rule in <b>Best by</b>: agreement between the predicted pairing and the measured 2A3 reactivity (default), the model's ranking score, or mean pLDDT. A design without reactivity falls back to ranking score and a method without a confidence score shows sample 1; the note under the pickers says so.</dd>
     </dl>
   </div>
 </div>
@@ -302,6 +303,15 @@
         <button id="deep-export" title="Download cif + pdb + png + txt as a zip">⤓ Export</button>
         <button id="deep-close" title="Close">&times;</button>
       </div>
+    </div>
+    <!-- T-0367: pickers for datasets whose records carry several structures (registry `multi`). app.js
+         renderMultiBar() fills and shows it; it stays hidden for one-structure datasets. -->
+    <div id="multi-bar" class="hidden">
+      <span class="mb-group"><span class="mb-lab">Method</span><span id="mb-methods" class="vtoggle"></span></span>
+      <span class="mb-group"><span class="mb-lab">Sample</span><span id="mb-samples" class="vtoggle"></span></span>
+      <span class="mb-group"><span class="mb-lab">Best by</span><select id="mb-bestby" class="deep-cby" title="what Best means"></select></span>
+      <span id="mb-cmpmode" class="vtoggle hidden" title="compare layout"><button type="button" data-cmp="side">side by side</button><button type="button" data-cmp="overlay">overlay</button></span>
+      <span id="mb-note" class="mb-note"></span>
     </div>
     <div class="deep-body">
       <div id="viewer3d"></div>

@@ -28,4 +28,17 @@ window.DATASETS = [
     parent: "ribo2", letters: ["I", "J", "K", "L", "M", "N", "O", "P", "Q"] },
   { id: "rfam_pdb130", label: "RFAM-PDB 130 (1,614)", base: "data/datasets/rfam_pdb130", ext: "pdb", react: true, motifs: true, cond: ["exp"] },
   { id: "rfam_pdb240", label: "RFAM-PDB 240 (2)", base: "data/datasets/rfam_pdb240", ext: "pdb", react: true, motifs: true, cond: ["exp"] },
+  // OpenKnot Round 9 (data T-0363, viewer T-0367): 44,003 designs x 3 methods x 5 samples. `multi` tells the
+  // viewer a record carries several structures: structs/<key>__<method>__s<k>.pdb (k 0..samples-1), a lazy
+  // data/samples/<key>.json with the per-sample fields, and a react/<key>.json over the whole 311-nt construct
+  // that a "design240" frame slices to the design window ("construct311" = the whole thing, RNet-Diffusion).
+  // Per-record `methods` holds a best-by summary, `default` the first structure to show. No pairing.json (the
+  // dot-bracket comes from the shown sample) and no tertiary-motif scan, hence motifs:false.
+  { id: "openknot_r9", label: "OpenKnot Round 9 (44,003)", base: "data/datasets/openknot_r9", ext: "pdb", react: true, motifs: false, cond: [],
+    multi: { samples: 5, methods: [
+      { id: "rnanix", label: "RNAnix", frame: "design240" },
+      { id: "protenix", label: "Protenix", frame: "design240" },
+      { id: "rnetdiff", label: "RNet-Diffusion", frame: "construct311",
+        note: "RNet-Diffusion folded the full 311-nt construct (5\u2032 constant + design + barcode hairpin + 3\u2032 constant), shown as folded; it reports no per-sample confidence" },
+    ] } },
 ];

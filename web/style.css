@@ -409,3 +409,18 @@ tbody tr:hover { background: var(--row-hover); }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* ---- multi-structure datasets (T-0367): method / sample / best-by pickers + compare overlay legend ---- */
+#multi-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: -2px 0 8px; font-size: 11px; color: var(--text-muted); }
+#multi-bar.hidden { display: none; }
+.mb-group { display: inline-flex; align-items: center; gap: 6px; }
+.mb-lab { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-faint); }
+#multi-bar .vtoggle button { font-size: 11px; padding: 3px 8px; }
+#multi-bar .vtoggle button + button { border-left: 0; }
+#multi-bar select.deep-cby { margin: 0; }
+.mb-note { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 3px 12px; font-size: 10.5px; color: var(--text-faint); }
+.mb-note:empty { display: none; }
+.mb-n::before { content: "\2022"; margin-right: 4px; color: var(--accent); }
+.ovl-leg { position: absolute; left: 6px; bottom: 6px; z-index: 2; display: flex; flex-wrap: wrap; gap: 3px 10px; background: rgba(13,17,23,.66); color: #dbe4ee; padding: 3px 6px; border-radius: 4px; font-size: 10px; line-height: 1.2; pointer-events: none; }
+.ovl-leg .leg-sw { margin-right: 3px; }
+#props .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 10px; word-break: break-all; }

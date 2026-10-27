@@ -14,6 +14,117 @@ function dsFor(f) { return DSBYID[f._dsid] || DATASETS[0]; }
 // `f.key` can't be used as a blanket "prefer key" fallback now that ribo2 records also carry
 // a `key` field (added for clustering, not file naming).
 function fileStem(f, ds) { return (ds.id !== "ribo2" && f.key) ? f.key : f.id; }
+// ---------------- multi-structure datasets (T-0367) ----------------
+// A registry entry with `multi: {samples, methods:[{id,label,frame,note}]}` says every record carries several
+// structures: structs/<key>__<method>__s<k>.<ext> (k = 0..samples-1), a lazy data/samples/<key>.json with the
+// per-sample fields (dot-bracket, confidence, reactivity agreement) and a react/<key>.json over the whole
+// construct (seq311 + design_start/design_end) that a "design240" frame slices to the design window. The
+// record's `methods` summary ({<m>: {best:{react,ranking,plddt}, plddt, ranking_score, shape_agr}}) and its
+// `default` ({method, sample}) let the pickers render before the lazy file arrives. First user: openknot_r9.
+const MULTI_BESTBY = [["react", "reactivity agreement"], ["ranking", "ranking score"], ["plddt", "mean pLDDT"]];
+const MULTI_KEY = "atlas_multi";
+function multiOf(ds) { const m = ds && ds.multi; return (m && Array.isArray(m.methods) && m.methods.length) ? m : null; }
+// Method, best-by and compare stick across folds (a reader browsing Protenix wants Protenix on the next design
+// too); the explicit sample does not: openDeep() resets it to "best".
+let multiSel = (() => {
+  const d = { method: null, sample: "best", bestBy: "react", compare: false, cmpMode: "side" };
+  try { Object.assign(d, JSON.parse(localStorage.getItem(MULTI_KEY) || "{}")); } catch (e) {}
+  d.sample = "best";
+  if (!MULTI_BESTBY.some((b) => b[0] === d.bestBy)) d.bestBy = "react";
+  if (d.cmpMode !== "overlay") d.cmpMode = "side";
+  d.compare = !!d.compare;
+  if (typeof d.method !== "string") d.method = null;
+  return d;
+})();
+function saveMultiSel() { try { localStorage.setItem(MULTI_KEY, JSON.stringify({ method: multiSel.method, bestBy: multiSel.bestBy, compare: multiSel.compare, cmpMode: multiSel.cmpMode })); } catch (e) {} }
+function bestByLabel(by) { const b = MULTI_BESTBY.find((x) => x[0] === by); return b ? b[1] : String(by || ""); }
+// Which sample a method shows under a Best-by rule, read from the build's precomputed best indices:
+// react -> ranking -> sample 0, each fallback with the note users see.
+function resolveBest(mblock, bestBy, mdef) {
+  const best = (mblock && mblock.best) || {};
+  const has = (v) => Number.isInteger(v) && v >= 0;
+  const who = (mdef && (mdef.label || mdef.id)) || "this method";
+  if (bestBy === "react") {
+    if (has(best.react)) return { k: best.react, by: "react", note: "" };
+    if (has(best.ranking)) return { k: best.ranking, by: "ranking", note: "no reactivity for this design: best by ranking score" };
+    return { k: 0, by: null, note: "no reactivity for this design and no confidence for " + who + ": showing sample 1" };
+  }
+  if (has(best[bestBy])) return { k: best[bestBy], by: bestBy, note: "" };
+  return { k: 0, by: null, note: "no confidence for " + who + ": showing sample 1" };
+}
+// The structure a fold shows: {multi, mdef, method, k, by, note, frame, nS}, or null for a one-structure dataset.
+// `method` / `sample` override the current selection (the compare cells ask for each method's best).
+function multiCurrent(f, method, sample) {
+  const ds = dsFor(f), multi = multiOf(ds);
+  if (!multi) return null;
+  const ids = multi.methods.map((m) => m.id);
+  const dflt = (f.default && ids.includes(f.default.method)) ? f.default.method : ids[0];
+  const want = method || multiSel.method;
+  const mid = ids.includes(want) ? want : dflt;
+  const mdef = multi.methods.find((m) => m.id === mid);
+  const mblock = (f.methods || {})[mid] || {};
+  const nS = Math.max(1, (multi.samples | 0) || 5);
+  const sel = sample === undefined ? multiSel.sample : sample;
+  let r;
+  if (sel === "best" || sel == null) r = resolveBest(mblock, multiSel.bestBy, mdef);
+  else r = { k: Math.max(0, Math.min(nS - 1, sel | 0)), by: null, note: "" };
+  return { multi, mdef, method: mid, k: r.k, by: r.by, note: r.note, frame: mdef.frame === "construct311" ? "construct311" : "design240", nS };
+}
+function multiStructPath(f, ds, method, k) { return prefix(ds) + "structs/" + fileStem(f, ds) + "__" + method + "__s" + k + "." + (ds.ext || "pdb"); }
+function structPath(f, ds) {
+  const cur = multiCurrent(f);
+  return cur ? multiStructPath(f, ds, cur.method, cur.k) : prefix(ds) + "structs/" + fileStem(f, ds) + "." + (ds.ext || "cif");
+}
+// A multi dataset's react file covers the whole construct; a design240 structure gets the design window
+// [design_start, design_end), a construct311 one the full arrays. Legacy {seq, a23, dms, sn[]} files pass through.
+function reactForFrame(raw, frame) {
+  if (!raw || (!raw.seq311 && raw.design_start == null)) return raw || null;
+  const full = raw.seq311 || "";
+  const n = full.length || (raw.a23 || raw.dms || []).length;
+  let s = 0, e = n;
+  if (frame !== "construct311" && raw.design_start != null && raw.design_end != null) { s = Math.max(0, raw.design_start | 0); e = Math.min(n, raw.design_end | 0); }
+  const cut = (a) => (Array.isArray(a) ? a.slice(s, e) : null);
+  const sn = Array.isArray(raw.sn) ? raw.sn : (raw.sn ? [raw.sn.dms == null ? null : raw.sn.dms, raw.sn.a23 == null ? null : raw.sn.a23] : null);
+  return { seq: full.slice(s, e), a23: cut(raw.a23), dms: cut(raw.dms), a23_err: cut(raw.a23_err), dms_err: cut(raw.dms_err), sn,
+    reads: raw.reads || null, frame: frame === "construct311" ? "construct311" : "design240", design_start: raw.design_start, design_end: raw.design_end, construct_length: n };
+}
+// the per-sample record (from the lazy samples file) of the OPEN fold; null until that file is in
+function sampleOf(f, method, k) {
+  const S = currentDeep && currentDeep.f === f && currentDeep.samples;
+  const m = S && S[method];
+  return (m && Array.isArray(m.samples) && m.samples[k]) || null;
+}
+// dot-bracket of a shown sample: the samples file's, else derived once from its 3D (ss.js deriveSS)
+function sampleDbn(f, method, k, structText) {
+  const s = sampleOf(f, method, k);
+  if (s && s.dbn) return s.dbn;
+  if (structText && typeof deriveSS === "function") {
+    const cache = (currentDeep && currentDeep.f === f) ? (currentDeep._dbnDerived = currentDeep._dbnDerived || {}) : {};
+    const key = method + "/" + k;
+    if (!(key in cache)) { try { cache[key] = deriveSS(structText).dbn || ""; } catch (e) { cache[key] = ""; } }
+    return cache[key];
+  }
+  return "";
+}
+// what the pairing track, the "pairing" colouring, the 2D and the export use: the shown sample's dot-bracket
+// for a multi dataset, the dataset-wide pairing.json otherwise
+function dbnFor(f) {
+  const cur = multiCurrent(f);
+  if (!cur) return (PAIRING_BY_DS[f._dsid] || {})[f.id] || "";
+  const sel = currentDeep && currentDeep.f === f && currentDeep.structSel;
+  const st = (sel && sel.method === cur.method && sel.k === cur.k) ? currentDeep.structText : null;
+  return sampleDbn(f, cur.method, cur.k, st);
+}
+// share-link state for the pickers (fullSnapshot / enterState)
+function multiShareState() { return { method: multiSel.method, sample: multiSel.sample, bestBy: multiSel.bestBy, compare: multiSel.compare, cmpMode: multiSel.cmpMode }; }
+function applyMultiState(m) {
+  if (!m || typeof m !== "object") return;
+  if (typeof m.method === "string" || m.method === null) multiSel.method = m.method;
+  if (m.sample === "best" || (Number.isInteger(m.sample) && m.sample >= 0)) multiSel.sample = m.sample;
+  if (MULTI_BESTBY.some((b) => b[0] === m.bestBy)) multiSel.bestBy = m.bestBy;
+  if (typeof m.compare === "boolean") multiSel.compare = m.compare;
+  if (m.cmpMode === "side" || m.cmpMode === "overlay") multiSel.cmpMode = m.cmpMode;
+}
 // Companion datasets share a parent source's checkbox + per-letter filter and load lazily.
 function companionsOf(srcId) { return DATASETS.filter((d) => d.parent === srcId); }
 function companionLetterSet() { return new Set(DATASETS.filter((d) => d.parent).flatMap((d) => d.letters || [])); }
@@ -93,7 +204,7 @@ function fullSnapshot() {
   s.view = viewMode;
   if ($("map_color")) s.map_color = $("map_color").value;
   s.mapT = mapT;
-  if (currentDeep && currentDeep.f) s.deep = currentDeep.f._uid;
+  if (currentDeep && currentDeep.f) { s.deep = currentDeep.f._uid; if (multiOf(dsFor(currentDeep.f))) s.multi = multiShareState(); }   // T-0367: method/sample/best-by/compare travel with the link
   return s;
 }
 function decodeHashState() {
@@ -169,7 +280,8 @@ async function enterState(initial) {
   if (initial && initial.map_color && $("map_color")) $("map_color").value = initial.map_color;
   if (initial && initial.mapT) mapT = initial.mapT;
   setView((initial && initial.view) || "table");
-  if (initial && initial.deep) await openDeep(initial.deep);
+  if (initial && initial.multi) applyMultiState(initial.multi);          // T-0367: before openDeep, which reads it
+  if (initial && initial.deep) await openDeep(initial.deep, { keepSample: !!initial.multi });
   else if (currentDeep) closeDeep();
   updateShareUI();   // normalize the address bar to whatever we actually ended up showing
 }
@@ -378,6 +490,7 @@ function wireStatic() {
   const h2 = document.querySelector("#config h2");
   if (h2) h2.addEventListener("click", () => { $("config").classList.toggle("allcollapsed"); saveState(); });
   $("deep-close").addEventListener("click", closeDeep);
+  wireMultiBar();                                             // T-0367 pickers (delegated; the bar is re-rendered per fold)
   if ($("deep-export")) $("deep-export").addEventListener("click", exportFold);
   if ($("deep-vtoggle")) { markDeepEngine(); $("deep-vtoggle").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => setDeepEngine(b.dataset.v))); }
   $("deep").addEventListener("click", (e) => { if (e.target.id === "deep") closeDeep(); });
@@ -543,14 +656,14 @@ function drawTable(rows) {
       : (hasShape ? `<span class="muted" title="has SHAPE data but motif residues not protected">no</span>`
                   : `<span class="muted" title="no usable SHAPE data for this fold">n/d</span>`);
     return `<tr data-id="${esc(f.id)}" data-uid="${esc(f._uid)}">
-      <td>${esc(f.id)}</td><td>${esc(f.name || "")}</td><td>${esc(f.source_group || "")}</td><td>${f.letter}</td>
+      <td>${esc(f.id)}</td><td>${esc(f.name || "")}</td><td>${esc(f.source_group || "")}</td><td>${f.letter ?? ""}</td>
       <td class="num">${f.length ?? ""}</td><td class="num">${plbar}</td>
       <td class="num">${num(f.best_tm1, 3)}</td><td title="${(f.near_title || "").replace(/"/g, "&quot;")}">${f.near || ""}</td>
       <td class="num">${num(f.overlap_ae, 2)}</td><td>${shape}</td>
       <td class="num">${num(f.shape_agr, 2)}</td><td class="num">${num(f.contact_ratio, 2)}</td><td class="num">${num(f.bp_fraction, 2)}</td>
       <td class="num">${num(f.crossed_frac, 2)}</td>
       <td class="num" title="${f.global_fold_id ? "structural fold #" + f.global_fold_id : ""}">${f.fold_size ?? ""}</td>
-      <td class="num">${f.n_tert}</td><td class="num">${f.n_rare}</td>
+      <td class="num">${f.n_tert ?? ""}</td><td class="num">${f.n_rare ?? ""}</td>
       <td>${f.pseudoknot ? "&#10003;" : ""}</td><td>${chips}</td></tr>`;
   }).join("");
   $("tbody").innerHTML = body;
@@ -593,20 +706,32 @@ function closeDeep() {
   saveState();
 }
 
-async function openDeep(key) {
+let _openSeq = 0;
+async function openDeep(key, opts) {
   const f = foldById(key);
   if (!f) return;
   const id = f.id;
   const ds = dsFor(f);
+  const multi = multiOf(ds);
+  // T-0367: a specific sample is a per-design choice (back to Best); method, best-by and compare stick.
+  // A shared link that names a sample keeps it (enterState passes keepSample).
+  if (multi && !(opts && opts.keepSample)) multiSel.sample = "best";
+  const my = ++_openSeq;
   $("deep").classList.remove("hidden");
   setDeepMode(currentMode());
   $("deep-title").textContent = `${id}${f.name ? "  —  " + f.name : ""}`;
+  renderMultiBar(multi ? f : null);
   drawProps(f);
-  let react = null;
-  if (ds.react) {
-    try { react = await (await fetch(durl(prefix(ds) + "react/" + fileStem(f, ds) + ".json"), { cache: "no-cache" })).json(); } catch (e) { react = null; }
-  }
-  currentDeep = { f, react };
+  const get = (path) => fetch(durl(path), { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  const [reactRaw, samples] = await Promise.all([
+    ds.react ? get(prefix(ds) + "react/" + fileStem(f, ds) + ".json") : null,
+    multi ? get(prefix(ds) + "data/samples/" + fileStem(f, ds) + ".json") : null,   // per-sample block, one lazy file per record
+  ]);
+  if (my !== _openSeq) return;                                  // another fold opened while these were in flight
+  currentDeep = { f, reactRaw, react: null, samples: (samples && samples.methods) ? samples.methods : null, targetDbn: (samples && samples.target_dbn) || null };
+  currentDeep.react = multi ? reactForFrame(reactRaw, multiCurrent(f).frame) : reactRaw;
+  const react = currentDeep.react;
+  if (multi) { renderMultiBar(f); drawProps(f); }               // again, now with the per-sample details
   saveState();
   drawTracks(f, react);
   drawReactChart(f, react);
@@ -619,7 +744,8 @@ function drawProps(f) {
   const verdict = f.best_tm1 == null ? "n/a (not scored vs v341)"
     : f.best_tm1 < 0.40 ? "novel" : f.best_tm1 < 0.45 ? "borderline" : "matches known fold";
   const rowsHtml = [
-    ["Source", `${f.source} (lib ${f.letter})`],
+    ...multiPropRows(f),                                       // T-0367: shown structure, per-sample metrics, replicates, target
+    ["Source", `${esc(f.source || "")}${f.letter ? ` (lib ${esc(f.letter)})` : ""}`],
     f.source_group ? ["Biological source", esc(f.source_group)] : null,
     ["Sublibrary", f.sublibrary],
     f.rnacentral_id ? ["RNAcentral", `<a href="https://rnacentral.org/rna/${esc(f.rnacentral_id)}" target="_blank" rel="noopener">${esc(f.rnacentral_id)}</a>${f.rnacentral_name ? ` &mdash; ${esc(f.rnacentral_name)}` : ""}`] : null,
@@ -743,7 +869,7 @@ function drawTracks(f, react) {
   let yReact = ySeq + 16;
   reactRows.forEach((row) => { svg += rrow(row.arr, yReact, row.label); yReact += 16; });
   // predicted pairing track: unpaired = light red, paired = white (eyeball SHAPE agreement)
-  const dbn = (PAIRING_BY_DS[f._dsid] || {})[f.id] || "";
+  const dbn = dbnFor(f);                                       // T-0367: the shown sample's for a multi dataset
   let pr = `<text x="${W + 3}" y="${yPair + 11}" fill="currentColor">pair</text>`;
   for (let i = 0; i < n; i++) {
     const ch = dbn[i];
@@ -927,12 +1053,15 @@ async function load3D(f, react) {
   const ds = dsFor(f);
   let data;
   viewerModel = null; if (currentDeep) { currentDeep.structText = null; currentDeep.structFmt = null; }
-  try { data = await (await fetch(durl(prefix(ds) + "structs/" + fileStem(f, ds) + "." + (ds.ext || "cif")))).text(); }
+  const cur = multiCurrent(f);                                   // T-0367: which of the record's structures
+  if (cur && multiSel.compare) { currentDeep.structSel = null; await renderCompare(f, cur); return; }
+  try { data = await (await fetch(durl(structPath(f, ds)))).text(); }
   catch (e) { if (currentDeep && currentDeep.f === f) el.innerHTML = '<p style="color:#fff;padding:8px">structure unavailable</p>'; return; }
   // a newer fold may have opened while this fetch was in flight — don't clobber it
   if (!currentDeep || currentDeep.f !== f) return;
   const fmt = data.startsWith("data_") || data.includes("_atom_site") ? "cif" : "pdb";
   currentDeep.structText = data; currentDeep.structFmt = fmt; currentDeep._proj = null;
+  currentDeep.structSel = cur ? { method: cur.method, k: cur.k } : null;
   if ($("deep_color_by") && $("color_by")) $("deep_color_by").value = $("color_by").value;
   if ($("deep_ss_view") && $("ss_view")) $("deep_ss_view").value = $("ss_view").value;
   // panoramic always uses the 3Dmol channel gallery (before the Mol* branch, so Mol* + panoramic
@@ -980,7 +1109,7 @@ function channelLegend(key, alt) {
   return inner ? `<div class="chan-leg">${inner}</div>` : "";
 }
 // the 3D viewer the 2D projection tracks (single viewer, or the linked gallery's first viewer)
-function projActiveViewer() { return (currentMode() === "panoramic" && panoViewers[0]) ? panoViewers[0] : viewer; }
+function projActiveViewer() { return (currentMode() === "panoramic" && panoViewers[0]) ? panoViewers[0] : (viewer || panoViewers[0] || null); }
 // let the user drag the 2D "3D projection" to rotate — it drives the 3D viewer, which re-projects
 // the 2D (and, in panoramic, spins the linked gallery) via the existing view-change plumbing.
 let _projDrag = null;
@@ -999,7 +1128,7 @@ function initProjDrag() {
     _projDrag.x = e.clientX; _projDrag.y = e.clientY;
     try {
       v.rotate(dx * 0.5, "y", 0); v.rotate(dy * 0.5, "x", 0); v.render();
-      if (currentMode() === "panoramic") { const view = v.getView(); panoViewers.forEach((o) => { if (o !== v) { try { o.setView(view); o.render(); } catch (e2) {} } }); }
+      if (panoViewers.length > 1) { const view = v.getView(); panoViewers.forEach((o) => { if (o !== v) { try { o.setView(view); o.render(); } catch (e2) {} } }); }
     } catch (e2) {}
     refreshProjIfActive();
   });
@@ -1010,7 +1139,7 @@ function initProjDrag() {
 // quaternion of the active 3D viewer's current camera (for aligning the 2D projection to it)
 function activeQuat() {
   try {
-    const v = (currentMode() === "panoramic" && panoViewers && panoViewers[0]) ? panoViewers[0] : viewer;
+    const v = (currentMode() === "panoramic" && panoViewers && panoViewers[0]) ? panoViewers[0] : (viewer || (panoViewers && panoViewers[0]));
     if (v && typeof v.getView === "function") { const a = v.getView(); if (a && a.length >= 8) return [a[4], a[5], a[6], a[7]]; }
   } catch (e) {}
   return null;
@@ -1038,7 +1167,7 @@ function refreshProjIfActive() {
     if (!box) return;
     if (!currentDeep._proj) currentDeep._proj = projParse(currentDeep.structText);
     if (!currentDeep._proj) return;
-    const dbn = (PAIRING_BY_DS[fold._dsid] || {})[fold.id] || "";
+    const dbn = dbnFor(fold);
     const svg = proj2D(currentDeep._proj, dbn, (currentDeep.react && currentDeep.react.seq) || "", 340, altPalette(), activeQuat());
     if (svg) box.innerHTML = svg;
   });
@@ -1046,9 +1175,9 @@ function refreshProjIfActive() {
 // nucColor() returns a CSS hex ("#rrggbb"); 3Dmol colorfuncs want 0x-prefixed hex.
 function hexCF(c) { return (c || "#cccccc").replace("#", "0x"); }
 // 3Dmol style object for a given coloring channel (shared by the single viewer + the gallery).
-function styleForMode(mode, f, react) {
+function styleForMode(mode, f, react, dbnOver) {           // dbnOver: a compare cell's own dot-bracket (T-0367)
   const a23 = react && react.a23, dms = react && react.dms;
-  const dbn = (PAIRING_BY_DS[f._dsid] || {})[f.id] || "";
+  const dbn = dbnOver != null ? dbnOver : dbnFor(f);
   if (mode === "plddt") return { cartoon: { colorfunc: (a) => plddtCF(a.b), ringMode: 3 } };
   if (mode === "pairing") return { cartoon: { colorfunc: (a) => { const c = dbn[a.resi - 1]; const p = c && c !== "." && c !== "-"; return p ? "0xffffff" : (c ? "0xf3a0a0" : "0x9aa7b0"); }, ringMode: 3 } };
   if (mode === "nuc") { const alt = altPalette(); return { cartoon: { colorfunc: (a) => hexCF(nucColor((a.resn || "").trim(), alt)), ringMode: 3 } }; }
@@ -1057,8 +1186,8 @@ function styleForMode(mode, f, react) {
   const arr = mode === "dms" ? dms : a23;                     // a23 / dms reactivity; spectrum if absent
   return arr ? { cartoon: { colorfunc: (a) => shapeColorHex(arr[a.resi - 1]), ringMode: 3 } } : { cartoon: { color: "spectrum", ringMode: 3 } };
 }
-function paintViewer(v, f, react, mode) {
-  v.setStyle({}, styleForMode(mode, f, react));
+function paintViewer(v, f, react, mode, dbnOver) {
+  v.setStyle({}, styleForMode(mode, f, react, dbnOver));
   spansFor(f).forEach((m) => {
     const resi = [];
     m.ranges.forEach(([a, b]) => { for (let r = a; r <= b; r++) resi.push(r); });
@@ -1104,7 +1233,101 @@ function renderChannelGallery(f, react, data, fmt) {
   const zb = zoom.querySelectorAll("button");
   zb[0].onclick = () => setPanoCols(panoCols() + 1);
   zb[1].onclick = () => setPanoCols(panoCols() - 1);
-  // link cameras: dragging/rotating any panel rotates all the others in lock-step
+  linkPanoCameras();
+  // align the "3D projection" 2D to the gallery's shared camera now that it exists
+  if ($("ss_view") && $("ss_view").value === "proj" && currentDeep) drawTracks(f, react);
+}
+// ---- T-0367 pickers: the #multi-bar row under the deep-view header (hidden for one-structure datasets) ----
+function renderMultiBar(f) {
+  const bar = $("multi-bar"); if (!bar) return;
+  const cur = f ? multiCurrent(f) : null;
+  if (!cur) { bar.classList.add("hidden"); return; }
+  bar.classList.remove("hidden");
+  const fmt = (v, d) => (v == null ? "n/a" : (+v).toFixed(d));
+  const trio = (s) => s ? ["pLDDT " + fmt(s.plddt, 1), "ranking " + fmt(s.ranking_score, 3), "agreement " + fmt(s.shape_agr, 2)].join(" · ") : "";
+  const sum = f.methods || {};
+  $("mb-methods").innerHTML = cur.multi.methods.map((m) =>
+    `<button type="button" data-m="${esc(m.id)}" class="${!multiSel.compare && m.id === cur.method ? "active" : ""}" title="${esc(m.label)}${sum[m.id] ? " · best-by-reactivity sample: " + esc(trio(sum[m.id])) : ""}">${esc(m.label)}</button>`).join("")
+    + `<button type="button" data-m="compare" class="${multiSel.compare ? "active" : ""}" title="every method for this design, each at its Best-by sample (the selected method keeps its sample)">Compare</button>`;
+  const best = multiCurrent(f, cur.method, "best");
+  let sh = `<button type="button" data-k="best" class="${multiSel.sample === "best" ? "active" : ""}" title="${esc(best.note || ("best by " + bestByLabel(best.by)))}">Best (${best.k + 1})</button>`;
+  for (let k = 0; k < cur.nS; k++) sh += `<button type="button" data-k="${k}" class="${multiSel.sample !== "best" && cur.k === k ? "active" : ""}" title="${esc(trio(sampleOf(f, cur.method, k)) || ("sample " + (k + 1)))}">${k + 1}</button>`;
+  $("mb-samples").innerHTML = sh;
+  $("mb-bestby").innerHTML = MULTI_BESTBY.map(([v, l]) => `<option value="${v}"${v === multiSel.bestBy ? " selected" : ""}>${l}</option>`).join("");
+  const cm = $("mb-cmpmode"); cm.classList.toggle("hidden", !multiSel.compare);
+  cm.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.cmp === multiSel.cmpMode));
+  // notes: a Best fallback (no reactivity / no confidence), a frame note (RNet's 311-nt construct), replicates
+  const notes = [];
+  if (multiSel.sample === "best" && cur.note) notes.push(cur.note);
+  if (multiSel.compare) cur.multi.methods.forEach((m) => { if (m.id === cur.method) return; const c = multiCurrent(f, m.id, "best"); if (c.note) notes.push(m.label + ": " + c.note); });
+  cur.multi.methods.forEach((m) => { if (m.note && (multiSel.compare || m.id === cur.method)) notes.push(m.note); });
+  if (f.replicate_of) notes.push(`replicate of ${f.replicate_of}: the same design sequence, so design-frame predictions are shared`);
+  else if (f.n_replicates > 1) notes.push(`${f.n_replicates} constructs share this design sequence`);
+  $("mb-note").innerHTML = notes.map((n) => `<span class="mb-n">${esc(n)}</span>`).join("");
+}
+function wireMultiBar() {
+  const bar = $("multi-bar"); if (!bar) return;
+  bar.addEventListener("click", (e) => {                       // delegated: the buttons are re-created on every render
+    const b = e.target.closest ? e.target.closest("button") : null; if (!b || !bar.contains(b)) return;
+    if (b.dataset.m) { if (b.dataset.m === "compare") setMulti({ compare: !multiSel.compare }); else setMulti({ method: b.dataset.m, compare: false }); }
+    else if (b.dataset.k !== undefined) setMulti({ sample: b.dataset.k === "best" ? "best" : +b.dataset.k });
+    else if (b.dataset.cmp) setMulti({ cmpMode: b.dataset.cmp });
+  });
+  if ($("mb-bestby")) $("mb-bestby").addEventListener("change", () => setMulti({ bestBy: $("mb-bestby").value }));
+}
+// a picker change: re-slice the reactivity when the frame changes, reload the 3D when the structure changes,
+// redraw the bar / props / tracks, keep the share link current
+function setMulti(patch) {
+  const f = currentDeep && currentDeep.f;
+  const before = f ? multiCurrent(f) : null;
+  Object.assign(multiSel, patch);
+  saveMultiSel();
+  if (!f || !before) return;
+  const cur = multiCurrent(f);
+  currentDeep.react = reactForFrame(currentDeep.reactRaw, cur.frame);
+  renderMultiBar(f);
+  drawProps(f);
+  const structChanged = before.method !== cur.method || before.k !== cur.k || ("compare" in patch) || (("cmpMode" in patch) && multiSel.compare);
+  if (structChanged) load3D(f, currentDeep.react);
+  else drawTracks(f, currentDeep.react);
+  drawReactChart(f, currentDeep.react);
+  saveState();
+}
+// extra metadata rows for a multi record (drawProps)
+function multiPropRows(f) {
+  const cur = multiCurrent(f); if (!cur) return [];
+  const raw = currentDeep && currentDeep.f === f ? currentDeep.reactRaw : null;
+  const s = sampleOf(f, cur.method, cur.k);
+  const how = multiSel.sample === "best" ? ` (best by ${bestByLabel(cur.by || multiSel.bestBy)}${cur.note ? "; " + esc(cur.note) : ""})` : " (chosen)";
+  const rows = [["Structure shown", `${esc(cur.mdef.label)} · sample ${cur.k + 1} of ${cur.nS}${how}${multiSel.compare ? " · comparing all methods" : ""}`]];
+  if (cur.frame === "construct311") rows.push(["Frame", `the full ${f.construct_length || (raw && raw.seq311 && raw.seq311.length) || ""}-nt construct as folded${raw && raw.design_start != null && raw.design_end != null ? `; the design is positions ${raw.design_start + 1}–${raw.design_end}` : ""}`]);
+  if (s) rows.push(["This sample", [s.plddt != null && "pLDDT " + num(s.plddt), s.ptm != null && "pTM " + num(s.ptm, 3), s.gpde != null && "gpde " + num(s.gpde, 3),
+    s.ranking_score != null && "ranking " + num(s.ranking_score, 3), s.has_clash != null && (s.has_clash ? "has clash" : "no clash"),
+    s.shape_agr != null && "2A3 agreement " + num(s.shape_agr, 3), s.rdms != null && "DMS r " + num(s.rdms, 3),
+    s.ss_class && esc(s.ss_class), s.bp_fraction != null && "paired " + num(s.bp_fraction, 2)].filter(Boolean).join(" · ") || "n/a"]);
+  else if (currentDeep && currentDeep.f === f && currentDeep.samples === null) rows.push(["This sample", "per-sample details unavailable (no samples file for this record)"]);
+  const per = cur.multi.methods.map((m) => { const b = (f.methods || {})[m.id]; return b ? `${esc(m.label)}: pLDDT ${num(b.plddt)} · ranking ${num(b.ranking_score, 3)} · agreement ${num(b.shape_agr, 3)}` : null; }).filter(Boolean);
+  if (per.length) rows.push(["Methods (best-by-reactivity sample)", per.join("<br>")]);
+  if (f.replicate_of) rows.push(["Replicate", `same design sequence as ${esc(f.replicate_of)}${f.n_replicates ? ` (${f.n_replicates} constructs)` : ""}`]);
+  else if (f.n_replicates > 1) rows.push(["Replicate", `${f.n_replicates} constructs share this design sequence`]);
+  const tdbn = currentDeep && currentDeep.f === f ? currentDeep.targetDbn : null;
+  if (tdbn) rows.push(["Design target", `${f.n_crossed_bp_target != null ? f.n_crossed_bp_target + " crossed base pairs · " : ""}<span class="mono" title="${esc(tdbn)}">${esc(tdbn.length > 72 ? tdbn.slice(0, 72) + "…" : tdbn)}</span>`]);
+  else if (f.n_crossed_bp_target != null) rows.push(["Design target", `${f.n_crossed_bp_target} crossed base pairs`]);
+  if (f.ok_overall != null || f.ok_crossed != null || f.snr != null) rows.push(["Measured OpenKnot", [f.ok_overall != null && "overall " + num(f.ok_overall), f.ok_crossed != null && "crossed " + num(f.ok_crossed), f.snr != null && "SNR " + num(f.snr, 2)].filter(Boolean).join(" · ")]);
+  return rows;
+}
+// metrics suffix for a compare cell: the sample's own values, else the record's best-by-reactivity summary
+function metricsLabel(f, c) {
+  const s = sampleOf(f, c.method, c.k) || (c.by === "react" ? (f.methods || {})[c.method] : null);
+  if (!s) return "";
+  const parts = [];
+  if (s.plddt != null) parts.push("pLDDT " + (+s.plddt).toFixed(1));
+  if (s.ranking_score != null) parts.push("rank " + (+s.ranking_score).toFixed(2));
+  if (s.shape_agr != null) parts.push("agr " + (+s.shape_agr).toFixed(2));
+  return parts.length ? " · " + parts.join(" · ") : "";
+}
+// link cameras: dragging/rotating any panel rotates all the others in lock-step (panoramic gallery + compare)
+function linkPanoCameras() {
   let syncing = false;
   panoViewers.forEach((v) => {
     try {
@@ -1117,8 +1340,123 @@ function renderChannelGallery(f, react, data, fmt) {
       });
     } catch (e) {}
   });
-  // align the "3D projection" 2D to the gallery's shared camera now that it exists
-  if ($("ss_view") && $("ss_view").value === "proj" && currentDeep) drawTracks(f, react);
+}
+// ---- T-0367 compare: every method of a multi record for one design. Side by side = linked-camera viewers
+// (the gallery's mechanics); overlay = one viewer, the others superposed on the selected method by a C1'
+// Kabsch fit over the design window. The selected method keeps its sample, the others show their Best-by one.
+let _compareSeq = 0;
+const OVERLAY_COLORS = ["#f2a93b", "#4aa3df", "#e4572e", "#8ac926", "#c77dff"];
+async function renderCompare(f, cur) {
+  const el = $("viewer3d"), ds = dsFor(f);
+  const cells = cur.multi.methods.map((m) => (m.id === cur.method ? cur : multiCurrent(f, m.id, "best")));
+  const my = ++_compareSeq;
+  const texts = await Promise.all(cells.map((c) => fetch(durl(multiStructPath(f, ds, c.method, c.k))).then((r) => (r.ok ? r.text() : null)).catch(() => null)));
+  if (!currentDeep || currentDeep.f !== f || my !== _compareSeq || !multiSel.compare) return;
+  const prim = cells.findIndex((c) => c.method === cur.method);
+  const fmtOf = (t) => (t.startsWith("data_") || t.includes("_atom_site") ? "cif" : "pdb");
+  if (texts[prim]) { currentDeep.structText = texts[prim]; currentDeep.structFmt = fmtOf(texts[prim]); currentDeep.structSel = { method: cur.method, k: cur.k }; currentDeep._proj = null; }
+  if (typeof $3Dmol === "undefined") { el.innerHTML = '<p style="color:#fff;padding:8px">3Dmol.js not loaded.</p>'; return; }
+  disposePano(); loseGL(el); el.innerHTML = ""; viewer = null; viewerModel = null;
+  const mode = ($("color_by") && $("color_by").value) || "a23";
+  const label = (c, i) => `${c.mdef.label} · s${c.k + 1}${c.by ? " · best by " + bestByLabel(c.by) : ""}${metricsLabel(f, c)}${texts[i] ? "" : " · unavailable"}`;
+  if (multiSel.cmpMode === "overlay") { renderOverlay(el, f, cur, cells, texts, prim, label); }
+  else {
+    el.classList.add("pano-gallery");
+    el.style.gridTemplateColumns = "repeat(" + (el.clientWidth >= 640 ? Math.min(cells.length, 3) : 1) + ",1fr)";
+    cells.forEach((c, i) => {
+      const cell = document.createElement("div"); cell.className = "chan-cell";
+      const lab = document.createElement("div"); lab.className = "chan-lab"; lab.textContent = label(c, i);
+      const vd = document.createElement("div"); vd.className = "chan-viewer";
+      cell.appendChild(vd); cell.appendChild(lab);
+      cell.insertAdjacentHTML("beforeend", channelLegend(mode, altPalette()));
+      el.appendChild(cell);
+      if (!texts[i]) { vd.innerHTML = '<p style="color:#fff;padding:8px">structure unavailable</p>'; return; }
+      try {
+        const v = $3Dmol.createViewer(vd, { backgroundColor: "0x0d1117" });
+        const m = v.addModel(texts[i], fmtOf(texts[i]));
+        paintViewer(v, f, reactForFrame(currentDeep.reactRaw, c.frame), mode, sampleDbn(f, c.method, c.k, texts[i]));
+        panoViewers.push(v);
+        if (i === prim) viewerModel = m;
+      } catch (e) {}
+    });
+    linkPanoCameras();
+  }
+  if ($("ss_view") && $("ss_view").value === "proj" && currentDeep) drawTracks(f, currentDeep.react);
+}
+function renderOverlay(el, f, cur, cells, texts, prim, label) {
+  el.classList.remove("pano-gallery"); el.style.gridTemplateColumns = "";
+  const ref = texts[prim];
+  if (!ref) { el.innerHTML = '<p style="color:#fff;padding:8px">structure unavailable</p>'; return; }
+  viewer = $3Dmol.createViewer(el, { backgroundColor: "0x0d1117" });
+  const refC1 = c1Coords(ref), refWin = designWindow(cur);
+  const leg = [];
+  cells.forEach((c, i) => {
+    const txt = texts[i]; const col = OVERLAY_COLORS[i % OVERLAY_COLORS.length];
+    if (!txt) { leg.push({ c, col, text: "unavailable" }); return; }
+    let t = txt, rmsd = null, n = 0, aligned = i === prim;
+    if (i !== prim) {
+      const fit = superposeC1(c1Coords(txt), designWindow(c), refC1, refWin);
+      if (fit) { t = transformPDB(txt, fit.R, fit.t); rmsd = fit.rmsd; n = fit.n; aligned = true; }
+    }
+    const m = viewer.addModel(t, t.startsWith("data_") || t.includes("_atom_site") ? "cif" : "pdb");
+    viewer.setStyle({ model: m }, { cartoon: { color: hexCF(col), ringMode: 3 } });
+    if (i === prim) viewerModel = m;
+    leg.push({ c, col, text: i === prim ? "reference" : (aligned ? `RMSD ${rmsd.toFixed(2)} Å over ${n} C1′` : "not aligned (no design window)") });
+  });
+  viewer.zoomTo(); viewer.render();
+  try { viewer.setViewChangeCallback(refreshProjIfActive); } catch (e) {}
+  el.insertAdjacentHTML("beforeend", `<div class="ovl-leg">` + leg.map((x) => `<span><span class="leg-sw" style="background:${x.col}"></span>${esc(label(x.c, cells.indexOf(x.c)))} · ${esc(x.text)}</span>`).join("") + `</div>`);
+}
+// residue index window (0-based, end exclusive) of the DESIGN in a method's frame; null = the whole chain
+function designWindow(c) {
+  const raw = currentDeep && currentDeep.reactRaw;
+  if (c.frame === "construct311" && raw && raw.design_start != null && raw.design_end != null) return [raw.design_start | 0, raw.design_end | 0];
+  return null;
+}
+// one C1' coordinate per residue (null where missing), first chain / first model (ss.js parser)
+function c1Coords(text) { return (typeof ssParseResidues === "function" ? ssParseResidues(text) : []).map((r) => (r.atoms && r.atoms["C1'"]) || null); }
+// pair residues by position inside each design window, then Kabsch-fit the mobile set onto the reference
+function superposeC1(mob, mobWin, ref, refWin) {
+  const sl = (a, w) => (w ? a.slice(w[0], w[1]) : a);
+  const a = sl(mob, mobWin), b = sl(ref, refWin), n = Math.min(a.length, b.length);
+  const P = [], Q = [];
+  for (let i = 0; i < n; i++) if (a[i] && b[i]) { P.push(a[i]); Q.push(b[i]); }
+  return kabsch(P, Q);
+}
+// Kabsch: the rotation R and translation t that move P onto Q (least squares); {R, t, rmsd, n} or null.
+// SVD of the 3x3 covariance via the eigen-decomposition of HᵀH (ss.js jacobiEig3); a reflection is undone
+// by flipping the smallest singular direction.
+function kabsch(P, Q) {
+  const n = P.length; if (n < 3 || Q.length !== n) return null;
+  const cp = [0, 0, 0], cq = [0, 0, 0];
+  for (let i = 0; i < n; i++) for (let d = 0; d < 3; d++) { cp[d] += P[i][d] / n; cq[d] += Q[i][d] / n; }
+  const H = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+  for (let i = 0; i < n; i++) for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) H[a][b] += (P[i][a] - cp[a]) * (Q[i][b] - cq[b]);
+  const HtH = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+  for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) for (let k = 0; k < 3; k++) HtH[a][b] += H[k][a] * H[k][b];
+  const V = jacobiEig3(HtH);                                     // right singular vectors, largest first
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const U = V.map((v) => { const hv = [0, 1, 2].map((a) => H[a][0] * v[0] + H[a][1] * v[1] + H[a][2] * v[2]); const s = Math.hypot(hv[0], hv[1], hv[2]); return s > 1e-9 ? hv.map((x) => x / s) : null; });
+  if (!U[0] || !U[1]) return null;                              // collinear points: no unique rotation
+  if (!U[2]) U[2] = cross(U[0], U[1]);                          // planar set: complete the frame
+  const det3 = (M) => M[0][0] * (M[1][1] * M[2][2] - M[1][2] * M[2][1]) - M[0][1] * (M[1][0] * M[2][2] - M[1][2] * M[2][0]) + M[0][2] * (M[1][0] * M[2][1] - M[1][1] * M[2][0]);
+  const build = (sign) => { const R = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]; for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) { let s = 0; for (let i = 0; i < 3; i++) s += V[i][a] * (i === 2 ? sign : 1) * U[i][b]; R[a][b] = s; } return R; };
+  let R = build(1); if (det3(R) < 0) R = build(-1);
+  const t = [0, 1, 2].map((a) => cq[a] - (R[a][0] * cp[0] + R[a][1] * cp[1] + R[a][2] * cp[2]));
+  let ss = 0;
+  for (let i = 0; i < n; i++) { const p = P[i], q = Q[i]; const x = R[0][0] * p[0] + R[0][1] * p[1] + R[0][2] * p[2] + t[0], y = R[1][0] * p[0] + R[1][1] * p[1] + R[1][2] * p[2] + t[1], z = R[2][0] * p[0] + R[2][1] * p[1] + R[2][2] * p[2] + t[2]; ss += (x - q[0]) ** 2 + (y - q[1]) ** 2 + (z - q[2]) ** 2; }
+  return { R, t, rmsd: Math.sqrt(ss / n), n };
+}
+// apply R·p + t to every ATOM/HETATM coordinate of a PDB text (fixed columns); other formats pass through
+function transformPDB(text, R, t) {
+  if (text.startsWith("data_") || text.includes("_atom_site")) return text;
+  return text.split("\n").map((l) => {
+    if (!(l.startsWith("ATOM") || l.startsWith("HETATM")) || l.length < 54) return l;
+    const x = parseFloat(l.slice(30, 38)), y = parseFloat(l.slice(38, 46)), z = parseFloat(l.slice(46, 54));
+    if (Number.isNaN(x) || Number.isNaN(y) || Number.isNaN(z)) return l;
+    const nx = R[0][0] * x + R[0][1] * y + R[0][2] * z + t[0], ny = R[1][0] * x + R[1][1] * y + R[1][2] * z + t[1], nz = R[2][0] * x + R[2][1] * y + R[2][2] * z + t[2];
+    return l.slice(0, 30) + nx.toFixed(3).padStart(8) + ny.toFixed(3).padStart(8) + nz.toFixed(3).padStart(8) + l.slice(54);
+  }).join("\n");
 }
 function plddtCF(b) {                              // AlphaFold confidence palette
   if (b == null || Number.isNaN(b)) return "0xcccccc";
@@ -1199,14 +1537,24 @@ function foldTxt(f, react) {
   L.push("base-paired fraction: " + num(f.bp_fraction, 3));
   L.push("pseudoknot: " + (f.pseudoknot ? "yes" : "no"));
   L.push("tertiary motifs: " + (f.motifs || []).join(", ") + (f.n_tert != null ? "  (n_tert=" + f.n_tert + ", n_rare=" + f.n_rare + ")" : ""));
-  const dbn = (PAIRING_BY_DS[f._dsid] || {})[f.id];
+  const cur = multiCurrent(f);                                  // T-0367: which method / sample this export is
+  if (cur) {
+    L.push("method: " + cur.mdef.label + " (" + cur.method + ")");
+    L.push("sample: " + (cur.k + 1) + " of " + cur.nS + (multiSel.sample === "best" ? "   (best by " + bestByLabel(cur.by || multiSel.bestBy) + (cur.note ? "; " + cur.note : "") + ")" : ""));
+    const s = sampleOf(f, cur.method, cur.k);
+    if (s) L.push("sample metrics: pLDDT " + num(s.plddt, 1) + "   ranking " + num(s.ranking_score, 3) + "   2A3 agreement " + num(s.shape_agr, 3));
+    if (cur.mdef.note) L.push("note: " + cur.mdef.note);
+  }
+  const dbn = dbnFor(f);
   if (react && react.seq) L.push("sequence:\n" + react.seq);
   if (dbn) L.push("secondary structure (dbn):\n" + dbn);
   return L.join("\n") + "\n";
 }
 async function exportFold() {
   if (!currentDeep) return;
-  const f = currentDeep.f, react = currentDeep.react, base = safeName(f.id) || "fold";
+  const f = currentDeep.f, react = currentDeep.react, base0 = safeName(f.id) || "fold";
+  const sel = currentDeep.structSel;                           // T-0367: name the structure by method + sample
+  const base = sel ? base0 + "__" + safeName(sel.method) + "__sample" + (sel.k + 1) : base0;
   const files = [{ name: base + ".txt", data: _enc(foldTxt(f, react)) }];
   if (currentDeep.structText) {
     const native = currentDeep.structFmt;     // always ship the fetched file in its own format

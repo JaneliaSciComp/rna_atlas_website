@@ -319,6 +319,7 @@ test('renderMultiBar: hidden for one-structure datasets; buttons, Best label, no
   const sb = sandbox();
   sb.renderMultiBar({ id: 'p', _dsid: 'px' });
   assert.ok(sb._els['multi-bar']._cls.has('hidden'));
+  assert.ok(!sb._els.deep._cls.has('cmp-on'));
   const f = record();
   sb.currentDeep = { f, samples: samplesFile().methods, reactRaw: reactRaw() };
   sb.renderMultiBar(f);
@@ -345,7 +346,13 @@ test('renderMultiBar: hidden for one-structure datasets; buttons, Best label, no
   assert.ok(/data-k="3" class="active"/.test(sb._els['mb-samples'].innerHTML));
   assert.ok(/data-m="compare" class="active"/.test(sb._els['mb-methods'].innerHTML));
   assert.ok(!sb._els['mb-cmpmode']._cls.has('hidden'), 'compare layout toggle shows in compare');
-  assert.ok(/Gamma: no confidence for Gamma/.test(sb._els['mb-note'].innerHTML), "compare lists the other methods' fallbacks");
+  assert.ok(sb._els.deep._cls.has('cmp-on'), 'compare widens the 3D region');
+  const cmpNotes = sb._els['mb-note'].innerHTML;
+  assert.equal((cmpNotes.match(/no confidence for Gamma: showing sample 1/g) || []).length, 1, "compare lists the other methods' fallbacks once");
+  assert.ok(!/Gamma: no confidence for Gamma/.test(cmpNotes), 'no doubled method name');
+  sb.multiSel.compare = false; sb.renderMultiBar(f);
+  assert.ok(!sb._els.deep._cls.has('cmp-on') && sb._els['mb-cmpmode']._cls.has('hidden'));
+  sb.multiSel.compare = true;
   sb.renderMultiBar(record({ replicate_of: 'design-0000', n_replicates: 3 }));
   assert.ok(/replicate of design-0000/.test(sb._els['mb-note'].innerHTML));
 });

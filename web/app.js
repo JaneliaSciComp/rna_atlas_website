@@ -1241,8 +1241,9 @@ function renderChannelGallery(f, react, data, fmt) {
 function renderMultiBar(f) {
   const bar = $("multi-bar"); if (!bar) return;
   const cur = f ? multiCurrent(f) : null;
-  if (!cur) { bar.classList.add("hidden"); return; }
+  if (!cur) { bar.classList.add("hidden"); $("deep").classList.remove("cmp-on"); return; }
   bar.classList.remove("hidden");
+  $("deep").classList.toggle("cmp-on", multiSel.compare);        // compare: the 3D region spans the whole card width
   const fmt = (v, d) => (v == null ? "n/a" : (+v).toFixed(d));
   const trio = (s) => s ? ["pLDDT " + fmt(s.plddt, 1), "ranking " + fmt(s.ranking_score, 3), "agreement " + fmt(s.shape_agr, 2)].join(" · ") : "";
   const sum = f.methods || {};
@@ -1259,7 +1260,7 @@ function renderMultiBar(f) {
   // notes: a Best fallback (no reactivity / no confidence), a frame note (RNet's 311-nt construct), replicates
   const notes = [];
   if (multiSel.sample === "best" && cur.note) notes.push(cur.note);
-  if (multiSel.compare) cur.multi.methods.forEach((m) => { if (m.id === cur.method) return; const c = multiCurrent(f, m.id, "best"); if (c.note) notes.push(m.label + ": " + c.note); });
+  if (multiSel.compare) cur.multi.methods.forEach((m) => { if (m.id === cur.method) return; const c = multiCurrent(f, m.id, "best"); if (c.note) notes.push(c.note.indexOf(m.label) >= 0 ? c.note : m.label + ": " + c.note); });
   cur.multi.methods.forEach((m) => { if (m.note && (multiSel.compare || m.id === cur.method)) notes.push(m.note); });
   if (f.replicate_of) notes.push(`replicate of ${f.replicate_of}: the same design sequence, so design-frame predictions are shared`);
   else if (f.n_replicates > 1) notes.push(`${f.n_replicates} constructs share this design sequence`);
@@ -1362,7 +1363,7 @@ async function renderCompare(f, cur) {
   if (multiSel.cmpMode === "overlay") { renderOverlay(el, f, cur, cells, texts, prim, label); }
   else {
     el.classList.add("pano-gallery");
-    el.style.gridTemplateColumns = "repeat(" + (el.clientWidth >= 640 ? Math.min(cells.length, 3) : 1) + ",1fr)";
+    el.style.gridTemplateColumns = "repeat(" + (el.clientWidth >= 540 ? Math.min(cells.length, 3) : 1) + ",1fr)";
     cells.forEach((c, i) => {
       const cell = document.createElement("div"); cell.className = "chan-cell";
       const lab = document.createElement("div"); lab.className = "chan-lab"; lab.textContent = label(c, i);

@@ -418,6 +418,11 @@ tbody tr:hover { background: var(--row-hover); }
 #multi-bar .vtoggle button { font-size: 11px; padding: 3px 8px; }
 #multi-bar .vtoggle button + button { border-left: 0; }
 #multi-bar select.deep-cby { margin: 0; }
+#mb-cmpmode.hidden { display: none; }
+/* compare: the 3D region spans the whole card so the three structures sit in one row (panoramic has its own grid) */
+#deep.cmp-on:not(.mode-panoramic) .deep-body { grid-template-columns: 1fr 1fr; }
+#deep.cmp-on:not(.mode-panoramic) #viewer3d { grid-column: 1 / -1; grid-row: auto; }
+#deep.cmp-on #viewer3d.pano-gallery .chan-cell { aspect-ratio: 4 / 3; }
 .mb-note { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 3px 12px; font-size: 10.5px; color: var(--text-faint); }
 .mb-note:empty { display: none; }
 .mb-n::before { content: "\2022"; margin-right: 4px; color: var(--accent); }

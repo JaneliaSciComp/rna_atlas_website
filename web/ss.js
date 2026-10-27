@@ -62,8 +62,11 @@ function forna2D(id, dbn, seq, react, box, alt) {
   if (n < 2) return "";
   if (n > 900) return arcDiagram(dbn, n, Math.max(6, Math.min(16, Math.floor(900 / n))), n * Math.max(6, Math.min(16, Math.floor(900 / n))));
   const pairs = ssPairs((dbn || "").slice(0, n));
-  let pos = _ssCache[id];
-  if (!pos || pos.length !== n) { pos = ssLayout(n, pairs); _ssCache[id] = pos; }
+  // cached per id AND dot-bracket: a multi-structure record (T-0367) shows several dot-brackets under one id, and the
+  // node geometry must follow the shown sample, not the first one drawn; one-structure records key as before
+  const ck = id + "|" + (dbn || "").slice(0, n);
+  let pos = _ssCache[ck];
+  if (!pos || pos.length !== n) { pos = ssLayout(n, pairs); _ssCache[ck] = pos; }
   const xs = pos.map((p) => p.x), ys = pos.map((p) => p.y);
   const minx = Math.min(...xs), maxx = Math.max(...xs), miny = Math.min(...ys), maxy = Math.max(...ys);
   const pad = 12, sc = Math.min((box - 2 * pad) / ((maxx - minx) || 1), (box - 2 * pad) / ((maxy - miny) || 1));

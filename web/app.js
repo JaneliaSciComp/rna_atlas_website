@@ -117,12 +117,14 @@ function dbnFor(f) {
   const st = (sel && sel.method === cur.method && sel.k === cur.k) ? currentDeep.structText : null;
   return sampleDbn(f, cur.method, cur.k, st);
 }
+// a sample choice as a share link or the UI may name it: "best" or a non-negative index
+function validSample(v) { return v === "best" || (Number.isInteger(v) && v >= 0); }
 // share-link state for the pickers (fullSnapshot / enterState)
 function multiShareState() { return { method: multiSel.method, sample: multiSel.sample, bestBy: multiSel.bestBy, compare: multiSel.compare, cmpMode: multiSel.cmpMode }; }
 function applyMultiState(m) {
   if (!m || typeof m !== "object") return;
   if (typeof m.method === "string" || m.method === null) multiSel.method = m.method;
-  if (m.sample === "best" || (Number.isInteger(m.sample) && m.sample >= 0)) multiSel.sample = m.sample;
+  if (validSample(m.sample)) multiSel.sample = m.sample;
   if (MULTI_BESTBY.some((b) => b[0] === m.bestBy)) multiSel.bestBy = m.bestBy;
   if (typeof m.compare === "boolean") multiSel.compare = m.compare;
   if (m.cmpMode === "side" || m.cmpMode === "overlay") multiSel.cmpMode = m.cmpMode;
@@ -283,7 +285,7 @@ async function enterState(initial) {
   if (initial && initial.mapT) mapT = initial.mapT;
   setView((initial && initial.view) || "table");
   if (initial && initial.multi) applyMultiState(initial.multi);          // T-0367: before openDeep, which reads it
-  if (initial && initial.deep) await openDeep(initial.deep, { keepSample: !!(initial.multi && (initial.multi.sample === "best" || Number.isInteger(initial.multi.sample))) });
+  if (initial && initial.deep) await openDeep(initial.deep, { keepSample: !!(initial.multi && validSample(initial.multi.sample)) });
   else if (currentDeep) closeDeep();
   updateShareUI();   // normalize the address bar to whatever we actually ended up showing
 }

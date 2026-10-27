@@ -37,7 +37,7 @@ const need = (name, t) => { assert.ok(t, name + ' not found in app.js'); return 
 
 const FNS = ['multiOf', 'saveMultiSel', 'bestByLabel', 'resolveBest', 'multiCurrent', 'multiStructPath', 'structPath', 'reactForFrame',
   'sampleOf', 'sampleDbn', 'dbnFor', 'multiShareState', 'applyMultiState', 'renderMultiBar', 'setMulti', 'multiPropRows', 'metricsLabel',
-  'designWindow', 'c1Coords', 'superposeC1', 'kabsch', 'transformPDB', 'dsFor', 'fileStem', 'prefix', 'hexCF', 'structFmt', 'canPairFrames'];
+  'designWindow', 'c1Coords', 'superposeC1', 'kabsch', 'transformPDB', 'dsFor', 'fileStem', 'prefix', 'hexCF', 'structFmt', 'canPairFrames', 'validSample'];
 
 // --- synthetic fixtures (made-up dataset, ids, dot-brackets and sequences) ---
 const DS_MULTI = { id: 'mx', label: 'Multi (2)', base: 'data/datasets/mx', ext: 'pdb', react: true, motifs: false, cond: [],
@@ -104,7 +104,7 @@ function sandbox(opts) {
     $: (id) => (els[id] = els[id] || fakeEl(id)),
     DATASETS: [DS_RIBO, DS_PLAIN, DS_MULTI], DSBYID: { ribo2: DS_RIBO, px: DS_PLAIN, mx: DS_MULTI },
     PAIRING_BY_DS: { px: { 'design-0001': '((..))' } },
-    currentDeep: null, panoViewers: [],
+    currentDeep: null, panoViewers: [], nucColor: () => '#888888',   // viz_style.js palette, not under test
     load3D: () => { calls.load3D++; }, drawTracks: () => { calls.drawTracks++; }, drawProps: () => { calls.drawProps++; },
     drawReactChart: () => { calls.drawReactChart++; }, saveState: () => { calls.saveState++; }, refreshProjIfActive: () => {},
   };
@@ -174,7 +174,7 @@ test('shell: the picker bar is in index.html, app.js wires it and every JS file 
   for (const id of ['multi-bar', 'mb-methods', 'mb-samples', 'mb-bestby', 'mb-cmpmode', 'mb-note']) assert.ok(INDEX.includes('id="' + id + '"'), 'index.html lacks #' + id);
   assert.ok(/data-cmp="side"/.test(INDEX) && /data-cmp="overlay"/.test(INDEX), 'compare layout toggle');
   assert.ok(/^\s+wireMultiBar\(\);/m.test(APP), 'wireStatic does not call wireMultiBar()');
-  assert.ok(/openDeep\(initial\.deep, \{ keepSample: !!\(initial\.multi && \(initial\.multi\.sample === "best" \|\| Number\.isInteger\(initial\.multi\.sample\)\)\) \}\)/.test(APP), 'a shared link keeps its sample only when the link names a valid one');
+  assert.ok(/openDeep\(initial\.deep, \{ keepSample: !!\(initial\.multi && validSample\(initial\.multi\.sample\)\) \}\)/.test(APP), 'a shared link keeps its sample only when the link names a valid one');
   assert.ok(/applyMultiState\(initial\.multi\)/.test(APP), 'enterState does not apply the link state');
   assert.ok(/s\.multi = multiShareState\(\)/.test(APP), 'fullSnapshot does not record the pickers');
   assert.ok(!/PAIRING_BY_DS\[f\._dsid\] \|\| \{\}\)\[f\.id\] \|\| ""/.test(APP.replace(fnText('dbnFor'), '')), 'a dot-bracket site still bypasses dbnFor()');
@@ -284,6 +284,8 @@ test('share state: round trip through multiShareState/applyMultiState; junk is i
   assert.deepEqual(plain(sb2.multiShareState()), s, 'invalid values leave the state alone');
   sb2.applyMultiState(null); sb2.applyMultiState('x');
   assert.deepEqual(plain(sb2.multiShareState()), s);
+  assert.deepEqual(['best', 0, 4].map(sb2.validSample), [true, true, true]);
+  assert.deepEqual([-1, 2.5, '2', null, undefined, 'x'].map(sb2.validSample), [false, false, false, false, false, false]);
   sb2.saveMultiSel();
   const saved = JSON.parse(sb2._store.atlas_multi);
   assert.deepEqual(saved, { method: 'beta', bestBy: 'plddt', compare: true, cmpMode: 'overlay' }, 'the explicit sample is not persisted across folds');
@@ -508,4 +510,16 @@ test('openDeep + closeDeep: closing the view while its fetches are in flight lea
   assert.equal(sb._pending.length, 5, 'the structure of the record default (alpha, best by reactivity = sample 3) is fetched');
   assert.match(sb._pending[4].url, /__alpha__s2\.pdb$/);
   assert.equal(sb.multiSel.sample, 'best', 'opening a fold resets an explicit sample');
+});
+
+test('forna 2D layout: the node geometry follows the shown dot-bracket of one record, and repeats for the same one', () => {
+  const sb = sandbox();                                               // ss.js is loaded whole: real forna2D / ssLayout / _ssCache
+  const seq = 'ACGU'.repeat(15);
+  const nodes = (svg) => (svg.match(/<circle[^>]*cx="([\d.]+)"[^>]*cy="([\d.]+)"/g) || []).map((c) => c.replace(/.*cx="([\d.]+)".*cy="([\d.]+)".*/, '$1,$2'));
+  const a = sb.forna2D('rec-1', '((((((((((..........))))))))))' + '.'.repeat(30), seq, null, 340, true);
+  const b = sb.forna2D('rec-1', '.'.repeat(30) + '((((((((((..........))))))))))', seq, null, 340, true);
+  const a2 = sb.forna2D('rec-1', '((((((((((..........))))))))))' + '.'.repeat(30), seq, null, 340, true);
+  assert.equal(nodes(a).length, 60); assert.equal(nodes(b).length, 60);
+  assert.notDeepEqual(nodes(a), nodes(b), 'a different dot-bracket under the same id must get its own layout');
+  assert.deepEqual(nodes(a2), nodes(a), 'the same dot-bracket reuses the cached layout');
 });

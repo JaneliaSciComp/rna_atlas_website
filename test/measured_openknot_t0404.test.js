@@ -73,13 +73,15 @@ function sandbox() {
     $: (id) => (els[id] = els[id] || fakeEl(id)),
     document: { querySelectorAll: (sel) => (sel === '#rank_key option.okopt' ? options : []) },
     DSBYID: {}, SUBLIB_OFF: new Set(), motifColor: () => '#888888', openDeep: () => {},
+    saveState: () => {}, render: () => {}, lastRows: [],
   };
   vm.createContext(sb);
   const parts = [need('esc', declText('esc')), need('num', declText('num')), need('sortOverride', declText('sortOverride')),
     need('FIELD_IDS', declText('FIELD_IDS')), need('COLS', declText('COLS')), need('OK_COLS', declText('OK_COLS')), need('HAS_OK', declText('HAS_OK')),
-    need('hasMeasuredOK', declText('hasMeasuredOK')), need('FILTER_MAP', declText('FILTER_MAP')),
-    need('cols', fnText('cols')), need('toggleMeasuredOK', fnText('toggleMeasuredOK')), need('pass', fnText('pass')), need('ranker', fnText('ranker')),
-    need('drawTable', fnText('drawTable')), need('filters', fnText('filters'))];
+    need('hasMeasuredOK', declText('hasMeasuredOK')), need('OK_KEYS', declText('OK_KEYS')), need('FILTER_MAP', declText('FILTER_MAP')), need('BOOL_MAP', declText('BOOL_MAP')),
+    need('cols', fnText('cols')), need('toggleMeasuredOK', fnText('toggleMeasuredOK')), need('guardMeasuredSort', fnText('guardMeasuredSort')), need('pass', fnText('pass')),
+    need('ranker', fnText('ranker')), need('drawTable', fnText('drawTable')), need('filters', fnText('filters')), need('syncLabels', fnText('syncLabels')),
+    need('applyFilters', fnText('applyFilters')), need('loadSources', fnText('loadSources'))];
   // top-level let/const are not vm-global properties; re-declare as var so the tests can read and set them by name
   vm.runInContext(parts.join('\n').replace(/^(?:let|const) (\w+) = /gm, 'var $1 = '), sb);
   sb._els = els; sb._options = options;
@@ -94,7 +96,7 @@ test('index.html: three measured-OpenKnot sliders in their own fieldset, hidden 
   const input = (id) => { const m = new RegExp('<input type="range" id="' + id + '" ([^>]*)>').exec(fs[1]); assert.ok(m, id + ' slider missing'); return m[1]; };
   assert.match(input('okov_min'), /min="0" max="100" value="0" step="1"/);
   assert.match(input('okcr_min'), /min="0" max="100" value="0" step="1"/);
-  assert.match(input('snr_min'), /min="-1" max="30" value="-1" step="0\.5"/);   // -1 = any (SNR can be slightly negative)
+  assert.match(input('snr_min'), /min="-1" max="55" value="-1" step="0\.5"/);   // -1 = any (SNR can be slightly negative); live max is 53
   assert.match(fs[1], /<span id="snr_min_v">any<\/span>/);
   for (const id of ['okov_min_v', 'okcr_min_v']) assert.match(fs[1], new RegExp('<span id="' + id + '">0</span>'));
 });
@@ -208,7 +210,7 @@ test('cols()/drawTable: the three columns appear right after the predicted "cros
   assert.match(row('p-0001'), /<td class="num">0\.42<\/td><td class="num"><\/td><td class="num"><\/td><td class="num"><\/td>/);
 });
 
-test('header click on a measured column sorts by it (sortOverride marks the header)', () => {
+test('a measured-column sortOverride (what a header click sets) marks the header and drives the ranker', () => {
   const sb = sandbox(); sb.HAS_OK = true;
   sb.sortOverride = { key: 'ok_crossed', dir: 'desc' };
   sb.drawTable(all());
@@ -221,13 +223,86 @@ test('hasMeasuredOK / toggleMeasuredOK: the fieldset and the sort options follow
   const sb = sandbox();
   assert.equal(sb.hasMeasuredOK([R.plain, R.none]), false);
   assert.equal(sb.hasMeasuredOK([R.plain, R.nocr]), true);
-  assert.equal(sb.hasMeasuredOK([{ snr: 3 }]), true);
+  assert.equal(sb.hasMeasuredOK([{ ok_crossed: 1 }]), true);
+  assert.equal(sb.hasMeasuredOK([{ snr: 3 }]), false, 'a bare snr (a generic name) must not switch the OpenKnot UI on');
   sb.HAS_OK = false; sb.toggleMeasuredOK();
   assert.equal(sb._els.okfilt.style.display, 'none');
   assert.ok(sb._options.every((o) => o.hidden && o.disabled));
   sb.HAS_OK = true; sb.toggleMeasuredOK();
   assert.equal(sb._els.okfilt.style.display, '');
   assert.ok(sb._options.every((o) => !o.hidden && !o.disabled));
+});
+
+test('guardMeasuredSort (via toggleMeasuredOK / applyFilters): a sort on a measured key falls back while no loaded source has the scores', () => {
+  const sb = sandbox();
+  const rk = sb.$('rank_key');
+  sb.HAS_OK = false; rk.value = 'ok_overall:desc'; sb.sortOverride = { key: 'snr', dir: 'desc' };
+  sb.toggleMeasuredOK();
+  assert.equal(rk.value, 'best_tm1:asc'); assert.equal(sb.sortOverride, null);
+  rk.value = 'plddt:desc'; sb.sortOverride = { key: 'plddt', dir: 'asc' };
+  sb.toggleMeasuredOK();
+  assert.equal(rk.value, 'plddt:desc'); assert.deepEqual(JSON.parse(JSON.stringify(sb.sortOverride)), { key: 'plddt', dir: 'asc' }, 'an ordinary sort is left alone');
+  sb.HAS_OK = true; rk.value = 'ok_crossed:desc'; sb.sortOverride = { key: 'ok_overall', dir: 'desc' };
+  sb.toggleMeasuredOK();
+  assert.equal(rk.value, 'ok_crossed:desc'); assert.equal(sb.sortOverride.key, 'ok_overall', 'with the scores loaded nothing changes');
+  // the assistant's path: set_filters({rank: 'ok_overall:desc'}) on a source without the scores
+  sb.HAS_OK = false; sb.$('search').value = ''; sb.$('agr_min').value = '-1';
+  sb.applyFilters({ rank: 'ok_overall:desc', ok_overall_min: 80 });
+  assert.equal(rk.value, 'best_tm1:asc'); assert.equal(sb.$('okov_min').value, 80, 'the slider value is still written (inert while hidden)');
+  sb.HAS_OK = true; sb.applyFilters({ rank: 'snr:desc' });
+  assert.equal(rk.value, 'snr:desc');
+});
+
+test('syncLabels: the SNR slider reads "any" at its leftmost stop, a number above it; overall/crossed show their value', () => {
+  const sb = sandbox();
+  sb.$('snr_min').value = '-1'; sb.$('okov_min').value = '90'; sb.$('okcr_min').value = '0';
+  sb.syncLabels();
+  assert.equal(sb.$('snr_min_v').textContent, 'any'); assert.equal(sb.$('okov_min_v').textContent, '90'); assert.equal(sb.$('okcr_min_v').textContent, '0');
+  sb.$('snr_min').value = '2.5'; sb.syncLabels(); assert.equal(sb.$('snr_min_v').textContent, '2.5');
+  sb.$('snr_min').value = '0'; sb.syncLabels(); assert.equal(sb.$('snr_min_v').textContent, '0.0', '0 is a real threshold, not "any"');
+});
+
+test('Reset handler puts the three sliders back to any (0 / 0 / -1)', () => {
+  const ws = fnText('wireStatic'); assert.ok(ws, 'wireStatic not found');
+  const i = ws.indexOf('$("reset").addEventListener("click"'); assert.ok(i >= 0, 'reset handler not found');
+  const j = ws.indexOf('sortOverride = null; saveState(); syncLabels(); render();', i); assert.ok(j > i, 'reset handler end not found');
+  const body = ws.slice(i, j);
+  assert.match(body, /\$\("okov_min"\)\.value = 0/); assert.match(body, /\$\("okcr_min"\)\.value = 0/); assert.match(body, /\$\("snr_min"\)\.value = -1/);
+});
+
+// the REAL loadSources with its collaborators stubbed: the call site sets HAS_OK from the union, shows/hides the controls
+// AFTER the persisted state is restored, and drops a restored measured sort when the loaded sources have no scores
+async function loadWith(folds, restored) {
+  const sb = sandbox();
+  sb._restored = restored;
+  vm.runInContext(`var FOLDS = [], MOTIF_SET = [], LETTERS = [], MOTIFS_BY_DS = {}, PAIRING_BY_DS = {}, TSPANS_BY_DS = {}, FBYK = {}, LOADED = {}, PENDING_STATE = null;
+    var activeSources = () => ['src']; var companionsOf = () => []; var checkedLetters = () => []; var loadState = () => ({});
+    var ensureLoaded = async (id) => { LOADED[id] = { folds: _folds, motifs: {}, pairing: {}, tspans: {} }; };
+    var clearLoadError = () => {}; var showLoadError = () => {}; var buildMotifFilter = () => {}; var buildLetterFilter = () => {}; var wireDynamic = () => {};
+    var buildSublibFilter = () => {}; var toggleLetterVisibility = () => {}; var _calls = [];
+    var applyState = () => { _calls.push('applyState'); $('rank_key').value = _restored.rank_key; sortOverride = _restored.sort; };
+    var _toggle = toggleMeasuredOK; toggleMeasuredOK = () => { _calls.push('toggleMeasuredOK'); _toggle(); };
+    var _render = render; render = () => { _calls.push('render'); };`, sb);
+  sb._folds = folds;
+  await sb.loadSources();
+  return sb;
+}
+test('loadSources wiring: no measured source -> controls hidden, restored measured sort dropped; measured source -> shown and kept', async () => {
+  let sb = await loadWith([Object.assign({}, R.plain)], { rank_key: 'ok_overall:desc', sort: { key: 'snr', dir: 'desc' } });
+  assert.equal(sb.HAS_OK, false);
+  assert.equal(sb._els.okfilt.style.display, 'none');
+  assert.ok(sb._options.every((o) => o.hidden && o.disabled));
+  assert.equal(sb.$('rank_key').value, 'best_tm1:asc'); assert.equal(sb.sortOverride, null);
+  assert.deepEqual(Array.from(sb._calls), ['applyState', 'toggleMeasuredOK', 'render'], 'toggle runs after the state restore and before the first render');
+  sb = await loadWith([Object.assign({}, R.plain), Object.assign({}, R.hi)], { rank_key: 'ok_overall:desc', sort: null });
+  assert.equal(sb.HAS_OK, true);
+  assert.equal(sb._els.okfilt.style.display, '');
+  assert.ok(sb._options.every((o) => !o.hidden && !o.disabled));
+  assert.equal(sb.$('rank_key').value, 'ok_overall:desc');
+});
+
+test('AtlasAPI.getState reports the columns actually shown', () => {
+  assert.match(APP, /columns: cols\(\)\.map\(\(c\) => c\[0\]\)/, 'getState must use cols(), not the static COLS');
 });
 
 // With R9_FOLDS set, the same code runs over the REAL folds.json (gzip or plain): the column must not come out empty and the

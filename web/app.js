@@ -383,7 +383,7 @@ async function loadSources() {
   comps.forEach((c) => (c.letters || []).forEach((l) => ls.add(l)));
   MOTIF_SET = [...ms].sort();
   LETTERS = [...ls].sort();
-  HAS_OK = hasMeasuredOK(FOLDS); toggleMeasuredOK();   // T-0404: measured-OpenKnot columns/filters/sorts follow the loaded data
+  HAS_OK = hasMeasuredOK(FOLDS);   // T-0404: measured-OpenKnot columns/filters/sorts follow the loaded data
   $("len_max").value = 2000;   // default length-max cap (raise the field to see longer folds)
   const maxCR = Math.max(1, ...FOLDS.map((f) => f.contact_ratio || 0));
   $("cr_min").max = Math.ceil(maxCR * 20) / 20;
@@ -391,6 +391,7 @@ async function loadSources() {
   buildLetterFilter();
   wireDynamic();
   applyState(PENDING_STATE || loadState());
+  toggleMeasuredOK();    // after applyState: a restored sort on a measured key falls back while no loaded source has the scores
   buildSublibFilter();   // after applyState so it scopes to the restored letter + SUBLIB_OFF state
   toggleLetterVisibility();
   syncLabels();
@@ -662,12 +663,21 @@ const OK_COLS = [
   ["snr", "OpenKnot SNR", "signal-to-noise of the chemical-mapping measurement behind the OpenKnot score"],
 ];
 let HAS_OK = false;   // some loaded fold carries a measured OpenKnot score; set by loadSources, read by cols()/drawTable/pass
-const hasMeasuredOK = (folds) => folds.some((f) => f.ok_overall != null || f.ok_crossed != null || f.snr != null);
+const hasMeasuredOK = (folds) => folds.some((f) => f.ok_overall != null || f.ok_crossed != null);   // not `snr` alone: a generic name another source could carry
+const OK_KEYS = new Set(OK_COLS.map(([k]) => k));
 function cols() { if (!HAS_OK) return COLS; const i = COLS.findIndex(([k]) => k === "crossed_frac") + 1; return [...COLS.slice(0, i), ...OK_COLS, ...COLS.slice(i)]; }
 // the measured-OpenKnot filter fieldset and sort options show only while a loaded source carries the scores
 function toggleMeasuredOK() {
   const fs = $("okfilt"); if (fs) fs.style.display = HAS_OK ? "" : "none";
   document.querySelectorAll("#rank_key option.okopt").forEach((o) => { o.hidden = !HAS_OK; o.disabled = !HAS_OK; });
+  guardMeasuredSort();
+}
+// a sort on a measured key -- restored from localStorage or a share link, or asked for by the assistant -- falls back to the
+// default while no loaded source carries the scores: every row would compare equal (file order, no arrow) under a hidden menu entry
+function guardMeasuredSort() {
+  if (HAS_OK) return;
+  const rk = $("rank_key"); if (rk && OK_KEYS.has(String(rk.value).split(":")[0])) rk.value = "best_tm1:asc";
+  if (sortOverride && OK_KEYS.has(sortOverride.key)) sortOverride = null;
 }
 
 function drawTable(rows) {
@@ -1745,7 +1755,7 @@ function applyFilters(obj) {
     else if (k === "letters") { const want = new Set((obj[k] || []).map(String)); document.querySelectorAll(".lf").forEach((c) => { c.checked = want.has(c.value); }); }
     else if (k === "conditioning") { const want = new Set((obj[k] || []).map(String)); document.querySelectorAll(".cf").forEach((c) => { c.checked = want.has(c.value); }); }
   }
-  sortOverride = null; syncLabels(); saveState(); render();
+  sortOverride = null; guardMeasuredSort(); syncLabels(); saveState(); render();
   return lastRows.length;
 }
 function fieldStats(field, over) {
@@ -1772,13 +1782,13 @@ window.AtlasAPI = {
   getResults: (limit, fields) => {
     const def = ["id", "name", "letter", "length", "plddt", "best_tm1", "near", "rna_type", "rfam_id", "rfam_name",
       "fold_size", "global_fold_id", "seq_cluster_size", "contact_ratio", "bp_fraction", "pseudoknot", "n_tert", "n_rare",
-      "shape_ok", "shape_agr", "is_novel_v341", "motifs", "ex", "ey"];
+      "shape_ok", "shape_agr", "ok_overall", "ok_crossed", "snr", "is_novel_v341", "motifs", "ex", "ey"];   // ok_*/snr: present on measured sources only
     const ks = fields && fields.length ? fields : def;
     return lastRows.slice(0, limit || 50).map((f) => { const o = {}; ks.forEach((k) => { if (f[k] !== undefined) o[k] = f[k]; }); return o; });
   },
   fieldStats,
   getState: () => ({ shown: lastRows.length, total: FOLDS.length, view: viewMode, sources: activeSources(),
-    columns: COLS.map((c) => c[0]), motif_types: MOTIF_SET, letters: LETTERS }),
+    columns: cols().map((c) => c[0]), motif_types: MOTIF_SET, letters: LETTERS }),
 };
 
 boot();

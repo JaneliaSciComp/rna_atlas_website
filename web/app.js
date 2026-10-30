@@ -1788,6 +1788,7 @@ window.AtlasAPI = {
   },
   fieldStats,
   getState: () => ({ shown: lastRows.length, total: FOLDS.length, view: viewMode, sources: activeSources(),
+    rank: sortOverride ? `${sortOverride.key}:${sortOverride.dir}` : $("rank_key").value,   // the sort in force (a measured key falls back when its source leaves)
     columns: cols().map((c) => c[0]), motif_types: MOTIF_SET, letters: LETTERS }),
 };
 

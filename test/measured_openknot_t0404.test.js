@@ -294,8 +294,9 @@ test('loadSources wiring: no measured source -> controls hidden, restored measur
   assert.ok(sb._options.every((o) => o.hidden && o.disabled));
   assert.equal(sb.$('rank_key').value, 'best_tm1:asc'); assert.equal(sb.sortOverride, null);
   assert.deepEqual(Array.from(sb._calls), ['applyState', 'toggleMeasuredOK', 'render'], 'toggle runs after the state restore and before the first render');
-  sb = await loadWith([Object.assign({}, R.plain), Object.assign({}, R.hi)], { rank_key: 'ok_overall:desc', sort: null });
+  sb = await loadWith([Object.assign({}, R.plain), Object.assign({}, R.hi)], { rank_key: 'ok_overall:desc', sort: { key: 'snr', dir: 'asc' } });
   assert.equal(sb.HAS_OK, true);
+  assert.equal(sb.sortOverride.key, 'snr', 'a measured header sort is kept while the scores are loaded');
   assert.equal(sb._els.okfilt.style.display, '');
   assert.ok(sb._options.every((o) => !o.hidden && !o.disabled));
   assert.equal(sb.$('rank_key').value, 'ok_overall:desc');
@@ -303,6 +304,8 @@ test('loadSources wiring: no measured source -> controls hidden, restored measur
 
 test('AtlasAPI.getState reports the columns actually shown', () => {
   assert.match(APP, /columns: cols\(\)\.map\(\(c\) => c\[0\]\)/, 'getState must use cols(), not the static COLS');
+  assert.match(APP, /getState: \(\) => \(\{[^}]*rank: sortOverride \? `\$\{sortOverride\.key\}:\$\{sortOverride\.dir\}` : \$\("rank_key"\)\.value/, 'getState reports the sort in force');
+  assert.match(AGENT, /else the sort falls back to 'best_tm1:asc' -- check get_state\(\)\.rank/, 'the tool text warns about the fallback');
 });
 
 // With R9_FOLDS set, the same code runs over the REAL folds.json (gzip or plain): the column must not come out empty and the

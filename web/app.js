@@ -165,7 +165,7 @@ const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</
 // --- persist filter settings across reloads ---
 const FKEY = "atlas_filters";
 const FIELD_IDS = ["search", "len_min", "len_max", "plddt_min", "clash_max", "tm_max", "tm_has", "novel_only",
-  "ov_max", "shape_ok", "agr_min", "cr_min", "bp_min", "cf_min", "fold_min", "sclust_min", "req_tert", "req_rare", "motif_mode", "pk", "termini", "overhang_max", "uucg", "rank_key", "topn", "per_letter", "alt_palette", "color_by", "ss_view"];
+  "ov_max", "shape_ok", "agr_min", "cr_min", "bp_min", "cf_min", "okov_min", "okcr_min", "snr_min", "fold_min", "sclust_min", "req_tert", "req_rare", "motif_mode", "pk", "termini", "overhang_max", "uucg", "rank_key", "topn", "per_letter", "alt_palette", "color_by", "ss_view"];
 const altPalette = () => !!($("alt_palette") && $("alt_palette").checked);
 // Sublibraries menu: all present sublibraries are ON by default; we persist only the ones the
 // user has explicitly turned OFF, so newly-appearing sublibraries (from a new source) start ON.
@@ -383,6 +383,7 @@ async function loadSources() {
   comps.forEach((c) => (c.letters || []).forEach((l) => ls.add(l)));
   MOTIF_SET = [...ms].sort();
   LETTERS = [...ls].sort();
+  HAS_OK = hasMeasuredOK(FOLDS); toggleMeasuredOK();   // T-0404: measured-OpenKnot columns/filters/sorts follow the loaded data
   $("len_max").value = 2000;   // default length-max cap (raise the field to see longer folds)
   const maxCR = Math.max(1, ...FOLDS.map((f) => f.contact_ratio || 0));
   $("cr_min").max = Math.ceil(maxCR * 20) / 20;
@@ -472,6 +473,7 @@ function wireStatic() {
     $("len_max").value = 2000;
     ["shape_ok", "req_tert", "req_rare", "tm_has", "novel_only", "per_letter"].forEach((id) => $(id).checked = false);
     $("cr_min").value = 0; $("bp_min").value = 0; $("cf_min").value = 0;
+    if ($("okov_min")) $("okov_min").value = 0; if ($("okcr_min")) $("okcr_min").value = 0; if ($("snr_min")) $("snr_min").value = -1;   // T-0404
     if ($("fold_min")) $("fold_min").value = 0; if ($("sclust_min")) $("sclust_min").value = 0;
     $("pk").value = "any";
     $("rank_key").value = "best_tm1:asc"; $("topn").value = 200;
@@ -523,6 +525,10 @@ function syncLabels() {
   $("cr_min_v").textContent = (+$("cr_min").value).toFixed(2);
   $("bp_min_v").textContent = (+$("bp_min").value).toFixed(2);
   $("cf_min_v").textContent = (+$("cf_min").value).toFixed(2);
+  // T-0404 measured OpenKnot sliders: overall/crossed are 0-100 (0 = any); SNR's leftmost stop (-1) means any
+  if ($("okov_min_v")) $("okov_min_v").textContent = $("okov_min").value;
+  if ($("okcr_min_v")) $("okcr_min_v").textContent = $("okcr_min").value;
+  if ($("snr_min_v")) $("snr_min_v").textContent = +$("snr_min").value > -1 ? (+$("snr_min").value).toFixed(1) : "any";
 }
 
 function filters() {
@@ -537,6 +543,8 @@ function filters() {
     ovmax: +$("ov_max").value,
     shape: $("shape_ok").checked, agr: +$("agr_min").value,
     crmin: +$("cr_min").value, bpmin: +$("bp_min").value, cfmin: +$("cf_min").value,
+    okovMin: +($("okov_min") ? $("okov_min").value : 0), okcrMin: +($("okcr_min") ? $("okcr_min").value : 0),   // T-0404
+    snrMin: ($("snr_min") ? +$("snr_min").value : -1),
     foldMin: +($("fold_min") ? $("fold_min").value : 0), sclustMin: +($("sclust_min") ? $("sclust_min").value : 0),
     tert: $("req_tert").checked, rare: $("req_rare").checked, motifs: mf,
     motifMode: ($("motif_mode") ? $("motif_mode").value : "any"),
@@ -565,6 +573,14 @@ function pass(f, c) {
   if (c.agr > -1 && (f.shape_agr == null || f.shape_agr < c.agr)) return false;
   if (c.crmin > 0 && (f.contact_ratio == null || f.contact_ratio < c.crmin)) return false;
   if (c.cfmin > 0 && (f.crossed_frac == null || f.crossed_frac < c.cfmin)) return false;
+  // T-0404: MEASURED OpenKnot scores (experimental; distinct from the PREDICTED crossed_frac above). The controls exist only
+  // while a loaded source carries the scores (HAS_OK), so a hidden slider can never filter. At their minimum the sliders pass
+  // unscored rows; above it an unscored row fails like any other null-field filter.
+  if (HAS_OK) {
+    if (c.okovMin > 0 && (f.ok_overall == null || f.ok_overall < c.okovMin)) return false;
+    if (c.okcrMin > 0 && (f.ok_crossed == null || f.ok_crossed < c.okcrMin)) return false;
+    if (c.snrMin > -1 && (f.snr == null || f.snr < c.snrMin)) return false;
+  }
   if (c.bpmin > 0 && (f.bp_fraction == null || f.bp_fraction < c.bpmin)) return false;
   if (c.foldMin > 0 && (f.fold_size == null || f.fold_size < c.foldMin)) return false;
   if (c.sclustMin > 0 && (f.seq_cluster_size == null || f.seq_cluster_size < c.sclustMin)) return false;
@@ -635,14 +651,30 @@ const COLS = [
   ["id", "seq_id"], ["name", "name"], ["source_group", "source"], ["letter", "L"], ["length", "len"], ["plddt", "pLDDT"],
   ["best_tm1", "best_tm1"], ["near", "nearest"], ["overlap_ae", "ovlp_AE"],
   ["shape_ok", "SHAPE"], ["shape_agr", "SHAPE agr"], ["contact_ratio", "compact"], ["bp_fraction", "paired"],
-  ["crossed_frac", "crossed"], ["fold_size", "cluster"], ["n_tert", "tert"], ["n_rare", "rare"], ["pseudoknot", "PK"], ["motifs", "motifs"],
+  ["crossed_frac", "crossed", "PREDICTED tertiary complexity: fraction of residues in a crossed 3D contact pair, computed from our own structure"],
+  ["fold_size", "cluster"], ["n_tert", "tert"], ["n_rare", "rare"], ["pseudoknot", "PK"], ["motifs", "motifs"],
 ];
+// T-0404: MEASURED OpenKnot scores (experimental; today only OpenKnot Round 9 carries them). Spliced into the table right
+// after the PREDICTED crossed-pairs column, and only while a loaded source has them, so the other atlases get no blank columns.
+const OK_COLS = [
+  ["ok_overall", "OpenKnot overall", "MEASURED OpenKnot score, overall (experimental chemical mapping of the synthesized design, 0-100)"],
+  ["ok_crossed", "OpenKnot crossed", "MEASURED OpenKnot score on the design's crossed (pseudoknot) pairs (experimental, 0-100); not the predicted crossed-pairs fraction"],
+  ["snr", "OpenKnot SNR", "signal-to-noise of the chemical-mapping measurement behind the OpenKnot score"],
+];
+let HAS_OK = false;   // some loaded fold carries a measured OpenKnot score; set by loadSources, read by cols()/drawTable/pass
+const hasMeasuredOK = (folds) => folds.some((f) => f.ok_overall != null || f.ok_crossed != null || f.snr != null);
+function cols() { if (!HAS_OK) return COLS; const i = COLS.findIndex(([k]) => k === "crossed_frac") + 1; return [...COLS.slice(0, i), ...OK_COLS, ...COLS.slice(i)]; }
+// the measured-OpenKnot filter fieldset and sort options show only while a loaded source carries the scores
+function toggleMeasuredOK() {
+  const fs = $("okfilt"); if (fs) fs.style.display = HAS_OK ? "" : "none";
+  document.querySelectorAll("#rank_key option.okopt").forEach((o) => { o.hidden = !HAS_OK; o.disabled = !HAS_OK; });
+}
 
 function drawTable(rows) {
-  $("thead").innerHTML = COLS.map(([k, lbl]) => {
+  $("thead").innerHTML = cols().map(([k, lbl, title]) => {
     let cls = "";
     if (sortOverride && sortOverride.key === k) cls = sortOverride.dir === "asc" ? "asc" : "sorted";
-    return `<th data-k="${k}" class="${cls}">${lbl}</th>`;
+    return `<th data-k="${k}" class="${cls}"${title ? ` title="${esc(title)}"` : ""}>${lbl}</th>`;
   }).join("");
   $("thead").querySelectorAll("th").forEach((th) => th.addEventListener("click", () => {
     const k = th.dataset.k;
@@ -656,6 +688,8 @@ function drawTable(rows) {
     const pl = f.plddt || 0;
     const plbar = `<span class="bar" style="width:${pl * 0.45}px;background:${pl > 80 ? "#3a7d44" : pl > 60 ? "#edae49" : "#c0504d"}"></span> ${num(pl, 0)}`;
     const hasShape = f.r2a3 != null || f.mean_prot_2a3 != null;
+    // T-0404: same formatting as the deep view's "Measured OpenKnot" row (scores 1 decimal, SNR 2); unscored = blank
+    const okTds = HAS_OK ? `<td class="num">${num(f.ok_overall)}</td><td class="num">${num(f.ok_crossed)}</td><td class="num">${num(f.snr, 2)}</td>` : "";
     const shape = f.shape_ok ? `<span class="pill" style="background:#3a7d44">yes</span>`
       : (hasShape ? `<span class="muted" title="has SHAPE data but motif residues not protected">no</span>`
                   : `<span class="muted" title="no usable SHAPE data for this fold">n/d</span>`);
@@ -665,7 +699,7 @@ function drawTable(rows) {
       <td class="num">${num(f.best_tm1, 3)}</td><td title="${(f.near_title || "").replace(/"/g, "&quot;")}">${f.near || ""}</td>
       <td class="num">${num(f.overlap_ae, 2)}</td><td>${shape}</td>
       <td class="num">${num(f.shape_agr, 2)}</td><td class="num">${num(f.contact_ratio, 2)}</td><td class="num">${num(f.bp_fraction, 2)}</td>
-      <td class="num">${num(f.crossed_frac, 2)}</td>
+      <td class="num">${num(f.crossed_frac, 2)}</td>${okTds}
       <td class="num" title="${f.global_fold_id ? "structural fold #" + f.global_fold_id : ""}">${f.fold_size ?? ""}</td>
       <td class="num">${f.n_tert ?? ""}</td><td class="num">${f.n_rare ?? ""}</td>
       <td>${f.pseudoknot ? "&#10003;" : ""}</td><td>${chips}</td></tr>`;
@@ -1696,6 +1730,7 @@ function setupMap() {
 const FILTER_MAP = { length_min: "len_min", length_max: "len_max", plddt_min: "plddt_min", clash_max: "clash_max",
   novelty_max: "tm_max", overlap_max: "ov_max", shape_agr_min: "agr_min", compactness_min: "cr_min",
   paired_min: "bp_min", fold_size_min: "fold_min", seq_cluster_min: "sclust_min", top_n: "topn", rank: "rank_key",
+  ok_overall_min: "okov_min", ok_crossed_min: "okcr_min", snr_min: "snr_min",   // T-0404 measured OpenKnot (inert unless the data has them)
   termini: "termini", overhang_max: "overhang_max" };
 const BOOL_MAP = { novel_only: "novel_only", shape_only: "shape_ok", require_tertiary: "req_tert", require_rare: "req_rare", only_with_tm: "tm_has", per_letter: "per_letter", uucg: "uucg" };
 function applyFilters(obj) {

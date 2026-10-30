@@ -91,6 +91,14 @@
       <div class="row"><label title="fraction of residues in a crossed (tertiary) contact pair — tangled fold, distinct from compactness">tertiary (crossed) &ge;</label><input type="range" id="cf_min" min="0" max="1" value="0" step="0.01"><span id="cf_min_v">0.00</span></div>
     </fieldset>
 
+    <!-- T-0404: MEASURED (experimental) OpenKnot scores; shown only while a loaded source carries them (app.js toggleMeasuredOK) -->
+    <fieldset id="okfilt" style="display:none">
+      <legend title="experimental OpenKnot scores measured by chemical mapping of the synthesized design — not the predicted crossed-pairs fraction above">Measured OpenKnot</legend>
+      <div class="row"><label title="measured OpenKnot score, overall (0–100); leftmost = any, unscored designs stay">overall &ge;</label><input type="range" id="okov_min" min="0" max="100" value="0" step="1"><span id="okov_min_v">0</span></div>
+      <div class="row"><label title="measured OpenKnot score on the crossed (pseudoknot) pairs (0–100); leftmost = any, unscored designs stay">crossed &ge;</label><input type="range" id="okcr_min" min="0" max="100" value="0" step="1"><span id="okcr_min_v">0</span></div>
+      <div class="row"><label title="signal-to-noise of the measurement; leftmost = any, unscored designs stay">SNR &ge;</label><input type="range" id="snr_min" min="-1" max="30" value="-1" step="0.5"><span id="snr_min_v">any</span></div>
+    </fieldset>
+
     <fieldset>
       <legend>Clusters (A&ndash;H)</legend>
       <div class="row"><label>fold size &ge;</label><input type="number" id="fold_min" value="0" min="0"></div>
@@ -142,6 +150,9 @@
         <option value="contact_ratio:desc">compactness</option>
         <option value="bp_fraction:desc">base-paired fraction</option>
         <option value="crossed_frac:desc">tertiary complexity (crossed-pairs)</option>
+        <option value="ok_overall:desc" class="okopt">measured OpenKnot overall (experimental)</option>
+        <option value="ok_crossed:desc" class="okopt">measured OpenKnot crossed-pairs (experimental)</option>
+        <option value="snr:desc" class="okopt">measured OpenKnot SNR</option>
         <option value="mohca_regime_frac:desc">MOHCA-regime fraction (25&ndash;50 nt)</option>
         <option value="fold_size:desc">structural fold size (largest cluster)</option>
         <option value="seq_cluster_size:desc">sequence cluster size</option>
@@ -262,6 +273,7 @@
     <dl>
       <dt>Motifs</dt><dd>Tertiary RNA motifs detected by Rosetta <code>rna_motif</code> (A-minor, TL-receptor, T-loop, U-turn, platform, …). Filter by "≥1 tertiary", "a rare tertiary", or specific types. <b>tert</b>/<b>rare</b> columns count them.</dd>
       <dt>Tertiary complexity (crossed-pairs)</dt><dd><b>Fraction of residues in a ‘crossed’ contact pair</b> (Max/Rhiju): a 3D contact pair (i,j) is crossed when another contact (k,l) interleaves it (i&lt;k&lt;j&lt;l) — the residue is pinned by tertiary structure, not just nested 2D pairing. bpp-free 3D topology. <b>Distinct from compactness</b> (density) and a continuous 3D-contact generalization of <b>pseudoknot</b>: it separates genuinely tangled tertiary folds from merely compact hairpins. Threshold contact &lt; 12 Å, |i&minus;j| &ge; 8 (Rhiju to finalize). The “tertiary crossed-pairs” 3D coloring mode paints these pinned residues.</dd>
+      <dt>Measured OpenKnot (overall · crossed · SNR)</dt><dd><b>Experimental</b> OpenKnot scores from chemical mapping of the synthesized design (today only OpenKnot Round 9 carries them): <b>overall</b> = how well the measured reactivity agrees with the design's target structure over all positions (0–100), <b>crossed</b> = the same over its crossed (pseudoknot) pairs only, <b>SNR</b> = signal-to-noise of the measurement; the deep view's “OpenKnot score” is the mean of overall and crossed. These measure the RNA itself and are <b>not</b> the predicted <i>tertiary complexity (crossed-pairs)</i> above, which is computed from our own 3D model. The table columns, the “measured OpenKnot” sort keys and the <b>Measured OpenKnot</b> filters appear only while a source that carries the scores is loaded; a design without a measurement shows blanks, stays visible while the sliders are at their minimum, and sorts last.</dd>
       <dt>MOHCA-regime fraction</dt><dd>Fraction of predicted contacts in MOHCA-seq’s strongest range (medium-range, 25&ndash;50 nt separation) — a proxy for where a MOHCA map would most add signal.</dd>
       <dt>Pseudoknot</dt><dd>The predicted secondary structure contains crossed base pairs.</dd>
     </dl>
